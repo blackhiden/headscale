@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -92,6 +92,11 @@ type User struct {
 	// Provider is the origin of the user account,
 	// same as RegistrationMethod, without authkey.
 	Provider string
+
+	// OIDCGroups stores group memberships from OIDC provider's 'groups' claim.
+	// Groups are updated on every OIDC login and can be referenced in ACL policies.
+	// Stored as JSON array of group names.
+	OIDCGroups []string `gorm:"column:oidc_groups;serializer:json"`
 
 	// TODO(kradalby): See if we can fill in Gravatar here.
 	ProfilePicURL string
@@ -451,4 +456,7 @@ func (u *User) FromClaim(claims *OIDCClaims, emailVerifiedRequired bool) {
 	u.DisplayName = claims.Name
 	u.ProfilePicURL = claims.ProfilePictureURL
 	u.Provider = util.RegisterMethodOIDC
+
+	// Store OIDC groups for use in ACL policies
+	u.OIDCGroups = []string(claims.Groups)
 }

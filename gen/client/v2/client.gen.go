@@ -214,6 +214,7 @@ type User struct {
 	Id                 string    `json:"id"`
 	LastSeen           time.Time `json:"lastSeen"`
 	LoginName          string    `json:"loginName"`
+	OidcGroups         *[]string `json:"oidcGroups,omitempty"`
 	ProfilePicUrl      string    `json:"profilePicUrl"`
 	Role               string    `json:"role"`
 	Status             string    `json:"status"`

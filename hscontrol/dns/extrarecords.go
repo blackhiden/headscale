@@ -11,7 +11,7 @@ import (
 
 	"github.com/cenkalti/backoff/v5"
 	"github.com/fsnotify/fsnotify"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/util/set"

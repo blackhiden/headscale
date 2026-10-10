@@ -196,6 +196,36 @@ Used in Tailscale SSH rules to allow access to any user except root. Can only be
 This autogroup resolves to all IP addresses (`0.0.0.0/0` and `::/0`) which also includes all IP addresses outside the
 standard Tailscale IP ranges. This autogroup can only be used as source.
 
+## OIDC Groups
+
+When [OIDC is enabled](oidc.md), group memberships from the identity provider's `groups` claim are stored on each user
+record and can be referenced in policy rules without being defined in the policy file. This allows access control based
+on identity provider group membership, matching Tailscale's behavior.
+
+OIDC groups use the same `group:` prefix as policy-defined groups. When a group is both defined in the policy file and
+present as an OIDC group, the policy definition takes precedence.
+
+```json title="policy.json"
+{
+  "grants": [
+    {
+      // Allow members of the OIDC group "engineering" to access the database
+      "src": ["group:engineering"],
+      "dst": ["tag:database"],
+      "ip": ["*"]
+    }
+  ]
+}
+```
+
+OIDC groups can be used anywhere a policy-defined group can be used, including:
+
+- ACL and grant sources and destinations
+- `tagOwners` entries
+- `autoApprovers` entries
+
+Group memberships are refreshed on every OIDC login, so changes at the identity provider take effect the next time a
+user authenticates.
 ## Node Attributes
 
 [Node attributes](https://tailscale.com/docs/reference/syntax/policy-file#node-attributes) allow for device-specific

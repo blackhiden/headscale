@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 )
 
 // The v1 contract follows protojson: 64-bit integers are JSON strings (avoiding
@@ -27,6 +27,7 @@ type User struct {
 	ProviderID    string    `json:"providerId"`
 	Provider      string    `json:"provider"`
 	ProfilePicURL string    `json:"profilePicUrl"`
+	OIDCGroups    []string  `json:"oidcGroups"`
 }
 
 // userFromView converts a domain user into the v1 response shape, reading
@@ -48,5 +49,6 @@ func userFromView(u types.UserView) User {
 		ProviderID:    u.ProviderIdentifier().String,
 		Provider:      u.Provider(),
 		ProfilePicURL: u.ProfilePicURL(),
+		OIDCGroups:    u.OIDCGroups().AsSlice(),
 	}
 }

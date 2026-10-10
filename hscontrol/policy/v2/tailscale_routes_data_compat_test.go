@@ -21,7 +21,7 @@
 //     CanAccess fix from issue #3157.
 //
 // Test data source: testdata/routes_results/routes-*.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture
 
 package v2
 
@@ -36,9 +36,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/policyutil"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"

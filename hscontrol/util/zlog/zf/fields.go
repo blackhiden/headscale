@@ -3,7 +3,7 @@
 // Using constants ensures typos are caught at compile time and enables
 // easy refactoring. Import as:
 //
-//	import "github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+//	import "github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
 //
 // Usage:
 //
@@ -198,6 +198,15 @@ const (
 // Component field for sub-loggers.
 const (
 	Component = "component"
+)
+
+// Audit fields for caller-attributed mutations (who did what to which
+// resource). Kept generic so every audit log entry shares one vocabulary.
+const (
+	AuditAction   = "action"
+	AuditActor    = "actor"
+	AuditResource = "resource"
+	Timestamp     = "timestamp"
 )
 
 // Debug environment variable fields.

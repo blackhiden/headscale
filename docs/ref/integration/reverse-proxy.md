@@ -168,7 +168,7 @@ domain/subdomain, force HTTPS, and proxy WebSocket connections.
 
 Running Headscale behind a Cloudflare Proxy or Cloudflare Tunnel is not supported and will not work as Cloudflare does
 not support [WebSocket POSTs as required by the Tailscale protocol](#websocket). See [issue
-1468](https://github.com/juanfont/headscale/issues/1468) for more information.
+1468](https://github.com/arsydoni4326-alt/headscale/issues/1468) for more information.
 
 ### Envoy
 

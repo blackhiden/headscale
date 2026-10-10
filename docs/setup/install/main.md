@@ -19,8 +19,8 @@ with the short commit hash of the build (e.g. `main-abc1234`):
 - GitHub Container Registry: `ghcr.io/juanfont/headscale:main-<sha>`
 
 To find the latest available tag, check the
-[GitHub Actions workflow](https://github.com/juanfont/headscale/actions/workflows/container-main.yml)
-or the [GitHub Container Registry package page](https://github.com/juanfont/headscale/pkgs/container/headscale).
+[GitHub Actions workflow](https://github.com/arsydoni4326-alt/headscale/actions/workflows/container-main.yml)
+or the [GitHub Container Registry package page](https://github.com/arsydoni4326-alt/headscale/pkgs/container/headscale).
 
 For example, to run a specific development build:
 

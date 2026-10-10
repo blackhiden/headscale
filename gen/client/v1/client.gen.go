@@ -50,6 +50,47 @@ type ApiKey struct {
 	Prefix     string     `json:"prefix"`
 }
 
+// ApproveMachineOutputBody defines model for ApproveMachineOutputBody.
+type ApproveMachineOutputBody struct {
+	Node    Node `json:"node"`
+	Success bool `json:"success"`
+}
+
+// ApproveMachineRequestBody defines model for ApproveMachineRequestBody.
+type ApproveMachineRequestBody struct {
+	// NodeId Node ID to approve
+	//
+	// Example: 123
+	NodeId string `json:"nodeId"`
+
+	// UserId Optional user ID to assign
+	//
+	// Example: user-1
+	UserId *string `json:"userId,omitempty"`
+}
+
+// ApproveMachinesOutputBody defines model for ApproveMachinesOutputBody.
+type ApproveMachinesOutputBody struct {
+	Approved *[]string             `json:"approved"`
+	Errors   map[string]string     `json:"errors"`
+	Failed   *[]string             `json:"failed"`
+	Results  *[]BulkApprovalResult `json:"results"`
+	Success  bool                  `json:"success"`
+}
+
+// ApproveMachinesRequestBody defines model for ApproveMachinesRequestBody.
+type ApproveMachinesRequestBody struct {
+	// NodeIds List of node IDs to approve
+	//
+	// Example: ["123","456"]
+	NodeIds *[]string `json:"nodeIds"`
+
+	// UserId Optional user ID to assign to all nodes
+	//
+	// Example: user-1
+	UserId *string `json:"userId,omitempty"`
+}
+
 // AuthApproveOutputBody defines model for AuthApproveOutputBody.
 type AuthApproveOutputBody = map[string]interface{}
 
@@ -82,6 +123,13 @@ type BackfillNodeIPsOutputBody struct {
 	Changes []string `json:"changes"`
 }
 
+// BulkApprovalResult defines model for BulkApprovalResult.
+type BulkApprovalResult struct {
+	Error   *string `json:"error,omitempty"`
+	NodeId  string  `json:"nodeId"`
+	Success bool    `json:"success"`
+}
+
 // CheckPolicyOutputBody defines model for CheckPolicyOutputBody.
 type CheckPolicyOutputBody = map[string]interface{}
 
@@ -112,6 +160,68 @@ type CreateUserRequestBody struct {
 	PictureUrl  *string `json:"pictureUrl,omitempty"`
 }
 
+// CreateWebhookOutputBody defines model for CreateWebhookOutputBody.
+type CreateWebhookOutputBody struct {
+	Webhook Webhook `json:"webhook"`
+}
+
+// CreateWebhookRequestBody defines model for CreateWebhookRequestBody.
+type CreateWebhookRequestBody struct {
+	// Enabled Whether this webhook is active (default: true)
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Events Event types that trigger this webhook
+	Events *[]string `json:"events"`
+
+	// Headers Custom HTTP headers to include in requests
+	Headers *map[string]string `json:"headers,omitempty"`
+
+	// Name Human-readable webhook identifier
+	Name string `json:"name"`
+
+	// Secret Secret for HMAC-SHA256 payload signing
+	Secret *string `json:"secret,omitempty"`
+
+	// TimeoutSeconds HTTP timeout in seconds (default: 10)
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
+
+	// Url Destination endpoint for webhook POST requests
+	Url string `json:"url"`
+}
+
+// CurrentVersionResponse defines model for CurrentVersionResponse.
+type CurrentVersionResponse struct {
+	BuildTime string `json:"buildTime"`
+	Commit    string `json:"commit"`
+	Dirty     bool   `json:"dirty"`
+	Version   string `json:"version"`
+}
+
+// DERPNode defines model for DERPNode.
+type DERPNode struct {
+	DerpPort int64  `json:"derpPort"`
+	HostName string `json:"hostName"`
+	Ipv4     string `json:"ipv4"`
+	Ipv6     string `json:"ipv6"`
+	Name     string `json:"name"`
+	StunPort int64  `json:"stunPort"`
+}
+
+// DERPRegion defines model for DERPRegion.
+type DERPRegion struct {
+	Nodes      *[]DERPNode `json:"nodes"`
+	RegionCode string      `json:"regionCode"`
+	RegionId   int64       `json:"regionId"`
+	RegionName string      `json:"regionName"`
+}
+
+// DERPResponseBody defines model for DERPResponseBody.
+type DERPResponseBody struct {
+	Configured   bool          `json:"configured"`
+	Regions      *[]DERPRegion `json:"regions"`
+	TotalRegions int64         `json:"totalRegions"`
+}
+
 // DebugCreateNodeRequestBody defines model for DebugCreateNodeRequestBody.
 type DebugCreateNodeRequestBody struct {
 	Key    *string   `json:"key,omitempty"`
@@ -131,6 +241,9 @@ type DeletePreAuthKeyOutputBody = map[string]interface{}
 
 // DeleteUserOutputBody defines model for DeleteUserOutputBody.
 type DeleteUserOutputBody = map[string]interface{}
+
+// DeleteWebhookOutputBody defines model for DeleteWebhookOutputBody.
+type DeleteWebhookOutputBody = map[string]interface{}
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
@@ -198,6 +311,11 @@ type ExpirePreAuthKeyRequestBody struct {
 	Id *string `json:"id,omitempty"`
 }
 
+// GetWebhookOutputBody defines model for GetWebhookOutputBody.
+type GetWebhookOutputBody struct {
+	Webhook Webhook `json:"webhook"`
+}
+
 // HealthResponseBody defines model for HealthResponseBody.
 type HealthResponseBody struct {
 	DatabaseConnectivity bool `json:"databaseConnectivity"`
@@ -221,6 +339,11 @@ type ListPreAuthKeysOutputBody struct {
 // ListUsersOutputBody defines model for ListUsersOutputBody.
 type ListUsersOutputBody struct {
 	Users []User `json:"users"`
+}
+
+// ListWebhooksOutputBody defines model for ListWebhooksOutputBody.
+type ListWebhooksOutputBody struct {
+	Webhooks []Webhook `json:"webhooks"`
 }
 
 // Node defines model for Node.
@@ -295,6 +418,13 @@ type PreAuthKeyOutputBody struct {
 	PreAuthKey PreAuthKey `json:"preAuthKey"`
 }
 
+// RemoteVersionResponse defines model for RemoteVersionResponse.
+type RemoteVersionResponse struct {
+	Commit  string  `json:"commit"`
+	Url     string  `json:"url"`
+	Version *string `json:"version,omitempty"`
+}
+
 // SetApprovedRoutesRequestBody defines model for SetApprovedRoutesRequestBody.
 type SetApprovedRoutesRequestBody struct {
 	Routes *[]string `json:"routes,omitempty"`
@@ -305,6 +435,30 @@ type SetTagsRequestBody struct {
 	Tags *[]string `json:"tags,omitempty"`
 }
 
+// UpdateCheckResult defines model for UpdateCheckResult.
+type UpdateCheckResult struct {
+	Current         CurrentVersionResponse `json:"current"`
+	Error           *string                `json:"error,omitempty"`
+	Remote          *RemoteVersionResponse `json:"remote,omitempty"`
+	UpdateAvailable *bool                  `json:"updateAvailable,omitempty"`
+}
+
+// UpdateWebhookOutputBody defines model for UpdateWebhookOutputBody.
+type UpdateWebhookOutputBody struct {
+	Webhook Webhook `json:"webhook"`
+}
+
+// UpdateWebhookRequestBody defines model for UpdateWebhookRequestBody.
+type UpdateWebhookRequestBody struct {
+	Enabled        *bool              `json:"enabled,omitempty"`
+	Events         *[]string          `json:"events,omitempty"`
+	Headers        *map[string]string `json:"headers,omitempty"`
+	Name           *string            `json:"name,omitempty"`
+	Secret         *string            `json:"secret,omitempty"`
+	TimeoutSeconds *int64             `json:"timeoutSeconds,omitempty"`
+	Url            *string            `json:"url,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
 	CreatedAt     time.Time `json:"createdAt"`
@@ -312,6 +466,7 @@ type User struct {
 	Email         string    `json:"email"`
 	Id            string    `json:"id"`
 	Name          string    `json:"name"`
+	OidcGroups    *[]string `json:"oidcGroups"`
 	ProfilePicUrl string    `json:"profilePicUrl"`
 	Provider      string    `json:"provider"`
 	ProviderId    string    `json:"providerId"`
@@ -320,6 +475,18 @@ type User struct {
 // UserOutputBody defines model for UserOutputBody.
 type UserOutputBody struct {
 	User User `json:"user"`
+}
+
+// Webhook defines model for Webhook.
+type Webhook struct {
+	CreatedAt      string    `json:"createdAt"`
+	Enabled        bool      `json:"enabled"`
+	Events         *[]string `json:"events"`
+	Id             int64     `json:"id"`
+	Name           string    `json:"name"`
+	TimeoutSeconds int64     `json:"timeoutSeconds"`
+	UpdatedAt      string    `json:"updatedAt"`
+	Url            string    `json:"url"`
 }
 
 // DeleteApiKeyParams defines parameters for DeleteApiKey.
@@ -348,6 +515,12 @@ type DeletePreAuthKeyParams struct {
 	Id *string `form:"id,omitempty" json:"id,omitempty"`
 }
 
+// UpdateCheckParams defines parameters for UpdateCheck.
+type UpdateCheckParams struct {
+	// Check When "true", additionally fetch the remote latest commit and compare it with the running binary.
+	Check *string `form:"check,omitempty" json:"check,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	Id    *string `form:"id,omitempty" json:"id,omitempty"`
@@ -373,6 +546,12 @@ type AuthRejectJSONRequestBody = AuthRejectRequestBody
 // DebugCreateNodeJSONRequestBody defines body for DebugCreateNode for application/json ContentType.
 type DebugCreateNodeJSONRequestBody = DebugCreateNodeRequestBody
 
+// ApproveMachinesJSONRequestBody defines body for ApproveMachines for application/json ContentType.
+type ApproveMachinesJSONRequestBody = ApproveMachinesRequestBody
+
+// ApproveMachineJSONRequestBody defines body for ApproveMachine for application/json ContentType.
+type ApproveMachineJSONRequestBody = ApproveMachineRequestBody
+
 // SetApprovedRoutesJSONRequestBody defines body for SetApprovedRoutes for application/json ContentType.
 type SetApprovedRoutesJSONRequestBody = SetApprovedRoutesRequestBody
 
@@ -396,6 +575,12 @@ type ExpirePreAuthKeyJSONRequestBody = ExpirePreAuthKeyRequestBody
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequestBody
+
+// CreateWebhookJSONRequestBody defines body for CreateWebhook for application/json ContentType.
+type CreateWebhookJSONRequestBody = CreateWebhookRequestBody
+
+// UpdateWebhookJSONRequestBody defines body for UpdateWebhook for application/json ContentType.
+type UpdateWebhookJSONRequestBody = UpdateWebhookRequestBody
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -565,12 +750,63 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetDerp Get DERP map
+	//
+	// Returns the current DERP relay map configuration, including regions and their nodes.
+	//
+	// Corresponds with GET /api/v1/derp (the `GetDerp` operationId).
+	GetDerp(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// Health Health check
 	//
 	// Reports server health, including database connectivity.
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveMachinesWithBody Approve multiple machines
+	//
+	// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+	ApproveMachinesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveMachines Approve multiple machines
+	//
+	// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+	ApproveMachines(ctx context.Context, body ApproveMachinesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveMachineWithBody Approve a single machine
+	//
+	// Approves a pending machine by clearing its expiry, allowing it to join the network.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+	ApproveMachineWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveMachine Approve a single machine
+	//
+	// Approves a pending machine by clearing its expiry, allowing it to join the network.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+	ApproveMachine(ctx context.Context, id string, body ApproveMachineJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListNodes List nodes
 	//
@@ -719,6 +955,13 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateCheck Check for updates
+	//
+	// Returns the running binary's version information. When ?check=true is set, additionally fetches the latest commit from the fork's main branch and reports whether an update is available.
+	//
+	// Corresponds with GET /api/v1/update-check (the `UpdateCheck` operationId).
+	UpdateCheck(ctx context.Context, params *UpdateCheckParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListUsers List users
 	//
 	// Corresponds with GET /api/v1/user (the `ListUsers` operationId).
@@ -747,6 +990,63 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/user/{oldId}/rename/{newName} (the `RenameUser` operationId).
 	RenameUser(ctx context.Context, oldId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWebhooks List webhooks
+	//
+	// Lists all webhook configurations.
+	//
+	// Corresponds with GET /api/v1/webhooks (the `ListWebhooks` operationId).
+	ListWebhooks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWebhookWithBody Create webhook
+	//
+	// Creates a new webhook configuration for monitoring and alerting integrations.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+	CreateWebhookWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWebhook Create webhook
+	//
+	// Creates a new webhook configuration for monitoring and alerting integrations.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+	CreateWebhook(ctx context.Context, body CreateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteWebhook Delete webhook
+	//
+	// Deletes a webhook configuration.
+	//
+	// Corresponds with DELETE /api/v1/webhooks/{id} (the `DeleteWebhook` operationId).
+	DeleteWebhook(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetWebhook Get webhook
+	//
+	// Retrieves a webhook configuration by ID.
+	//
+	// Corresponds with GET /api/v1/webhooks/{id} (the `GetWebhook` operationId).
+	GetWebhook(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWebhookWithBody Update webhook
+	//
+	// Updates an existing webhook configuration.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+	UpdateWebhookWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWebhook Update webhook
+	//
+	// Updates an existing webhook configuration.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+	UpdateWebhook(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListApiKeys List API keys
@@ -983,6 +1283,23 @@ func (c *Client) DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRe
 	return c.Client.Do(req)
 }
 
+// GetDerp Get DERP map
+//
+// Returns the current DERP relay map configuration, including regions and their nodes.
+//
+// Corresponds with GET /api/v1/derp (the `GetDerp` operationId).
+func (c *Client) GetDerp(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDerpRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // Health Health check
 //
 // Reports server health, including database connectivity.
@@ -990,6 +1307,90 @@ func (c *Client) DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRe
 // Corresponds with GET /api/v1/health (the `Health` operationId).
 func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveMachinesWithBody Approve multiple machines
+//
+// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+func (c *Client) ApproveMachinesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveMachinesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveMachines Approve multiple machines
+//
+// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+func (c *Client) ApproveMachines(ctx context.Context, body ApproveMachinesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveMachinesRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveMachineWithBody Approve a single machine
+//
+// Approves a pending machine by clearing its expiry, allowing it to join the network.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+func (c *Client) ApproveMachineWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveMachineRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveMachine Approve a single machine
+//
+// Approves a pending machine by clearing its expiry, allowing it to join the network.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+func (c *Client) ApproveMachine(ctx context.Context, id string, body ApproveMachineJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveMachineRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1377,6 +1778,23 @@ func (c *Client) ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSON
 	return c.Client.Do(req)
 }
 
+// UpdateCheck Check for updates
+//
+// Returns the running binary's version information. When ?check=true is set, additionally fetches the latest commit from the fork's main branch and reports whether an update is available.
+//
+// Corresponds with GET /api/v1/update-check (the `UpdateCheck` operationId).
+func (c *Client) UpdateCheck(ctx context.Context, params *UpdateCheckParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateCheckRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListUsers List users
 //
 // Corresponds with GET /api/v1/user (the `ListUsers` operationId).
@@ -1446,6 +1864,133 @@ func (c *Client) DeleteUser(ctx context.Context, id string, reqEditors ...Reques
 // Corresponds with POST /api/v1/user/{oldId}/rename/{newName} (the `RenameUser` operationId).
 func (c *Client) RenameUser(ctx context.Context, oldId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRenameUserRequest(c.Server, oldId, newName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListWebhooks List webhooks
+//
+// Lists all webhook configurations.
+//
+// Corresponds with GET /api/v1/webhooks (the `ListWebhooks` operationId).
+func (c *Client) ListWebhooks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWebhooksRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateWebhookWithBody Create webhook
+//
+// Creates a new webhook configuration for monitoring and alerting integrations.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+func (c *Client) CreateWebhookWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWebhookRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateWebhook Create webhook
+//
+// Creates a new webhook configuration for monitoring and alerting integrations.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+func (c *Client) CreateWebhook(ctx context.Context, body CreateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWebhookRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteWebhook Delete webhook
+//
+// Deletes a webhook configuration.
+//
+// Corresponds with DELETE /api/v1/webhooks/{id} (the `DeleteWebhook` operationId).
+func (c *Client) DeleteWebhook(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWebhookRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetWebhook Get webhook
+//
+// Retrieves a webhook configuration by ID.
+//
+// Corresponds with GET /api/v1/webhooks/{id} (the `GetWebhook` operationId).
+func (c *Client) GetWebhook(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetWebhookRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateWebhookWithBody Update webhook
+//
+// Updates an existing webhook configuration.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+func (c *Client) UpdateWebhookWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWebhookRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateWebhook Update webhook
+//
+// Updates an existing webhook configuration.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+func (c *Client) UpdateWebhook(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWebhookRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1784,6 +2329,33 @@ func NewDebugCreateNodeRequestWithBody(server string, contentType string, body i
 	return req, nil
 }
 
+// NewGetDerpRequest constructs an http.Request for the GetDerp method
+func NewGetDerpRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/derp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewHealthRequest constructs an http.Request for the Health method
 func NewHealthRequest(server string) (*http.Request, error) {
 	var err error
@@ -1807,6 +2379,93 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewApproveMachinesRequest calls the generic ApproveMachines builder with application/json body
+func NewApproveMachinesRequest(server string, body ApproveMachinesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveMachinesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewApproveMachinesRequestWithBody constructs an http.Request for the ApproveMachines method, with any body, and a specified content type
+func NewApproveMachinesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/machines/approve")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewApproveMachineRequest calls the generic ApproveMachine builder with application/json body
+func NewApproveMachineRequest(server string, id string, body ApproveMachineJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveMachineRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewApproveMachineRequestWithBody constructs an http.Request for the ApproveMachine method, with any body, and a specified content type
+func NewApproveMachineRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/machines/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2503,6 +3162,60 @@ func NewExpirePreAuthKeyRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewUpdateCheckRequest constructs an http.Request for the UpdateCheck method
+func NewUpdateCheckRequest(server string, params *UpdateCheckParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/update-check")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Check != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "check", *params.Check, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListUsersRequest constructs an http.Request for the ListUsers method
 func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
 	var err error
@@ -2696,6 +3409,188 @@ func NewRenameUserRequest(server string, oldId string, newName string) (*http.Re
 	return req, nil
 }
 
+// NewListWebhooksRequest constructs an http.Request for the ListWebhooks method
+func NewListWebhooksRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/webhooks")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateWebhookRequest calls the generic CreateWebhook builder with application/json body
+func NewCreateWebhookRequest(server string, body CreateWebhookJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateWebhookRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateWebhookRequestWithBody constructs an http.Request for the CreateWebhook method, with any body, and a specified content type
+func NewCreateWebhookRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/webhooks")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteWebhookRequest constructs an http.Request for the DeleteWebhook method
+func NewDeleteWebhookRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/webhooks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetWebhookRequest constructs an http.Request for the GetWebhook method
+func NewGetWebhookRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/webhooks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateWebhookRequest calls the generic UpdateWebhook builder with application/json body
+func NewUpdateWebhookRequest(server string, id string, body UpdateWebhookJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateWebhookRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateWebhookRequestWithBody constructs an http.Request for the UpdateWebhook method, with any body, and a specified content type
+func NewUpdateWebhookRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/webhooks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -2838,6 +3733,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNodeWithResponse(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*DebugCreateNodeResponse, error)
 
+	// GetDerpWithResponse Get DERP map
+	//
+	// Returns the current DERP relay map configuration, including regions and their nodes.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/derp (the `GetDerp` operationId).
+	GetDerpWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDerpResponse, error)
+
 	// HealthWithResponse Health check
 	//
 	// Reports server health, including database connectivity.
@@ -2846,6 +3750,50 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
+	// ApproveMachinesWithBodyWithResponse Approve multiple machines
+	//
+	// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+	ApproveMachinesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveMachinesResponse, error)
+
+	// ApproveMachinesWithResponse Approve multiple machines
+	//
+	// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+	ApproveMachinesWithResponse(ctx context.Context, body ApproveMachinesJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveMachinesResponse, error)
+
+	// ApproveMachineWithBodyWithResponse Approve a single machine
+	//
+	// Approves a pending machine by clearing its expiry, allowing it to join the network.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+	ApproveMachineWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveMachineResponse, error)
+
+	// ApproveMachineWithResponse Approve a single machine
+	//
+	// Approves a pending machine by clearing its expiry, allowing it to join the network.
+	//
+	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+	ApproveMachineWithResponse(ctx context.Context, id string, body ApproveMachineJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveMachineResponse, error)
 
 	// ListNodesWithResponse List nodes
 	//
@@ -3012,6 +3960,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKeyWithResponse(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpirePreAuthKeyResponse, error)
 
+	// UpdateCheckWithResponse Check for updates
+	//
+	// Returns the running binary's version information. When ?check=true is set, additionally fetches the latest commit from the fork's main branch and reports whether an update is available.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/update-check (the `UpdateCheck` operationId).
+	UpdateCheckWithResponse(ctx context.Context, params *UpdateCheckParams, reqEditors ...RequestEditorFn) (*UpdateCheckResponse, error)
+
 	// ListUsersWithResponse List users
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -3046,6 +4003,69 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/user/{oldId}/rename/{newName} (the `RenameUser` operationId).
 	RenameUserWithResponse(ctx context.Context, oldId string, newName string, reqEditors ...RequestEditorFn) (*RenameUserResponse, error)
+
+	// ListWebhooksWithResponse List webhooks
+	//
+	// Lists all webhook configurations.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/webhooks (the `ListWebhooks` operationId).
+	ListWebhooksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListWebhooksResponse, error)
+
+	// CreateWebhookWithBodyWithResponse Create webhook
+	//
+	// Creates a new webhook configuration for monitoring and alerting integrations.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+	CreateWebhookWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWebhookResponse, error)
+
+	// CreateWebhookWithResponse Create webhook
+	//
+	// Creates a new webhook configuration for monitoring and alerting integrations.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+	CreateWebhookWithResponse(ctx context.Context, body CreateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWebhookResponse, error)
+
+	// DeleteWebhookWithResponse Delete webhook
+	//
+	// Deletes a webhook configuration.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/webhooks/{id} (the `DeleteWebhook` operationId).
+	DeleteWebhookWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteWebhookResponse, error)
+
+	// GetWebhookWithResponse Get webhook
+	//
+	// Retrieves a webhook configuration by ID.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/webhooks/{id} (the `GetWebhook` operationId).
+	GetWebhookWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetWebhookResponse, error)
+
+	// UpdateWebhookWithBodyWithResponse Update webhook
+	//
+	// Updates an existing webhook configuration.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+	UpdateWebhookWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWebhookResponse, error)
+
+	// UpdateWebhookWithResponse Update webhook
+	//
+	// Updates an existing webhook configuration.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+	UpdateWebhookWithResponse(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWebhookResponse, error)
 }
 
 type ListApiKeysResponse struct {
@@ -3432,6 +4452,54 @@ func (r DebugCreateNodeResponse) ContentType() string {
 	return ""
 }
 
+type GetDerpResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DERPResponseBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetDerpResponse) GetJSON200() *DERPResponseBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetDerpResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetDerpResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDerpResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDerpResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetDerpResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type HealthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3474,6 +4542,102 @@ func (r HealthResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r HealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveMachinesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApproveMachinesOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveMachinesResponse) GetJSON200() *ApproveMachinesOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveMachinesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveMachinesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveMachinesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveMachinesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveMachinesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveMachineResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApproveMachineOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveMachineResponse) GetJSON200() *ApproveMachineOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveMachineResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveMachineResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveMachineResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveMachineResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveMachineResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4248,6 +5412,54 @@ func (r ExpirePreAuthKeyResponse) ContentType() string {
 	return ""
 }
 
+type UpdateCheckResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UpdateCheckResult
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateCheckResponse) GetJSON200() *UpdateCheckResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateCheckResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateCheckResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateCheckResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateCheckResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateCheckResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4440,6 +5652,246 @@ func (r RenameUserResponse) ContentType() string {
 	return ""
 }
 
+type ListWebhooksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListWebhooksOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListWebhooksResponse) GetJSON200() *ListWebhooksOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListWebhooksResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListWebhooksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWebhooksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWebhooksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListWebhooksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CreateWebhookOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateWebhookResponse) GetJSON200() *CreateWebhookOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DeleteWebhookOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteWebhookResponse) GetJSON200() *DeleteWebhookOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GetWebhookOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetWebhookResponse) GetJSON200() *GetWebhookOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UpdateWebhookOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateWebhookResponse) GetJSON200() *UpdateWebhookOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListApiKeysWithResponse List API keys
 //
 // Returns a wrapper object for the known response body format(s).
@@ -4622,6 +6074,21 @@ func (c *ClientWithResponses) DebugCreateNodeWithResponse(ctx context.Context, b
 	return ParseDebugCreateNodeResponse(rsp)
 }
 
+// GetDerpWithResponse Get DERP map
+//
+// Returns the current DERP relay map configuration, including regions and their nodes.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/derp (the `GetDerp` operationId).
+func (c *ClientWithResponses) GetDerpWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDerpResponse, error) {
+	rsp, err := c.GetDerp(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDerpResponse(rsp)
+}
+
 // HealthWithResponse Health check
 //
 // Reports server health, including database connectivity.
@@ -4635,6 +6102,74 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseHealthResponse(rsp)
+}
+
+// ApproveMachinesWithBodyWithResponse Approve multiple machines
+//
+// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+func (c *ClientWithResponses) ApproveMachinesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveMachinesResponse, error) {
+	rsp, err := c.ApproveMachinesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveMachinesResponse(rsp)
+}
+
+// ApproveMachinesWithResponse Approve multiple machines
+//
+// Approves multiple pending machines in a single operation. Returns success/failure status for each machine.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/machines/approve (the `ApproveMachines` operationId).
+func (c *ClientWithResponses) ApproveMachinesWithResponse(ctx context.Context, body ApproveMachinesJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveMachinesResponse, error) {
+	rsp, err := c.ApproveMachines(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveMachinesResponse(rsp)
+}
+
+// ApproveMachineWithBodyWithResponse Approve a single machine
+//
+// Approves a pending machine by clearing its expiry, allowing it to join the network.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+func (c *ClientWithResponses) ApproveMachineWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveMachineResponse, error) {
+	rsp, err := c.ApproveMachineWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveMachineResponse(rsp)
+}
+
+// ApproveMachineWithResponse Approve a single machine
+//
+// Approves a pending machine by clearing its expiry, allowing it to join the network.
+//
+// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/machines/{id}/approve (the `ApproveMachine` operationId).
+func (c *ClientWithResponses) ApproveMachineWithResponse(ctx context.Context, id string, body ApproveMachineJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveMachineResponse, error) {
+	rsp, err := c.ApproveMachine(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveMachineResponse(rsp)
 }
 
 // ListNodesWithResponse List nodes
@@ -4940,6 +6475,21 @@ func (c *ClientWithResponses) ExpirePreAuthKeyWithResponse(ctx context.Context, 
 	return ParseExpirePreAuthKeyResponse(rsp)
 }
 
+// UpdateCheckWithResponse Check for updates
+//
+// Returns the running binary's version information. When ?check=true is set, additionally fetches the latest commit from the fork's main branch and reports whether an update is available.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/update-check (the `UpdateCheck` operationId).
+func (c *ClientWithResponses) UpdateCheckWithResponse(ctx context.Context, params *UpdateCheckParams, reqEditors ...RequestEditorFn) (*UpdateCheckResponse, error) {
+	rsp, err := c.UpdateCheck(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateCheckResponse(rsp)
+}
+
 // ListUsersWithResponse List users
 //
 // Returns a wrapper object for the known response body format(s).
@@ -5003,6 +6553,111 @@ func (c *ClientWithResponses) RenameUserWithResponse(ctx context.Context, oldId 
 		return nil, err
 	}
 	return ParseRenameUserResponse(rsp)
+}
+
+// ListWebhooksWithResponse List webhooks
+//
+// Lists all webhook configurations.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/webhooks (the `ListWebhooks` operationId).
+func (c *ClientWithResponses) ListWebhooksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListWebhooksResponse, error) {
+	rsp, err := c.ListWebhooks(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWebhooksResponse(rsp)
+}
+
+// CreateWebhookWithBodyWithResponse Create webhook
+//
+// Creates a new webhook configuration for monitoring and alerting integrations.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+func (c *ClientWithResponses) CreateWebhookWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWebhookResponse, error) {
+	rsp, err := c.CreateWebhookWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWebhookResponse(rsp)
+}
+
+// CreateWebhookWithResponse Create webhook
+//
+// Creates a new webhook configuration for monitoring and alerting integrations.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/webhooks (the `CreateWebhook` operationId).
+func (c *ClientWithResponses) CreateWebhookWithResponse(ctx context.Context, body CreateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWebhookResponse, error) {
+	rsp, err := c.CreateWebhook(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWebhookResponse(rsp)
+}
+
+// DeleteWebhookWithResponse Delete webhook
+//
+// Deletes a webhook configuration.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/webhooks/{id} (the `DeleteWebhook` operationId).
+func (c *ClientWithResponses) DeleteWebhookWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteWebhookResponse, error) {
+	rsp, err := c.DeleteWebhook(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteWebhookResponse(rsp)
+}
+
+// GetWebhookWithResponse Get webhook
+//
+// Retrieves a webhook configuration by ID.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/webhooks/{id} (the `GetWebhook` operationId).
+func (c *ClientWithResponses) GetWebhookWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetWebhookResponse, error) {
+	rsp, err := c.GetWebhook(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetWebhookResponse(rsp)
+}
+
+// UpdateWebhookWithBodyWithResponse Update webhook
+//
+// Updates an existing webhook configuration.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+func (c *ClientWithResponses) UpdateWebhookWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWebhookResponse, error) {
+	rsp, err := c.UpdateWebhookWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWebhookResponse(rsp)
+}
+
+// UpdateWebhookWithResponse Update webhook
+//
+// Updates an existing webhook configuration.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/webhooks/{id} (the `UpdateWebhook` operationId).
+func (c *ClientWithResponses) UpdateWebhookWithResponse(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWebhookResponse, error) {
+	rsp, err := c.UpdateWebhook(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWebhookResponse(rsp)
 }
 
 // ParseListApiKeysResponse parses an HTTP response from a ListApiKeysWithResponse call
@@ -5269,6 +6924,39 @@ func ParseDebugCreateNodeResponse(rsp *http.Response) (*DebugCreateNodeResponse,
 	return response, nil
 }
 
+// ParseGetDerpResponse parses an HTTP response from a GetDerpWithResponse call
+func ParseGetDerpResponse(rsp *http.Response) (*GetDerpResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDerpResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DERPResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseHealthResponse parses an HTTP response from a HealthWithResponse call
 func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5285,6 +6973,72 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest HealthResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveMachinesResponse parses an HTTP response from a ApproveMachinesWithResponse call
+func ParseApproveMachinesResponse(rsp *http.Response) (*ApproveMachinesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveMachinesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApproveMachinesOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveMachineResponse parses an HTTP response from a ApproveMachineWithResponse call
+func ParseApproveMachineResponse(rsp *http.Response) (*ApproveMachineResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveMachineResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApproveMachineOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5830,6 +7584,39 @@ func ParseExpirePreAuthKeyResponse(rsp *http.Response) (*ExpirePreAuthKeyRespons
 	return response, nil
 }
 
+// ParseUpdateCheckResponse parses an HTTP response from a UpdateCheckWithResponse call
+func ParseUpdateCheckResponse(rsp *http.Response) (*UpdateCheckResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateCheckResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpdateCheckResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListUsersResponse parses an HTTP response from a ListUsersWithResponse call
 func ParseListUsersResponse(rsp *http.Response) (*ListUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5945,6 +7732,171 @@ func ParseRenameUserResponse(rsp *http.Response) (*RenameUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest UserOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWebhooksResponse parses an HTTP response from a ListWebhooksWithResponse call
+func ParseListWebhooksResponse(rsp *http.Response) (*ListWebhooksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWebhooksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListWebhooksOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateWebhookResponse parses an HTTP response from a CreateWebhookWithResponse call
+func ParseCreateWebhookResponse(rsp *http.Response) (*CreateWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateWebhookOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteWebhookResponse parses an HTTP response from a DeleteWebhookWithResponse call
+func ParseDeleteWebhookResponse(rsp *http.Response) (*DeleteWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeleteWebhookOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetWebhookResponse parses an HTTP response from a GetWebhookWithResponse call
+func ParseGetWebhookResponse(rsp *http.Response) (*GetWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetWebhookOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateWebhookResponse parses an HTTP response from a UpdateWebhookWithResponse call
+func ParseUpdateWebhookResponse(rsp *http.Response) (*UpdateWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpdateWebhookOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/util"
+	clientv1 "github.com/arsydoni4326-alt/headscale/gen/client/v1"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/pterm/pterm"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"

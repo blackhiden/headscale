@@ -32,6 +32,7 @@
           "email": "",
           "id": "1",
           "name": "bob",
+          "oidcGroups": null,
           "profilePicUrl": "",
           "provider": "",
           "providerId": ""

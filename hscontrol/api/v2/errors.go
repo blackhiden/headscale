@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/state"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
 	"gorm.io/gorm"
 )
 

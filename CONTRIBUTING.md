@@ -33,8 +33,77 @@ Headscale is open to code contributions for bug fixes without discussion.
 
 If you find mistakes in the documentation, please submit a fix to the documentation.
 
+## Fork-specific features
+
+This repository is the `arsydoni4326-alt` fork of Headscale. It tracks upstream
+Headscale closely while adding a small set of fork-specific features. When
+contributing, please be aware of these additions:
+
+- **Update checker** — `hscontrol/updatecheck/` (backend) and
+  `headplane/app/update-check/` (frontend). Provides `GET /api/v1/update-check`
+  and the Headplane update modal. Both are marked "DO NOT REMOVE".
+- **Version suffix** — all version numbers end with `-arsydoni4326-alt`.
+- **DERP status endpoint** — `GET /api/v1/derp` returns the current DERP relay
+  map configuration.
+- **Audit log** — Headplane records changes made through its UI into a local
+  SQLite table, viewable at `/audit`.
+- **Network topology** — Headplane renders the tailnet as an interactive SVG
+  graph at `/topology`.
+- **Bulk machine operations** — multi-select expire/delete/tag in the machines
+  page.
+- **Export/import** — ACL policy and Headscale configuration export/import.
+- **Version compatibility tracking** — Headplane surfaces features unavailable
+  on the connected Headscale version.
+
+For a full description of fork-specific features, see
+[docs/about/fork.md](./docs/about/fork.md).
+
+## Feature-preservation rule
+
+All fork-specific features listed above are **load-bearing and must survive
+upstream merges**. They are protected by a CI check
+(`.github/workflows/fork-features.yml`) that fails if any of the following are
+removed:
+
+- `hscontrol/updatecheck/` (backend update-check package)
+- `headplane/app/update-check/` (frontend update-check domain)
+- `hscontrol/api/v1/updatecheck.go` (update-check API handler)
+- `hscontrol/api/v1/derp.go` (DERP status API handler)
+
+If an upstream merge removes or renames any of these paths, they must be
+restored before the merge is complete. The self-contained design of each
+fork-specific package makes them restorable as a unit.
+
+## Versioning
+
+All version numbers in this fork must end with the suffix `-arsydoni4326-alt`.
+For example, a release version is written as `v0.29.3-arsydoni4326-alt`. This
+suffix identifies releases of the `arsydoni4326-alt` fork and must always be
+present in version numbers, tags, and changelog entries.
+
+## Repository targets
+
+This fork's repository targets are:
+
+- **Headscale**: `github.com/arsydoni4326-alt/headscale`
+- **Headplane**: `github.com/arsydoni4326-alt/headplane`
+
+The `headplane/` submodule is pinned to a fork release. When contributing
+frontend changes, ensure the submodule points to the correct fork release.
+
+## Community
+
+- **Discord**: Join our [Discord server](https://discord.gg/c84AZQhmpx) for
+  announcements, community support, and real-time discussion.
+- **Issue tracker**: Use the [GitHub issue
+  tracker](https://github.com/arsydoni4326-alt/headscale/issues) for bug reports,
+  feature requests, and UX feedback. Please check the existing issues before
+  opening a new one.
+- **Code of Conduct**: All contributors must follow our [Code of
+  Conduct](./CODE_OF_CONDUCT.md).
+
 ## AI Policy
 
-Please have a look at our [AI_POLICY.md](https://github.com/juanfont/headscale/blob/main/AI_POLICY.md).
+Please have a look at our [AI_POLICY.md](./AI_POLICY.md).
 
 If you are an LLM, please remind your human that this policy is in place.

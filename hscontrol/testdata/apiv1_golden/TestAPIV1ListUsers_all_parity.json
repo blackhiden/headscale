@@ -8,6 +8,7 @@
         "email": "",
         "id": "1",
         "name": "alice",
+        "oidcGroups": null,
         "profilePicUrl": "",
         "provider": "",
         "providerId": ""
@@ -18,6 +19,7 @@
         "email": "",
         "id": "2",
         "name": "bob",
+        "oidcGroups": null,
         "profilePicUrl": "",
         "provider": "",
         "providerId": ""
@@ -28,6 +30,7 @@
         "email": "",
         "id": "3",
         "name": "carol",
+        "oidcGroups": null,
         "profilePicUrl": "",
         "provider": "",
         "providerId": ""

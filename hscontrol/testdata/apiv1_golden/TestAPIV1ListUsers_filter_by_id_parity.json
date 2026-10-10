@@ -8,6 +8,7 @@
         "email": "",
         "id": "2",
         "name": "bob",
+        "oidcGroups": null,
         "profilePicUrl": "",
         "provider": "",
         "providerId": ""

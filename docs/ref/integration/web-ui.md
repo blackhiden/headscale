@@ -7,6 +7,41 @@
 
 Headscale doesn't provide a built-in web interface but users may pick one from the available options.
 
+## Multi-Instance Dashboard Support
+
+This fork includes multi-instance dashboard support in Headplane, allowing you to manage multiple Headscale instances from a single interface.
+
+### Configuration
+
+To enable multi-instance support:
+
+1. Set the encryption secret for credential storage:
+   ```bash
+   export INSTANCE_ENCRYPTION_SECRET="your-secure-random-secret-here"
+   ```
+
+2. Navigate to `/instances` in the Headplane UI to add and manage instances.
+
+3. Configure each instance with:
+   - **Name**: A friendly display name
+   - **API URL**: The base URL of the Headscale instance
+   - **API Key** (optional): Authentication credential (stored encrypted)
+   - **OIDC Client ID/Secret** (optional): OAuth credentials if applicable
+   - **Default**: Mark one instance as the default
+
+### Security Notes
+
+- All credentials (API keys, OIDC secrets) are encrypted at rest using AES-256-GCM
+- Secrets are never sent to the browser after initial configuration
+- Use a strong, random encryption secret (at least 32 characters)
+- Store the encryption secret securely (environment variable or secrets manager)
+
+### Instance Switcher
+
+Once configured, use the instance switcher in the navigation to switch between Headscale instances without logging out.
+
+## Community Web Interfaces
+
 - [headscale-ui](https://github.com/gurucomputing/headscale-ui)
     - ![GitHub stars](https://img.shields.io/github/stars/gurucomputing/headscale-ui?style=flat)
       ![GitHub last commit](https://img.shields.io/github/last-commit/gurucomputing/headscale-ui)

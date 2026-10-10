@@ -9,11 +9,38 @@
 
 A container runtime such as [Docker](https://www.docker.com) or [Podman](https://podman.io) is required. The container
 image can be found on [Docker Hub](https://hub.docker.com/r/headscale/headscale) and [GitHub Container
-Registry](https://github.com/juanfont/headscale/pkgs/container/headscale). The container image URLs are:
+Registry](https://github.com/arsydoni4326-alt/headscale/pkgs/container/headscale). The container image URLs are:
 
 - [Docker Hub](https://hub.docker.com/r/headscale/headscale): `docker.io/headscale/headscale:<VERSION>`
-- [GitHub Container Registry](https://github.com/juanfont/headscale/pkgs/container/headscale):
+- [GitHub Container Registry](https://github.com/arsydoni4326-alt/headscale/pkgs/container/headscale):
   `ghcr.io/juanfont/headscale:<VERSION>`
+
+## Build from source
+
+To build a headscale image from a local checkout of the repository, use the
+`Dockerfile` in the repository root:
+
+```shell
+docker build \
+  --build-arg APP_VERSION="$(git describe --tags --abbrev=0)" \
+  --build-arg APP_COMMIT="$(git rev-parse --short HEAD)" \
+  --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --tag headscale:local \
+  .
+```
+
+The build args embed the version, short commit hash, and build time into the
+binary via `-ldflags`; they are reported by `headscale version`, `GET /version`
+and `GET /api/v1/update-check`. When omitted, the build date defaults to the
+image build time and the version/commit fall back to `dev`/`unknown`.
+
+The image is a multi-stage build: the headscale binary is compiled with the
+`golang:1.27.0` toolchain and copied into a minimal `debian:trixie-slim`
+runtime. The default entrypoint is `headscale` with `serve` as the default
+command, so the image is a drop-in replacement for the official image in the
+examples below (`docker run ... headscale serve` or `command: serve` in
+docker-compose). Ports `8080/tcp` (control plane) and `9090/tcp` (metrics and
+debug) are exposed.
 
 ## Configure and run headscale
 

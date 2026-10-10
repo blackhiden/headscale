@@ -5,8 +5,8 @@
 package state
 
 import (
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"

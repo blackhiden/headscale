@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/policyutil"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"
@@ -199,7 +199,7 @@ func validateUserReferences(pol *Policy, users types.Users) error {
 // It returns an error if the policy file is invalid.
 // The policy manager will update the filter rules based on the users and nodes.
 func NewPolicyManager(b []byte, users []types.User, nodes views.Slice[types.NodeView]) (*PolicyManager, error) {
-	policy, err := unmarshalPolicy(b)
+	policy, err := unmarshalPolicyWithUsers(b, users)
 	if err != nil {
 		return nil, fmt.Errorf("parsing policy: %w", err)
 	}
@@ -617,7 +617,7 @@ func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
 		return false, nil
 	}
 
-	pol, err := unmarshalPolicy(polB)
+	pol, err := unmarshalPolicyWithUsers(polB, pm.users)
 	if err != nil {
 		return false, fmt.Errorf("parsing policy: %w", err)
 	}

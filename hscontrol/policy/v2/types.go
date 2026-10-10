@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/go-json-experiment/json"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/tailscale/hujson"
 	"go4.org/netipx"
 	"tailscale.com/net/tsaddr"
@@ -91,7 +91,7 @@ var (
 	ErrNodeAttrsIPPoolOutOfRange    = errors.New("nodeAttrs ipPool must be within 100.64.0.0/10")
 	ErrNodeAttrsAutogroupNotAllowed = errors.New("nodeAttrs target does not support this autogroup")
 	ErrNodeAttrUnsupported          = errors.New("nodeAttrs uses a feature headscale does not yet support")
-	ErrNodeAttrIPPoolUnsupported    = errors.New("nodeAttrs ipPool requires the IP allocator (https://github.com/juanfont/headscale/issues/2912)")
+	ErrNodeAttrIPPoolUnsupported    = errors.New("nodeAttrs ipPool requires the IP allocator (https://github.com/arsydoni4326-alt/headscale/issues/2912)")
 	ErrNodeAttrTargetUnsupported    = errors.New("nodeAttrs target alias type is not supported")
 )
 
@@ -102,7 +102,7 @@ var (
 // would advertise a feature that does not work. Reject at policy load and
 // point operators at the issue.
 var nodeAttrUnsupportedCaps = map[nodecap.Cap]string{
-	nodecap.Funnel: "https://github.com/juanfont/headscale/issues/2527",
+	nodecap.Funnel: "https://github.com/arsydoni4326-alt/headscale/issues/2527",
 }
 
 // Policy validation errors.
@@ -518,13 +518,46 @@ func (g *Group) resolve(p *Policy, users types.Users, nodes views.Slice[types.No
 		errs []error
 	)
 
-	for _, user := range p.Groups[*g] {
-		uips, err := user.resolve(nil, users, nodes)
-		if err != nil {
-			errs = append(errs, err)
+	// Resolve policy-defined group members. When a group is defined in
+	// the policy, that definition takes precedence over OIDC groups.
+	if p != nil {
+		if members, ok := p.Groups[*g]; ok {
+			for _, user := range members {
+				uips, err := user.resolve(nil, users, nodes)
+				if err != nil {
+					errs = append(errs, err)
+				}
+
+				ips.AddSet(uips)
+			}
+
+			return buildIPSetMultiErr(&ips, errs)
+		}
+	}
+
+	// Resolve OIDC group members: users whose stored OIDC groups
+	// contain this group. OIDC groups can be referenced in ACLs
+	// without being defined in the policy file.
+	for _, user := range users {
+		if !slices.Contains(user.OIDCGroups, string(*g)) {
+			continue
 		}
 
-		ips.AddSet(uips)
+		for _, node := range nodes.All() {
+			// Skip tagged nodes - they are identified by tags, not users
+			if node.IsTagged() {
+				continue
+			}
+
+			// Skip nodes without a user (defensive check for tests)
+			if !node.User().Valid() {
+				continue
+			}
+
+			if node.User().ID() == user.ID {
+				node.AppendToIPSet(&ips)
+			}
+		}
 	}
 
 	return buildIPSetMultiErr(&ips, errs)
@@ -1311,6 +1344,30 @@ func (g *Groups) Contains(group *Group) error {
 
 	if _, ok := (*g)[*group]; ok {
 		return nil
+	}
+
+	return fmt.Errorf("%w: %q", ErrGroupNotDefined, group)
+}
+
+// ContainsOrOIDC reports whether the group is defined in the policy or
+// exists as an OIDC group on at least one user. OIDC groups are stored
+// on the user record from the provider's 'groups' claim and can be
+// referenced in ACLs without being defined in the policy file.
+func (g *Groups) ContainsOrOIDC(group *Group, users types.Users) error {
+	if group == nil {
+		return nil
+	}
+
+	if _, ok := (*g)[*group]; ok {
+		return nil
+	}
+
+	for _, user := range users {
+		for _, ug := range user.OIDCGroups {
+			if ug == string(*group) {
+				return nil
+			}
+		}
 	}
 
 	return fmt.Errorf("%w: %q", ErrGroupNotDefined, group)
@@ -2298,6 +2355,16 @@ func validateGrantSrcDstCombination(sources Aliases, destinations Aliases) error
 //
 //nolint:gocyclo // comprehensive policy validation
 func (p *Policy) validate() error {
+	return p.validateWithUsers(nil)
+}
+
+// validateWithUsers is [Policy.validate] with access to the user list so
+// OIDC groups (stored on user records) can be validated alongside
+// policy-defined groups. When users is nil, only policy-defined groups
+// are accepted.
+//
+//nolint:gocyclo // comprehensive policy validation
+func (p *Policy) validateWithUsers(users types.Users) error {
 	if p == nil {
 		panic("passed nil policy")
 	}
@@ -2331,7 +2398,7 @@ func (p *Policy) validate() error {
 			case *Group:
 				g := src
 
-				err := p.Groups.Contains(g)
+				err := p.Groups.ContainsOrOIDC(g, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2364,7 +2431,7 @@ func (p *Policy) validate() error {
 					continue
 				}
 			case *Group:
-				err := p.Groups.Contains(h)
+				err := p.Groups.ContainsOrOIDC(h, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2434,7 +2501,7 @@ func (p *Policy) validate() error {
 			case *Group:
 				g := src
 
-				err := p.Groups.Contains(g)
+				err := p.Groups.ContainsOrOIDC(g, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2570,7 +2637,7 @@ func (p *Policy) validate() error {
 			case *Group:
 				g := src
 
-				err := p.Groups.Contains(g)
+				err := p.Groups.ContainsOrOIDC(g, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2604,7 +2671,7 @@ func (p *Policy) validate() error {
 					continue
 				}
 			case *Group:
-				err := p.Groups.Contains(h)
+				err := p.Groups.ContainsOrOIDC(h, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2660,7 +2727,7 @@ func (p *Policy) validate() error {
 					errs = append(errs, err)
 				}
 			case *Group:
-				err := p.Groups.Contains(t)
+				err := p.Groups.ContainsOrOIDC(t, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2705,7 +2772,7 @@ func (p *Policy) validate() error {
 			case *Group:
 				g := tagOwner
 
-				err := p.Groups.Contains(g)
+				err := p.Groups.ContainsOrOIDC(g, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2732,7 +2799,7 @@ func (p *Policy) validate() error {
 			case *Group:
 				g := approver
 
-				err := p.Groups.Contains(g)
+				err := p.Groups.ContainsOrOIDC(g, users)
 				if err != nil {
 					errs = append(errs, err)
 				}
@@ -2752,7 +2819,7 @@ func (p *Policy) validate() error {
 		case *Group:
 			g := approver
 
-			err := p.Groups.Contains(g)
+			err := p.Groups.ContainsOrOIDC(g, users)
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -3123,6 +3190,12 @@ func stripMetadataMembers(v *hujson.Value) {
 // In addition to unmarshalling, it will also validate the policy.
 // This is the only entrypoint of reading a policy from a file or other source.
 func unmarshalPolicy(b []byte) (*Policy, error) {
+	return unmarshalPolicyWithUsers(b, nil)
+}
+
+// unmarshalPolicyWithUsers is [unmarshalPolicy] with access to the user
+// list so OIDC groups can be validated alongside policy-defined groups.
+func unmarshalPolicyWithUsers(b []byte, users types.Users) (*Policy, error) {
 	if len(b) == 0 {
 		return nil, nil //nolint:nilnil // intentional: no policy when empty input
 	}
@@ -3165,7 +3238,7 @@ func unmarshalPolicy(b []byte) (*Policy, error) {
 		return nil, fmt.Errorf("parsing policy from bytes: %w", err)
 	}
 
-	if err := policy.validate(); err != nil { //nolint:noinlineerr
+	if err := policy.validateWithUsers(users); err != nil { //nolint:noinlineerr
 		return nil, err
 	}
 

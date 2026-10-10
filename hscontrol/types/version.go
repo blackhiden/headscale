@@ -38,9 +38,39 @@ func (v *VersionInfo) String() string {
 	return sb.String()
 }
 
+// Build-time injected variables.
+//
+// These are set via -ldflags -X by the Docker/CI pipeline:
+//
+//	-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=...'
+//	-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Commit=...'
+//	-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.BuildDate=...'
+//
+// They take precedence over the VCS info embedded by the Go toolchain, which
+// is unavailable in Docker builds because .git is excluded from the build
+// context.
+var (
+	Version   string
+	Commit    string
+	BuildDate string
+)
+
 var buildInfo = sync.OnceValues(debug.ReadBuildInfo)
 
 var GetVersionInfo = sync.OnceValue(func() *VersionInfo {
+	bi, ok := buildInfo()
+	return buildVersionInfo(Version, Commit, BuildDate, bi, ok)
+})
+
+// buildVersionInfo assembles the VersionInfo from the Go toolchain's embedded
+// build info (if any) and the build-time injected values, which take
+// precedence. Extracted as a pure function so the precedence rules are
+// testable.
+func buildVersionInfo(
+	injectedVersion, injectedCommit, injectedBuildDate string,
+	bi *debug.BuildInfo,
+	ok bool,
+) *VersionInfo {
 	info := &VersionInfo{
 		Version:   "dev",
 		Commit:    "unknown",
@@ -52,27 +82,38 @@ var GetVersionInfo = sync.OnceValue(func() *VersionInfo {
 		},
 	}
 
-	buildInfo, ok := buildInfo()
-	if !ok {
-		return info
-	}
+	if ok && bi != nil {
+		// Extract version from module path or main version
+		if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+			info.Version = bi.Main.Version
+		}
 
-	// Extract version from module path or main version
-	if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
-		info.Version = buildInfo.Main.Version
-	}
-
-	// Extract build settings
-	for _, setting := range buildInfo.Settings {
-		switch setting.Key {
-		case "vcs.revision":
-			info.Commit = setting.Value
-		case "vcs.modified":
-			info.Dirty = setting.Value == "true"
-		case "vcs.time":
-			info.BuildTime = setting.Value
+		// Extract build settings
+		for _, setting := range bi.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				info.Commit = setting.Value
+			case "vcs.modified":
+				info.Dirty = setting.Value == "true"
+			case "vcs.time":
+				info.BuildTime = setting.Value
+			}
 		}
 	}
 
+	// Build-time injected values take precedence over the toolchain's
+	// embedded VCS info.
+	if injectedVersion != "" {
+		info.Version = injectedVersion
+	}
+
+	if injectedCommit != "" {
+		info.Commit = injectedCommit
+	}
+
+	if injectedBuildDate != "" {
+		info.BuildTime = injectedBuildDate
+	}
+
 	return info
-})
+}

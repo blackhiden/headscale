@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/tsic"
-	"github.com/juanfont/headscale/integration/tsric"
+	"github.com/arsydoni4326-alt/headscale/integration/hsic"
+	"github.com/arsydoni4326-alt/headscale/integration/tsic"
+	"github.com/arsydoni4326-alt/headscale/integration/tsric"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

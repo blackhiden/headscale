@@ -58,3 +58,9 @@ __debug_bin
 node_modules/
 package-lock.json
 package.json
+.agents
+session.md
+INITIAL_PROMPT.md
+AGENT_INSTRUCTIONS.md
+TASK*.md
+PHASE*.md

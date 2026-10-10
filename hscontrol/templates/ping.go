@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	elem "github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 	"github.com/chasefleming/elem-go/styles"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // PingResult contains the outcome of a ping request.

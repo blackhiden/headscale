@@ -16,7 +16,7 @@ go 1.27.0
 
 require (
 	// NOTE: modernc sqlite has a fragile dependency chain:
-	// https://github.com/juanfont/headscale/issues/2188
+	// https://github.com/arsydoni4326-alt/headscale/issues/2188
 	modernc.org/sqlite v1.52.0
 	pgregory.net/rapid v1.3.0
 )
@@ -29,7 +29,7 @@ go 1.27.0
 
 require (
 	// NOTE: modernc sqlite has a fragile dependency chain:
-	// https://github.com/juanfont/headscale/issues/2188
+	// https://github.com/arsydoni4326-alt/headscale/issues/2188
 	pgregory.net/rapid v1.3.0
 
 	modernc.org/sqlite v1.52.0

@@ -1,6 +1,6 @@
 ![headscale logo](./docs/assets/logo/headscale3_header_stacked_left.png)
 
-![ci](https://github.com/juanfont/headscale/actions/workflows/test.yml/badge.svg)
+![ci](https://github.com/arsydoni4326-alt/headscale/actions/workflows/test.yml/badge.svg)
 
 An open source, self-hosted implementation of the Tailscale control server.
 
@@ -62,6 +62,17 @@ Please see ["Client and operating system support" in the documentation](https://
 and container to run Headscale.**
 
 Please have a look at the [`documentation`](https://headscale.net/stable/).
+
+### Authentication
+
+Headscale supports multiple authentication methods:
+
+- **Password Authentication** — Simple password-based login for Headplane web UI access
+- **Settings Menu** — Manage API key storage, password changes, theme preferences, and profile after login
+- **API Keys** — Token-based authentication for programmatic API access and automation
+- **Admin User Management** — Full admin UI available for both password and API key authentication (Phase 13c)
+
+See the [Authentication Guide](https://headscale.net/stable/usage/authentication/) for complete setup instructions.
 
 For NixOS users, a module is available in [`nix/`](./nix/).
 
@@ -179,8 +190,8 @@ The Makefile will warn you if any required tools are missing and suggest running
 
 ## Contributors
 
-<a href="https://github.com/juanfont/headscale/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=juanfont/headscale" />
+<a href="https://github.com/arsydoni4326-alt/headscale/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=arsydoni4326-alt/headscale" />
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).

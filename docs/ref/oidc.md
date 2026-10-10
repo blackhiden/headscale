@@ -240,19 +240,18 @@ endpoint.
 | username            | `preferred_username` | Depends on identity provider, eg: `ssmith`, `ssmith@idp.example.com`, `\\example.com\ssmith`      |
 | profile picture     | `picture`            | URL to a profile picture or avatar                                                                |
 | provider identifier | `iss`, `sub`         | A stable and unique identifier for a user, typically a combination of `iss` and `sub` OIDC claims |
-|                     | `groups`             | [Only used to filter for allowed groups](#authorize-users-with-filters)                           |
+|                     | `groups`             | [Used to filter for allowed groups](#authorize-users-with-filters) and [in ACL policies](../ref/policy.md#oidc-groups) |
 
 ## Limitations
 
 - Support for OpenID Connect aims to be generic and vendor independent. It offers only limited support for quirks of
   specific identity providers.
-- OIDC groups cannot be used in policy rules.
 - The username provided by the identity provider needs to adhere to this pattern:
     - The username must be at least two characters long.
     - It must only contain letters, digits, hyphens, dots, underscores, and up to a single `@`.
     - The username must start with a letter.
 
-Please see the [GitHub label "OIDC"](https://github.com/juanfont/headscale/labels/OIDC) for OIDC related issues.
+Please see the [GitHub label "OIDC"](https://github.com/arsydoni4326-alt/headscale/labels/OIDC) for OIDC related issues.
 
 ## Identity provider specific configuration
 
@@ -277,7 +276,7 @@ Authelia is fully supported by Headscale.
 ### Authentik
 
 - Authentik is fully supported by Headscale.
-- [Headscale does not support JSON Web Encryption](https://github.com/juanfont/headscale/issues/2446). Leave the field
+- [Headscale does not support JSON Web Encryption](https://github.com/arsydoni4326-alt/headscale/issues/2446). Leave the field
   `Encryption Key` in the providers section unset.
 - See Authentik's [Integrate with Headscale](https://integrations.goauthentik.io/networking/headscale/)
 

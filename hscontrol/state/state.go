@@ -24,15 +24,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	hsdb "github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/policy"
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/puzpuzpuz/xsync/v4"
@@ -164,6 +164,9 @@ type State struct {
 	// via the eviction callback so any waiting goroutines wake.
 	authCache *expirable.LRU[types.AuthID, *types.AuthRequest]
 
+	// authCacheExpiration is the configured lifetime for pending requests.
+	authCacheExpiration time.Duration
+
 	// pings tracks pending ping requests and their response channels.
 	pings *pingTracker
 
@@ -279,12 +282,13 @@ func NewState(cfg *types.Config) (*State, error) {
 	s := &State{
 		cfg: cfg,
 
-		db:        db,
-		ipAlloc:   ipAlloc,
-		polMan:    polMan,
-		authCache: authCache,
-		nodeStore: nodeStore,
-		pings:     newPingTracker(),
+		db:                  db,
+		ipAlloc:             ipAlloc,
+		polMan:              polMan,
+		authCache:           authCache,
+		authCacheExpiration: cacheExpiration,
+		nodeStore:           nodeStore,
+		pings:               newPingTracker(),
 
 		sshCheckAuth:  make(map[sshCheckPair]time.Time),
 		registerLocks: xsync.NewMap[key.MachinePublic, *sync.Mutex](),
@@ -1591,6 +1595,36 @@ func (s *State) DestroyAPIKey(key types.APIKey) error {
 	return s.db.DestroyAPIKey(key)
 }
 
+// CreateWebhook creates a new webhook configuration.
+func (s *State) CreateWebhook(webhook *types.Webhook) error {
+	return s.db.CreateWebhook(webhook)
+}
+
+// GetWebhook retrieves a webhook by ID.
+func (s *State) GetWebhook(id uint) (*types.Webhook, error) {
+	return s.db.GetWebhook(id)
+}
+
+// ListWebhooks returns all webhook configurations.
+func (s *State) ListWebhooks() ([]*types.Webhook, error) {
+	return s.db.ListWebhooks()
+}
+
+// ListWebhooksForEvent returns all enabled webhooks that listen to a specific event.
+func (s *State) ListWebhooksForEvent(eventType types.WebhookEventType) ([]*types.Webhook, error) {
+	return s.db.ListWebhooksForEvent(eventType)
+}
+
+// UpdateWebhook updates an existing webhook configuration.
+func (s *State) UpdateWebhook(webhook *types.Webhook) error {
+	return s.db.UpdateWebhook(webhook)
+}
+
+// DeleteWebhook deletes a webhook by ID.
+func (s *State) DeleteWebhook(id uint) error {
+	return s.db.DeleteWebhook(id)
+}
+
 // CreatePreAuthKey generates a new pre-authentication key for a user.
 // The userID parameter is now optional (can be nil) for system-created tagged keys.
 func (s *State) CreatePreAuthKey(userID *types.UserID, reusable bool, ephemeral bool, expiration *time.Time, aclTags []string) (*types.PreAuthKeyNew, error) {
@@ -1766,7 +1800,25 @@ func (s *State) GetAuthCacheEntry(id types.AuthID) (*types.AuthRequest, bool) {
 }
 
 // SetAuthCacheEntry stores a pending auth request in the cache.
+// If the entry already exists, this does NOT extend its TTL or update its expiry.
+// If the entry has no expiry set, the default cache expiration is applied.
 func (s *State) SetAuthCacheEntry(id types.AuthID, entry *types.AuthRequest) {
+	// Only set expiry if not already set
+	if entry.ExpiresAt().IsZero() {
+		entry.SetExpiry(time.Now().Add(s.authCacheExpiration))
+	}
+	
+	// Check if entry already exists - if so, don't overwrite with new expiry
+	if existing, ok := s.authCache.Get(id); ok {
+		// Entry already exists - preserve original expiry, don't allow bypass
+		log.Debug().
+			Str("auth_id", id.String()).
+			Time("existing_expiry", existing.ExpiresAt()).
+			Time("attempted_expiry", entry.ExpiresAt()).
+			Msg("auth cache entry already exists, preserving original expiry")
+		return
+	}
+	
 	s.authCache.Add(id, entry)
 }
 
@@ -2592,7 +2644,7 @@ func (s *State) findExistingNodeForPAK(
 		// It is still the same machine, proven by the machine key, so recognise
 		// it for re-registration instead of re-validating the spent key or
 		// creating a duplicate node. Re-registration preserves the node's tagged
-		// ownership. See https://github.com/juanfont/headscale/issues/3312.
+		// ownership. See https://github.com/arsydoni4326-alt/headscale/issues/3312.
 		if node, ok := all[0]; ok && node.IsTagged() {
 			return node, true, nil
 		}

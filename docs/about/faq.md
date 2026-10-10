@@ -24,8 +24,8 @@ We are more than happy to exchange emails, or to have dedicated calls before a P
 
 ## When/Why is Feature X going to be implemented?
 
-We use [GitHub Milestones to plan for upcoming Headscale releases](https://github.com/juanfont/headscale/milestones).
-Have a look at [our current plan](https://github.com/juanfont/headscale/milestones) to get an idea when a specific
+We use [GitHub Milestones to plan for upcoming Headscale releases](https://github.com/arsydoni4326-alt/headscale/milestones).
+Have a look at [our current plan](https://github.com/arsydoni4326-alt/headscale/milestones) to get an idea when a specific
 feature is about to be implemented. The release plan is subject to change at any time.
 
 If you're interested in contributing, please post a feature request about it. Please be aware that there are a number of
@@ -53,7 +53,7 @@ Please follow the steps outlined in the [upgrade guide](../setup/upgrade.md) to 
 installation. Its required to update from one stable version to the next (e.g. 0.26.0 → 0.27.1 → 0.28.0) without
 skipping minor versions in between. You should always pick the latest available patch release.
 
-Be sure to check the [changelog](https://github.com/juanfont/headscale/blob/main/CHANGELOG.md) for version specific
+Be sure to check the [changelog](https://github.com/arsydoni4326-alt/headscale/blob/main/CHANGELOG.md) for version specific
 upgrade instructions and breaking changes.
 
 ## Scaling / How many clients does Headscale support?

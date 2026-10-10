@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/scope"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 )
 
 func init() {
@@ -43,6 +43,7 @@ type User struct {
 	DeviceCount        int       `json:"deviceCount"`
 	LastSeen           time.Time `json:"lastSeen"`
 	CurrentlyConnected bool      `json:"currentlyConnected"`
+	OIDCGroups         []string  `json:"oidcGroups,omitempty"`
 }
 
 type (
@@ -157,6 +158,7 @@ func userFromView(b Backend, view types.UserView) User {
 		Type:          userTypeMember,
 		Role:          userRoleMember,
 		Status:        userStatusActive,
+		OIDCGroups:    view.OIDCGroups().AsSlice(),
 	}
 
 	nodes := b.State.ListNodesByUser(types.UserID(view.ID()))

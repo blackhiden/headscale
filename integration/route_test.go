@@ -14,13 +14,13 @@ import (
 
 	cmpdiff "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/arsydoni4326-alt/headscale/gen/client/v1"
+	policyv2 "github.com/arsydoni4326-alt/headscale/hscontrol/policy/v2"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/integration/hsic"
+	"github.com/arsydoni4326-alt/headscale/integration/integrationutil"
+	"github.com/arsydoni4326-alt/headscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	xmaps "golang.org/x/exp/maps"
@@ -1326,7 +1326,7 @@ func TestHASubnetRouterFailover(t *testing.T) {
 // TestSubnetRouteACL verifies that Subnet routes are distributed
 // as expected when ACLs are activated.
 // It implements the issue from
-// https://github.com/juanfont/headscale/issues/1604
+// https://github.com/arsydoni4326-alt/headscale/issues/1604
 func TestSubnetRouteACL(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -3859,7 +3859,7 @@ func TestHASubnetRouterPingFailover(t *testing.T) {
 // TestHASubnetRouterFailoverBothOffline reproduces issue #3203:
 // HA tracking loses the secondary subnet router after all routers serving
 // the route have been offline simultaneously and one of them returns.
-// See https://github.com/juanfont/headscale/issues/3203.
+// See https://github.com/arsydoni4326-alt/headscale/issues/3203.
 //
 // Existing TestHASubnetRouterFailover keeps subRouter3 online across both
 // failover steps, so the all-offline transition is uncovered. This test

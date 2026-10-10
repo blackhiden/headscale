@@ -9,8 +9,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/k3sic"
+	"github.com/arsydoni4326-alt/headscale/integration/dockertestutil"
+	"github.com/arsydoni4326-alt/headscale/integration/k3sic"
 )
 
 const (
@@ -328,7 +328,7 @@ func checkGitRepository(ctx context.Context) DoctorResult {
 			"Git Repository",
 			"Not in a Git repository",
 			"Run from within the headscale git repository",
-			"Clone the repository: git clone https://github.com/juanfont/headscale.git",
+			"Clone the repository: git clone https://github.com/arsydoni4326-alt/headscale.git",
 		)
 	}
 

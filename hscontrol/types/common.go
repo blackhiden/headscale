@@ -117,6 +117,11 @@ type PendingRegistrationConfirmation struct {
 // have a single canonical instance even when stored in caches that
 // internally copy values.
 type AuthRequest struct {
+	// expiresAt is the fixed deadline assigned when the request enters the
+	// registration cache. QR payloads use it so reloading the page cannot
+	// extend the registration session.
+	expiresAt time.Time
+
 	// regData is populated for node-registration flows (interactive web
 	// or OIDC). It carries the cached registration payload that the
 	// auth callback uses to promote this request into a real node.
@@ -229,6 +234,16 @@ func (rn *AuthRequest) SetPendingConfirmation(p *PendingRegistrationConfirmation
 // has yet resolved an identity for this [AuthRequest].
 func (rn *AuthRequest) PendingConfirmation() *PendingRegistrationConfirmation {
 	return rn.pendingConfirmation
+}
+
+// SetExpiry records the cache deadline for this pending request.
+func (rn *AuthRequest) SetExpiry(expiresAt time.Time) {
+	rn.expiresAt = expiresAt
+}
+
+// ExpiresAt returns the cache deadline for this pending request.
+func (rn *AuthRequest) ExpiresAt() time.Time {
+	return rn.expiresAt
 }
 
 func (rn *AuthRequest) FinishAuth(verdict AuthVerdict) {

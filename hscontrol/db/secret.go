@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"

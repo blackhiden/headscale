@@ -4,8 +4,8 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"tailscale.com/tailcfg"
 )

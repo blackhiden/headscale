@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -105,6 +105,15 @@ type NodeConfig struct {
 	Routes RouteConfig
 }
 
+// HeadplaneConfig contains deprecated Headplane-specific configuration.
+// Phase 13c: This config is preserved during the rollback window but no longer
+// used by Headscale. Headplane local-auth runtime has been retired.
+type HeadplaneConfig struct {
+	// Password is deprecated and no longer used.
+	// Preserved for rollback compatibility only.
+	Password string `json:"-"`
+}
+
 // Config contains the initial Headscale configuration.
 type Config struct {
 	ServerURL           string
@@ -153,6 +162,8 @@ type Config struct {
 	Policy PolicyConfig
 
 	Tuning Tuning
+
+	Headplane HeadplaneConfig
 }
 
 type DNSConfig struct {
@@ -494,6 +505,8 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("tuning.node_store_batch_timeout", "500ms")
 
 	viper.SetDefault("prefixes.allocation", string(IPAllocationStrategySequential))
+
+	viper.SetDefault("headplane.password", "")
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -1500,6 +1513,10 @@ func LoadServerConfig() (*Config, error) {
 			RegisterCacheMaxEntries: viper.GetInt("tuning.register_cache_max_entries"),
 			NodeStoreBatchSize:      viper.GetInt("tuning.node_store_batch_size"),
 			NodeStoreBatchTimeout:   viper.GetDuration("tuning.node_store_batch_timeout"),
+		},
+
+		Headplane: HeadplaneConfig{
+			Password: viper.GetString("headplane.password"),
 		},
 	}, nil
 }

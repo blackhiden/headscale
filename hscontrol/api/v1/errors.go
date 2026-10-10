@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/state"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
 	"gorm.io/gorm"
 )
 
@@ -24,7 +24,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrNodeNotInNodeStore),
 		errors.Is(err, db.ErrUserNotFound),
 		errors.Is(err, db.ErrNodeNotFoundRegistrationCache),
-		errors.Is(err, state.ErrRegistrationExpired):
+		errors.Is(err, state.ErrRegistrationExpired),
+		errors.Is(err, db.ErrWebhookNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -36,11 +37,13 @@ func mapError(msg string, err error) error {
 		errors.Is(err, db.ErrUserStillHasNodes),
 		errors.Is(err, db.ErrCannotChangeOIDCUser),
 		errors.Is(err, db.ErrPreAuthKeyNotTaggedOrOwned),
-		errors.Is(err, db.ErrSingleUseAuthKeyHasBeenUsed):
+		errors.Is(err, db.ErrSingleUseAuthKeyHasBeenUsed),
+		errors.Is(err, db.ErrWebhookInvalidEvents):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
-		errors.Is(err, state.ErrAmbiguousNodeOwnership):
+		errors.Is(err, state.ErrAmbiguousNodeOwnership),
+		errors.Is(err, db.ErrWebhookNameExists):
 		return huma.Error409Conflict(msg, err)
 
 	default:

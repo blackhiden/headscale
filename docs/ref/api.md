@@ -58,6 +58,180 @@ Headscale server at `/api/v1/docs` for details.
         https://headscale.example.com/api/v1/auth/register
     ```
 
+### Machine approval
+
+The fork provides API endpoints for approving pending machines that have initiated
+web authentication. Machines awaiting approval can be approved individually or in bulk.
+
+!!! note "Coordinate with backend agent"
+    The exact request/response schemas, error codes, and authentication requirements
+    need to be confirmed with the backend API agent. Placeholders below represent
+    expected behavior based on the task specification.
+
+=== "Approve a single machine"
+
+    Approve a specific machine by its ID.
+
+    **Endpoint:** `POST /api/v1/machines/{id}/approve`
+
+    **Authentication:** Requires API key with machine management permissions.
+
+    **Path parameters:**
+
+    - `id` (required): Machine ID to approve
+
+    **Request body:** (TBD - confirm with backend agent)
+
+    ```json
+    {
+      "user": "<USER>"
+    }
+    ```
+
+    **Response:** (TBD - confirm with backend agent)
+
+    ```json
+    {
+      "machine": {
+        "id": "12345",
+        "name": "laptop",
+        "user": "alice",
+        "approved": true,
+        "online": true
+      }
+    }
+    ```
+
+    **Example:**
+
+    ```console
+    curl -X POST \
+      -H "Authorization: Bearer <API_KEY>" \
+      --json '{"user": "alice"}' \
+      https://headscale.example.com/api/v1/machines/12345/approve
+    ```
+
+=== "Bulk approve machines"
+
+    Approve multiple machines in a single request.
+
+    **Endpoint:** `POST /api/v1/machines/approve`
+
+    **Authentication:** Requires API key with machine management permissions.
+
+    **Request body:** (TBD - confirm with backend agent)
+
+    ```json
+    {
+      "machineIds": ["12345", "12346", "12347"],
+      "user": "<USER>"
+    }
+    ```
+
+    **Response:** (TBD - confirm with backend agent)
+
+    ```json
+    {
+      "approved": ["12345", "12346", "12347"],
+      "failed": [],
+      "errors": {}
+    }
+    ```
+
+    **Example:**
+
+    ```console
+    curl -X POST \
+      -H "Authorization: Bearer <API_KEY>" \
+      --json '{"machineIds": ["12345", "12346"], "user": "alice"}' \
+      https://headscale.example.com/api/v1/machines/approve
+    ```
+
+**Common error responses:** (TBD - confirm with backend agent)
+
+- `400 Bad Request` - Invalid request body or missing required fields
+- `401 Unauthorized` - Missing or invalid API key
+- `403 Forbidden` - Insufficient permissions
+- `404 Not Found` - Machine ID not found
+- `409 Conflict` - Machine already approved or in invalid state
+
+See the [registration methods](registration.md#web-authentication) documentation for
+the complete web-based approval workflow, including CLI approval with
+`headscale auth register`.
+
+### Update check
+
+The fork exposes a public, unauthenticated endpoint that reports the running
+binary's version information and, optionally, whether an update is available:
+
+```console
+curl https://headscale.example.com/api/v1/update-check
+```
+
+Without `?check=true`, the endpoint returns the current version information
+only. With `?check=true`, it fetches the latest release tag (for release
+builds) or commit hash (for dev builds) from the configured GitHub repository
+and compares it with the running binary:
+
+```console
+curl "https://headscale.example.com/api/v1/update-check?check=true"
+```
+
+Results are cached for 15 minutes. The remote repository can be overridden via
+the `HEADSCALE_UPDATE_CHECK_REPO` environment variable.
+
+See [The fork](../about/fork.md) for details about this fork-specific feature.
+
+### DERP map
+
+The fork exposes a read-only, authenticated endpoint that returns the current
+DERP relay map configuration:
+
+```console
+curl -H "Authorization: Bearer <API_KEY>" \
+  https://headscale.example.com/api/v1/derp
+```
+
+The response reports whether DERP is configured, the total region count, and
+each region's ID, name, code, and relay nodes (name, hostname, DERP/STUN
+ports, IPv4/IPv6). This powers the DERP status page in Headplane.
+
+### Machine approval
+
+Machines that have not yet been approved cannot join the tailnet. Two
+authenticated endpoints approve pending machines (see
+[Registration](./registration.md) for how a machine ends up pending):
+
+=== "Approve one machine"
+
+    ```console
+    curl -H "Authorization: Bearer <API_KEY>" \
+        --json '{"nodeId": "123"}' \
+        https://headscale.example.com/api/v1/machines/123/approve
+    ```
+
+    The response is `{"success": true, "node": {...}}`, with the approved
+    machine's full record.
+
+=== "Approve several machines"
+
+    ```console
+    curl -H "Authorization: Bearer <API_KEY>" \
+        --json '{"nodeIds": ["123", "456"]}' \
+        https://headscale.example.com/api/v1/machines/approve
+    ```
+
+    The response reports the outcome per node:
+    `{"success": true, "approved": ["123"], "failed": ["456"], "errors": {"456": "machine not found: 456"}, "results": [...]}`.
+    `success` is true when at least one machine was approved; the batch is not
+    atomic, so a failure for one machine does not affect the others.
+
+Both endpoints require write access to machines: an admin API key (all-access)
+or an OAuth access token holding the `devices:core` scope. A read-only token is
+rejected with `403`. Approving a machine clears its key expiry so it no longer
+reports as expired, and records an audit log entry (action `machine_approve` or
+`machine_approve_bulk`).
+
 ## Join nodes with an OAuth client
 
 Headscale also serves a subset of the Tailscale-compatible API at `/api/v2`, which
@@ -162,7 +336,7 @@ The `headscale` binary can control a Headscale instance from a remote machine ov
 
 ### Setup remote control
 
-1. Download the [`headscale` binary from GitHub's release page](https://github.com/juanfont/headscale/releases). Make
+1. Download the [`headscale` binary from GitHub's release page](https://github.com/arsydoni4326-alt/headscale/releases). Make
    sure to use the same version as on the server.
 
 1. Put the binary somewhere in your `PATH`, e.g. `/usr/local/bin/headscale`

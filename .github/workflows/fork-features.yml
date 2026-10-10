@@ -1,0 +1,28 @@
+name: Check fork-specific features
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-$${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check-fork-features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: recursive
+      - name: Verify fork-specific features exist
+        run: |
+          test -d hscontrol/updatecheck || { echo "❌ hscontrol/updatecheck/ is missing"; exit 1; }
+          test -f hscontrol/api/v1/updatecheck.go || { echo "❌ hscontrol/api/v1/updatecheck.go is missing"; exit 1; }
+          test -f hscontrol/api/v1/derp.go || { echo "❌ hscontrol/api/v1/derp.go is missing"; exit 1; }
+          test -d headplane/app/update-check || { echo "❌ headplane/app/update-check/ is missing"; exit 1; }
+          echo "✅ All fork-specific features are present."

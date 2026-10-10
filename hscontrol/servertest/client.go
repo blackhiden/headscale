@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"tailscale.com/control/controlclient"
 	"tailscale.com/health"
 	"tailscale.com/net/netmon"

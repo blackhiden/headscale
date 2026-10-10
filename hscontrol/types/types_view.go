@@ -114,6 +114,11 @@ func (v UserView) ProviderIdentifier() sql.NullString { return v.ж.ProviderIden
 // same as RegistrationMethod, without authkey.
 func (v UserView) Provider() string { return v.ж.Provider }
 
+// OIDCGroups stores group memberships from OIDC provider's 'groups' claim.
+// Groups are updated on every OIDC login and can be referenced in ACL policies.
+// Stored as JSON array of group names.
+func (v UserView) OIDCGroups() views.Slice[string] { return views.SliceOf(v.ж.OIDCGroups) }
+
 // TODO(kradalby): See if we can fill in Gravatar here.
 func (v UserView) ProfilePicURL() string { return v.ж.ProfilePicURL }
 
@@ -125,6 +130,7 @@ var _UserViewNeedsRegeneration = User(struct {
 	Email              string
 	ProviderIdentifier sql.NullString
 	Provider           string
+	OIDCGroups         []string
 	ProfilePicURL      string
 }{})
 

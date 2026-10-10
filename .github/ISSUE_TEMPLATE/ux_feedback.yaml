@@ -1,0 +1,61 @@
+name: 🎨 UX Feedback
+description: Share feedback about the Headplane user interface or user experience
+title: "[UX] <title>"
+labels: ["ux", "needs triage"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Is this a support request?
+      description: This issue tracker is for UI/UX feedback, feature requests, and bug
+        reports. If you need help with setup or configuration, please ask in our
+        Discord community.
+      options:
+        - label: This is UI/UX feedback, not a support request
+          required: true
+  - type: textarea
+    attributes:
+      label: Which area of the UI does this relate to?
+      description: Select the part of Headplane you are providing feedback on.
+      placeholder: |-
+        e.g. Machine list, ACL editor, DNS settings, Topology graph,
+        Audit log, DERP status, Settings, Login flow, Navigation,
+        or Other
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What were you trying to do?
+      description: Describe the task or goal you had in mind.
+      placeholder: e.g. "I was trying to find a specific machine in a large tailnet."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What did you expect?
+      description: Describe what you expected to happen or how you expected the UI to behave.
+      placeholder: e.g. "I expected a search bar at the top of the machine list."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What actually happened or what did you experience?
+      description: Describe what you actually experienced. Include screenshots if helpful.
+      placeholder: e.g. "I had to scroll through a long list to find the machine."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: How could this be improved?
+      description: Optional — share any ideas you have for improving the experience.
+      placeholder: e.g. "Adding a search bar with filters would make it much faster to find machines."
+    validations:
+      required: false
+  - type: checkboxes
+    attributes:
+      label: Environment
+      description: Please confirm the environment where you experienced this.
+      options:
+        - label: I am using the latest Headplane release
+          required: false
+        - label: I am using the latest Headscale release
+          required: false

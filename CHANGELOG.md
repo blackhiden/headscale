@@ -1,8 +1,291 @@
 # CHANGELOG
 
+## Next
+
+### Features
+
+- **QR Code Registration:** Add QR code-based device registration flow. Users can now register devices by scanning a QR code displayed on the registration page using Headplane's web UI. The QR code contains the registration auth-id, server URL, and expiry timestamp. The existing CLI registration method remains available. ([Phase 17](#phase-17--qr-code-registration-flow-headscale--headplane))
+  - Backend: QR code generation for standard CLI-approved and OIDC registration pages using `github.com/skip2/go-qrcode`
+  - Frontend: Machines → Scan QR navigation and scanner component using `html5-qrcode`
+  - Security: QR codes expire with session, single-use validation
+  - Browser support: Chrome, Firefox, Safari, Edge (desktop and mobile)
+
+### Headplane schema repair
+
+- Fix SQLite schema validation rejecting the Headplane user and settings tables.
+  The repair migrations recreate missing Headplane tables and normalize indexes
+  GORM created with quoted identifiers; the admin users page now displays backend
+  load errors instead of crashing.
+
+### Phase 13c Known Gap Fix
+
+Resolved the Known Gap in Phase 13c multi-user implementation, enabling full admin user management UI for API key-authenticated sessions:
+
+- **Frontend Admin UI Enhancement** — Unified admin interface for all authentication methods
+  - Admin API keys can now access `/admin/users` with full user management UI
+  - "Add Headplane User" button and dialogs now visible for API key sessions
+  - CRUD operations for Headplane dashboard users available via both password and API key authentication
+  - Authorization checks properly validate admin privileges regardless of auth method
+
+- **Backend Authorization Update** — Enhanced endpoint access control
+  - User management endpoints (`GET/POST/PUT/DELETE /api/v1/headplane/users`) now accept admin API keys
+  - Authorization middleware validates admin privileges for both session tokens and API keys
+  - Consistent admin access enforcement across all user management operations
+
+- **Documentation Updates** — Comprehensive guides for unified admin UI
+  - New API reference: `docs/ref/api/headplane-users.md` documents all user management endpoints
+  - Updated authentication guide with admin API key usage instructions and examples
+  - Updated settings guide to reflect Known Gap resolution
+  - Added screenshots showing unified admin UI (placeholders for actual implementation)
+
+**What Changed:**
+- Prior to this fix, admin user management UI was only accessible when logged in with Headplane password
+- API key authentication did not provide access to the "Add Headplane User" functionality
+- After fix: Admin API keys have full parity with password authentication for user management
+
+**Files changed:**
+- `docs/ref/api/headplane-users.md` (new, comprehensive API reference)
+- `docs/usage/authentication.md` (added admin API key section)
+- `docs/usage/settings.md` (updated Known Issues section)
+- `ROADMAP.md` (marked Known Gap as resolved)
+
+### Settings Menu (Phase 13b)
+
+Added comprehensive settings management for Headplane authenticated users:
+
+- **Backend Settings API** — Three new endpoints for settings management
+  - `GET /api/v1/headplane/settings` — retrieve user settings (API key, theme, profile name)
+  - `POST /api/v1/headplane/settings` — update settings with validation
+  - `POST /api/v1/headplane/change-password` — change password with current password verification
+  - Settings stored in SQLite table with single-row constraint (single-user mode)
+  - API key encrypted at rest with AES-256-GCM using PBKDF2-derived key (100,000 iterations)
+  - Per-key salt and nonce for maximum security
+  - Session automatically loads stored API key on login (no re-entry needed)
+  - Comprehensive unit tests covering encryption, validation, and error cases
+
+- **Frontend Settings UI** — Complete settings page with multiple sections
+  - `/settings/profile` route accessible after password authentication
+  - Account section: change password, session info, logout
+  - Integration section: Headscale API key management with masked display
+  - Preferences section: theme selector (light/dark/system) with persistence
+  - Profile section: optional display name
+  - Full form validation and error handling
+  - Visual feedback for all operations
+  - Unit and E2E tests for all flows
+
+- **Documentation** — Comprehensive guides
+  - User guide: `docs/usage/settings.md`
+  - API reference: `docs/ref/api/headplane-settings.md`
+  - Integration testing guide: `docs/phase13b-integration-testing.md`
+
+**Security features:**
+- AES-256-GCM encryption for API key storage
+- PBKDF2 key derivation (100,000 iterations) with random salt
+- Constant-time password comparison
+- CSRF protection on all endpoints
+- No secrets in logs or responses
+
+**Files changed:**
+- `hscontrol/headplane_settings.go` (new, 402 lines)
+- `hscontrol/headplane_settings_test.go` (new, 497 lines)
+- `hscontrol/app.go` (register endpoints)
+- `headplane/app/routes/settings/profile.tsx` (new, 386 lines)
+- `headplane/app/server/headscale/api/` (API client updates)
+- `docs/usage/settings.md`, `docs/ref/api/headplane-settings.md` (new)
+
+## 0.35.9-arsydoni4326-alt (2026-10-02)
+
+### Settings Menu for Headplane (Phase 13b) [IN PROGRESS]
+
+Added a Settings menu to Headplane for managing user preferences and Headscale integration:
+
+- **Settings Page** — Comprehensive settings interface accessible after password login
+  - Account section: Change password with current password verification
+  - Integration section: Store and manage Headscale API key (encrypted at rest)
+  - Preferences section: Select theme (light/dark) with instant application
+  - Profile section: Set optional display name
+  - All settings persist across login sessions
+  
+- **Backend API Endpoints** — RESTful API for settings management
+  - `GET /api/v1/headplane/settings` — Retrieve current settings (decrypts API key)
+  - `POST /api/v1/headplane/settings` — Update settings (encrypts API key before storage)
+  - `POST /api/v1/headplane/change-password` — Change password with verification
+  - All endpoints require valid session token authentication
+  - Full OpenAPI-style schema documentation
+  
+- **API Key Storage** — Secure encrypted storage eliminates re-entry at each login
+  - AES-256-GCM encryption with PBKDF2-derived keys
+  - Session-token-based key derivation for security
+  - Automatic loading on login with valid password
+  - Support for update, removal, and rotation workflows
+  
+- **Password Management** — Self-service password changes
+  - Current password verification required (constant-time comparison)
+  - Updates config file or environment variable
+  - Existing sessions remain valid after change
+  - Comprehensive error handling and user feedback
+  
+- **Theme System** — Persistent light/dark theme preferences
+  - Immediate application without page reload
+  - Server-side storage survives logout/login
+  - Pre-render application prevents theme flash
+  
+- **Profile Customization** — Optional display name for personalization
+  - Appears in navigation bar and UI
+  - Up to 100 characters
+  - Server-side persistence
+  
+- **Security Features**:
+  - API key encrypted at rest with AES-256-GCM
+  - Session-derived encryption keys for per-user security
+  - CSRF protection on all settings endpoints
+  - Constant-time password comparison prevents timing attacks
+  - No secrets logged or exposed in responses
+  - HTTPS required for production use
+  
+- **Single-User Model** (Phase 13b):
+  - Single settings row in SQLite database
+  - Single-row constraint enforces one user
+  - Multi-user support planned for Phase 13c
+  
+- **Documentation** — Comprehensive user and API documentation
+  - `docs/usage/settings.md` — Complete user guide with troubleshooting
+  - `docs/ref/api/headplane-settings.md` — Full OpenAPI-style API reference
+  - `docs/usage/authentication.md` — Updated with settings integration
+  - Security best practices and known limitations documented
+  
+- **Backward Compatibility**:
+  - No breaking changes to Phase 13a password authentication
+  - API key authentication fully preserved
+  - Settings are optional enhancements
+  - Existing deployments work without configuration changes
+
+This feature enhances the single-user experience by eliminating API key re-entry, providing self-service password management, and allowing UI customization through persistent theme preferences.
+
+Files changed:
+- `hscontrol/headplane_settings.go` (new) — Settings API handlers
+- `hscontrol/headplane_settings_test.go` (new) — Backend unit tests
+- `hscontrol/app.go` — Registered settings endpoints
+- `headplane/` — Settings UI components and routes
+- `docs/usage/settings.md` (new) — Settings user guide
+- `docs/ref/api/headplane-settings.md` (new) — API reference
+- `docs/usage/authentication.md` — Updated with settings reference
+- `README.md` — Updated features list
+- `CHANGELOG.md` — Phase 13b entry
+
+---
+
+## 0.35.9-arsydoni4326-alt (2026-10-02)
+
+### Simple Password Login for Headplane (Phase 13a)
+
+Added password-based authentication for Headplane web UI as an alternative to API key authentication:
+
+- **Backend Authentication** — Password authentication handler with session management
+  - `POST /api/v1/headplane/login` endpoint for password-based login
+  - Session tokens: 256-bit cryptographically random, 24-hour expiry
+  - Rate limiting: 5 login attempts per minute per IP address
+  - Constant-time password comparison to prevent timing attacks
+  - Automatic session cleanup every 5 minutes
+  - Configuration via `headplane.password` in `config.yaml` or `HEADSCALE_HEADPLANE_PASSWORD` environment variable
+  - Comprehensive unit tests covering success, failure, and rate limiting scenarios
+  
+- **Frontend UI** — Password login interface in Headplane
+  - Password/API Key toggle in login form (password is default)
+  - Password visibility toggle for improved UX
+  - Full error handling: invalid password (401), rate limiting (429), not configured (503)
+  - Session token management in secure HTTP-only cookies
+  - Unit and E2E tests for all login flows
+  - Complete backward compatibility with API key authentication
+  
+- **Documentation** — Comprehensive guides for setup and usage
+  - `docs/usage/authentication.md` — Complete authentication guide covering both password and API key methods
+  - `docs/troubleshooting.md` — Troubleshooting guide for authentication, configuration, and network issues
+  - `docs/ref/configuration.md` — Updated with password configuration reference and security best practices
+  - `config-example.yaml` — Added `headplane.password` field with inline documentation
+  - `README.md` — Updated with authentication overview
+  
+- **Security Features**:
+  - HTTPS required for production use (secure cookies)
+  - Rate limiting prevents brute-force attacks
+  - Constant-time password comparison prevents timing attacks
+  - Session tokens never logged or exposed
+  - Password never serialized in JSON output
+  
+- **Backward Compatibility**:
+  - No database migrations required
+  - API key authentication fully preserved and unchanged
+  - Password authentication is optional
+  - Existing deployments continue working without configuration changes
+
+This feature provides administrators with a simpler login method for Headplane web UI access while maintaining the existing API key method for programmatic access and automation.
+
+Files changed:
+- `hscontrol/headplane_auth.go` (new) — Authentication handler
+- `hscontrol/headplane_auth_test.go` (new) — Unit tests
+- `hscontrol/types/config.go` — Added HeadplaneConfig
+- `hscontrol/app.go` — Registered login endpoint
+- `config-example.yaml` — Password configuration
+- `docs/usage/authentication.md` (new) — Authentication guide
+- `docs/troubleshooting.md` (new) — Troubleshooting guide
+- `docs/ref/configuration.md` — Configuration reference
+- `README.md` — Authentication overview
+- `headplane` submodule — Password login UI
+
 ## 0.30.0 (202x-xx-xx)
 
 **Minimum supported Tailscale client version: v1.82.0**
+
+### Web-based Machine Approval (Phase 12)
+
+Added web interface support for approving pending machines through API, UI, and documentation:
+
+- **Machine approval API** — REST endpoints for single and bulk machine approval
+  - `POST /api/v1/machines/{id}/approve` — Approve a single machine by ID and return its full record
+  - `POST /api/v1/machines/approve` — Bulk approve multiple machines from a `nodeIds` array, 
+    reporting per-node success/failure (non-atomic: one failure does not affect others)
+  - **RBAC** — v1 auth middleware distinguishes admin API keys from scope-limited OAuth tokens. 
+    Approval requires admin rights or the `devices:core` OAuth scope; read-only tokens are 
+    rejected with `403`. Required scope is emitted in OpenAPI as `x-required-scope`
+  - **Audit logging** — each approval emits structured log entries (actions: `machine_approve`, `machine_approve_bulk`)
+  - Approving a machine clears its key expiry (Headscale treats machines as authorized when not expired)
+- **Headplane UI integration** — View and approve pending machines through the web interface
+  - Pending machines list with status badges and metadata
+  - Single machine approval with user assignment confirmation
+  - Bulk selection and approval workflow
+  - Real-time status updates and error handling
+- **Documentation** — Comprehensive guides for API and UI workflows
+  - API reference (`docs/ref/api.md`) with request/response schemas, curl examples, and OpenAPI document
+  - Registration methods updated to include web-based approval (`docs/ref/registration.md`)
+  - UI guide (`docs/usage/ui-guide.md`) with approval workflow, permissions, and troubleshooting
+  - Unit tests covering single, bulk, partial-failure, and RBAC paths
+- **Error handling** — Detailed error messages for common failure cases
+
+This complements existing CLI (`headscale auth register`) and API-only approval methods,
+providing a streamlined workflow for administrators managing multiple machines.
+
+**Bug fix**: Fixed a pre-existing schema-validation failure that broke every SQLite test: 
+`hscontrol/db/schema.sql` was missing the Phase 11 `webhooks` table, and the webhook migration 
+used `AutoMigrate` (whose backticked index DDL never matched the schema file). The table now 
+uses explicit per-dialect DDL (`hscontrol/db/migrate_webhooks.go`) and is recorded in `schema.sql`. 
+A latent `TestAPIV1Derp` JSON type-assertion bug surfaced by the fix was also corrected.
+
+### Monitoring/Alerting Webhooks (Phase 11, Task 3)
+
+Added webhook support for monitoring and alerting integrations:
+
+- **Webhook API** - Full CRUD API at `/api/v1/webhooks` for managing webhook configurations
+- **Event types** - Support for `node_up`, `node_down`, `health_check_fail`, and `alert_firing` events
+- **HMAC signing** - Optional HMAC-SHA256 payload signing for webhook security via `X-Headscale-Signature` header
+- **Custom headers** - Support for custom HTTP headers (e.g., authorization tokens)
+- **Configurable timeouts** - Per-webhook timeout configuration (default: 10 seconds)
+- **Event filtering** - Each webhook can subscribe to specific event types
+- **Prometheus metrics** - `headscale_webhook_dispatch_total` (counter) and `headscale_webhook_dispatch_duration_seconds` (histogram)
+- **Database storage** - Webhook configurations persisted in database with enabled/disabled state
+- **Comprehensive documentation** - Added `docs/usage/webhooks.md` with API examples, security best practices, and integration guides for Prometheus Alertmanager and Grafana
+- **Unit tests** - Tests for HMAC signature generation, webhook dispatch, and event type validation
+
+Migration: `202609301000-create-webhooks-table` adds the `webhooks` table.
 
 ### v1 REST API replaced; gRPC and Protobuf removed
 
@@ -156,6 +439,307 @@ clients, and how to run the same setup without Nix.
 
 - Fix an exit node or subnet router not seeing its own approved routes until it reconnected, so `tailscale status` did not show it offering an exit node [#3518](https://github.com/juanfont/headscale/pull/3518)
 
+# Next
+- **Phase 10: Core Feature Expansion (IN PROGRESS)**:
+  - **Part 1: OIDC Group Support in ACLs**:
+    - Added `oidc_groups` column to the `users` table to store OIDC group
+      memberships from the identity provider's `groups` claim.
+    - OIDC groups are refreshed on every OIDC login via `User.FromClaim`.
+    - Policy engine now resolves OIDC groups in ACLs, grants, `tagOwners`,
+      and `autoApprovers` without requiring them to be defined in the policy
+      file. Policy-defined groups take precedence over OIDC groups.
+    - Added `Groups.ContainsOrOIDC` and `Policy.validateWithUsers` to validate
+      OIDC group references against the live user list.
+    - Exposed `oidcGroups` in the v1 and v2 user API responses.
+    - Added unit tests covering OIDC groups in ACL sources/destinations,
+      tag owners, auto-approvers, undefined-group rejection, and
+      policy-defined precedence.
+    - Updated documentation: `docs/about/features.md`, `docs/ref/oidc.md`,
+      `docs/ref/policy.md`.
+    - Renamed `UpdateCheckResponse` to `UpdateCheckResult` in the
+      `hscontrol/updatecheck/` package to resolve an oapi-codegen type
+      collision exposed when regenerating the API clients. The JSON wire
+      format is unchanged.
+  - **Part 2: Machine Management Parity**:
+    - **Key rotation**: Added a "Rotate key" action to the Headplane machine
+      menu. It invalidates the machine's node key via the existing expire
+      API, forcing the device to re-authenticate. Records a
+      `machine.rotate_key` audit entry.
+    - **Route overview**: Added a `/routes` page in Headplane that aggregates
+      all subnet routes and exit nodes across every machine, shows
+      approved/pending status, and allows approving or disabling routes
+      directly from the overview.
+    - Device posture remains a documented limitation (requires significant
+      policy engine changes).
+  - **Part 3: DNS Management Improvements**:
+    - The Headplane DNS page now shows a notice when `dns.extra_records_path`
+      is configured, indicating that DNS records are managed via the JSON
+      file and changes are picked up automatically.
+    - Added CNAME record support to the DNS record dialog (A, AAAA, and
+      CNAME are now offered).
+    - Added IP address validation for A (IPv4) and AAAA (IPv6) records with
+      inline error messages.
+    - Added unit tests for DNS record value validation.
+  - **Part 4: Extensibility Foundation**:
+    - Created `docs/ref/extending.md` documenting the extension points:
+      v1/v2 REST APIs, OAuth client-credentials for external tools, policy
+      engine, Headplane, and monitoring/alerting integrations.
+    - Added a Grafana dashboard JSON example to
+      `docs/usage/observability.md` visualising key Headscale metrics.
+    - Validated the Terraform provider / Kubernetes operator support via the
+      existing servertest suite (`TestAPIv2`, `TestAPIv2OAuthScopes`).
+    - Added "Extending Headscale" to the docs navigation.
+
+### Changes
+
+- **Phase 9: Supporting Features and Observability (COMPLETED)**:
+  - Added `/ready` endpoint for Kubernetes-style readiness probes. Returns 200 OK
+    when ready, 503 Service Unavailable when database is unreachable. JSON response
+    includes `ready` boolean and `status` string.
+  - Created comprehensive observability documentation at `docs/usage/observability.md`:
+    - Documented all operational endpoints (`/health`, `/ready`, `/version`, `/api/v1/health`)
+    - Cataloged all Prometheus metrics with types, descriptions, and labels:
+      HTTP metrics, MapResponse metrics, NodeStore metrics, Mapper metrics,
+      Update Check metrics, and HA Health Probe metrics
+    - Documented structured logging with zerolog (log levels, formats, best practices)
+    - Documented debug endpoints (`/debug/overview`, `/debug/config`, `/debug/policy`,
+      `/debug/pprof/`, `/debug/statsviz`)
+    - Added Prometheus scrape configuration examples and recommended alerting rules
+    - Added troubleshooting guide for common observability issues
+  - Added unit tests: `TestHealthHandler`, `TestReadyHandler`, `TestVersionHandler`
+  - All tests pass successfully
+- **Phase 8: UI/UX and Accessibility Refinement (COMPLETED)**:
+  - Created standardized UI state components: `EmptyState` (with `default`, 
+    `filtered`, and `error` variants) and `LoadingSpinner` (with accessible 
+    ARIA attributes).
+  - Refactored all data-displaying routes to use standardized components:
+    - machines, users, audit, derp, topology, and auth-keys all use `EmptyState`
+    - Configuration routes (ACLs, DNS, settings) use appropriate patterns for 
+      their editor-based UIs
+  - Verified all 25 dialogs use standardized `Dialog` + `DialogPanel` pattern
+    with proper variants (`destructive`, `normal`, `unactionable`)
+  - Confirmed tooltip component is in use on 12+ UI elements providing 
+    contextual help
+  - All component tests pass (51/51) and typecheck passes with no errors
+  - Documentation: Added comprehensive accessibility section to
+    `docs/usage/ui-guide.md` covering keyboard navigation, screen reader
+    support, visual accessibility, forms and validation, testing, known
+    limitations, and reporting process.
+  - Updated ROADMAP.md: Phase 8 status changed to [Implemented].
+  - Updated maintenance checklist to include accessibility verification.
+- **Phase 7: Testing and Technical Hardening**:
+  - Backend: Wired `DisableUpdateCheck` into the fork's update-check endpoint.
+    When `disable_check_updates: true` is set, the endpoint skips the remote
+    comparison and returns version info only.
+  - Backend: Added `TestAPIV1Derp` and `TestAPIV1DerpInSpec` to verify the
+    `/api/v1/derp` endpoint response shape and its presence in the OpenAPI spec.
+  - Backend: Added `TestBuildResponse_Disabled` to verify the disabled behavior.
+  - Headplane: Added a UI component testing framework (Vitest + jsdom +
+    React Testing Library) with 38 component tests covering button, chip,
+    status-circle, table-list, token-list, tabs, and switch. Wire into CI.
+  - Headplane: Fixed `HEADPLANE_LOAD_ENV_OVERRIDES` documentation
+    inconsistency in `docs/configuration/index.md`.
+  - Headplane: Removed legacy `useUpdateCheck.ts` and `git-api.ts` (dead code;
+    only `useUpdateCheckContext` from `UpdateCheckProvider` is used).
+  - Docs: Updated `docs/usage/ui-guide.md` to track screenshot placeholders as
+    a maintenance task.
+  - Docs: Updated `ROADMAP.md` to mark Phase 7 as Implemented.
+
+## 0.34.0-arsydoni4326-alt (2026-09-29)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- **Phase 6: Community and Ecosystem**:
+  - Added a UX feedback issue template (`.github/ISSUE_TEMPLATE/ux_feedback.yaml`)
+    for UI/UX feedback on Headplane.
+  - Updated `CONTRIBUTING.md` with:
+    - A comprehensive list of fork-specific features (update-check, version
+      suffix, DERP endpoint, audit log, topology, bulk operations,
+      export/import, version compatibility tracking).
+    - The feature-preservation rule and the CI gate that protects fork-specific
+      paths from accidental removal during upstream merges.
+    - Fork repository targets and submodule pinning guidance.
+    - Community links (Discord, issue tracker, Code of Conduct).
+  - Updated `ROADMAP.md`: Phase 6 marked Completed; added a "Headplane roadmap
+    sync" section documenting the process for keeping both roadmaps consistent
+    when items span backend and frontend.
+  - Updated `session.md` with Phase 6 progress.
+
+## 0.33.0-arsydoni4326-alt (2026-09-28)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- **Phase 5: Testing, Performance, and CI/CD**:
+  - Backend: added deterministic edge-case tests for the update-check endpoint
+    (GitHub API non-200/empty/malformed responses, cache behavior, repo-config
+    env var handling, release/commit comparison fallbacks). The GitHub API base
+    URL is now a package variable so tests can point it at a local server.
+  - CI: the fork-features gate now also verifies `hscontrol/api/v1/updatecheck.go`
+    and `hscontrol/api/v1/derp.go` survive upstream merges.
+  - Updated `headplane` submodule to `v0.8.1-arsydoni4326-alt` (Phase 5 frontend
+    work: Playwright e2e + axe-core accessibility tests, Lighthouse CI,
+    bundle-size analysis).
+
+## 0.32.0-arsydoni4326-alt (2026-09-28)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Added a read-only `GET /api/v1/derp` endpoint that returns the current DERP
+  relay map configuration (regions, nodes, DERP/STUN ports, IPv4/IPv6). This
+  powers the DERP status page in Headplane.
+- Updated `headplane` submodule to `v0.8.0-arsydoni4326-alt` (Phase 4 feature
+  expansion: audit log, DERP status, topology, bulk operations, export/import,
+  version compatibility tracking).
+
+## 0.31.0-arsydoni4326-alt (2026-09-27)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Fixed the `golangci-lint` and `treefmt-check` failures reported by the CI
+  (`nix-checks.yml`): wrapped sentinel errors (err113), context-aware HTTP
+  requests in tests (noctx), `any` instead of `interface{}` (modernize),
+  removed `time.Sleep` from the cache-expiry test (forbidigo), split inline
+  error handling (noinlineerr), unnamed returns from `BuildInfo()`
+  (nonamedreturns), string concatenation (perfsprint), `unknownVersion`
+  constant (goconst), dedicated `Deprecated:` paragraphs (gocritic), aligned
+  struct tags (tagalign), and whitespace fixes (nlreturn, wsl_v5) across
+  `hscontrol/updatecheck/`, `hscontrol/api/v1/updatecheck.go`, and
+  `hscontrol/types/version.go`.
+- Added trailing newlines to `SPECIFICATION.md`, `ROADMAP.md`, and
+  `ARCHITECTURE.md` so the treefmt prettier check passes.
+- Updated `headplane` submodule (Dockerfile version args, CHANGELOG `# Next`
+  section).
+
+## 0.30.0-arsydoni4326-alt (2026-09-27)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Docker builds now embed the short commit hash, build time, and version into
+  the binary via `-ldflags` (`hscontrol/types.Version`, `hscontrol/types.Commit`,
+  `hscontrol/types.BuildDate`). The `/version` and `/api/v1/update-check`
+  endpoints now report real values instead of `dev`/`unknown` for container
+  images built by the CI pipeline. The `Makefile` build target embeds the same
+  metadata.
+- Updated `headplane` submodule to `v0.7.9-arsydoni4326-alt`.
+
+## 0.29.10-arsydoni4326-alt (2026-09-26)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- **Phase 3: UI/UX Polish** — Audit, documentation, and minor style improvements:
+  - UI Inventory & Audit: read all server-rendered template files and the
+    Headplane frontend component library, cataloguing UI elements, shared
+    components, and polishing opportunities.
+  - Created `docs/usage/ui-guide.md` with screenshot placeholders, Mermaid
+    flow diagrams for key user flows, contributor guidance, and a maintenance
+    checklist.
+  - Created `docs/assets/screenshots/` and `docs/assets/diagrams/` directories
+    for storing visual documentation.
+  - Updated `mkdocs.yml` to include the UI Guide in the documentation nav.
+  - Accessibility: added `role="img"` to status circle SVG; verified focus
+    states, ARIA labels, and keyboard navigation across all components.
+  - Visual refinements: increased table-list item padding for touch targets;
+    simplified add button icon sizing in token list editor; added
+    `active:scale-[0.98]` press-state feedback on buttons; added entrance
+    animation (opacity + scale) to dialog panels; added transition-opacity
+    to mobile navigation tabs.
+- Updated `headplane` submodule to `v0.7.8-arsydoni4326-alt`.
+
+## 0.29.9-arsydoni4326-alt (2026-09-26)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Added root-level `SPECIFICATION.md` and `ARCHITECTURE.md` describing the fork
+  as a whole (backend + frontend), including the fork-specific features and the
+  feature-preservation rule.
+- Added a CI check that verifies `hscontrol/updatecheck/` and
+  `headplane/app/update-check/` still exist after every merge, so an upstream
+  merge cannot silently delete them.
+- Documented the fork-specific features in the user-facing docs site (`docs/`),
+  including the update-check endpoint and the version suffix convention.
+- Added the `/api/v1/update-check` endpoint to the OpenAPI specification so it
+  is discoverable alongside the rest of the v1 API.
+- **Update-check hardening** (Phase 2):
+  - Server-side caching of GitHub API responses (15-min TTL, mutex-protected
+    with singleflight behavior) to stay within unauthenticated rate limits.
+  - Configurable remote repository via `HEADSCALE_UPDATE_CHECK_REPO` env var
+    (format: `owner/repo`), defaulting to `arsydoni4326-alt/headscale`.
+  - Release version comparison for tagged builds: fetches the latest release
+    tag from GitHub and compares versions via semver precedence. Falls back to
+    commit-hash comparison for dev builds (dirty, pseudo-version, or untagged).
+  - Prometheus metrics: `headscale_updatecheck_requests_total`,
+    `headscale_updatecheck_remote_failures_total`,
+    `headscale_updatecheck_cache_hits_total`,
+    `headscale_updatecheck_cache_misses_total`.
+  - Frontend sessionStorage caching (15-min TTL) so the modal does not re-fetch
+    on every page load; manual checks bypass the cache.
+  - "Dismiss for this session" and "Remind me later (24h)" buttons on the
+    update modal, using sessionStorage.
+  - Release notes link when a tag-based update is detected.
+  - Comprehensive edge-case tests: version parsing, semver comparison, cache
+    hit/miss/expiry, malformed GitHub API responses, Go module pseudo-version
+    detection, dev-build fallback.
+
+## 0.29.8-arsydoni4326-alt (2026-09-25)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Added `ROADMAP.md` with a multi-phase improvement roadmap for the fork.
+- Added `session.md` to `.gitignore` (AI working context is no longer tracked).
+- Updated `headplane` submodule to `v0.7.6-arsydoni4326-alt`.
+
+## 0.29.7-arsydoni4326-alt (2026-09-25)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Added `GET /api/v1/update-check` endpoint for checking updates against the
+  fork repository (`github.com/arsydoni4326-alt/headscale`). Returns current
+  version info; optionally fetches remote latest commit with `?check=true`.
+- Fixed `CPA_VERSION`/`CPA_COMMIT` naming inconsistency in Dockerfile
+  (renamed to `APP_VERSION`/`APP_COMMIT`).
+- Updated `headplane` submodule to `v0.7.5-arsydoni4326-alt`.
+
+## 0.29.6-arsydoni4326-alt (2026-09-25)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Use the repo `Dockerfile` for the GHCR deploy build
+
+## 0.29.4-arsydoni4326-alt (2026-09-25)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
 ## 0.29.4 (2026-09-23)
 
 **Minimum supported Tailscale client version: v1.80.0**
@@ -179,6 +763,16 @@ clients, and how to run the same setup without Nix.
 - Fix `#`-prefixed metadata fields being rejected outside `acls`, so policy editors can store metadata in grants, SSH rules and `nodeAttrs` [#3481](https://github.com/juanfont/headscale/pull/3481)
 - Fix exit nodes not offered by recent macOS and iOS clients, which read the `suggest-exit-node` peer attribute rather than the advertised `0.0.0.0/0` routes [#3487](https://github.com/juanfont/headscale/pull/3487)
 - Fix exit node not offered to viewers whose only matching rule is a `via` grant; peer visibility now comes from the peer map alone [#3409](https://github.com/juanfont/headscale/pull/3409)
+- Use `Dockerfile.tailscale-HEAD` for the GHCR deploy build
+
+## 0.29.3-arsydoni4326-alt (2026-09-25)
+
+Fork release of the `arsydoni4326-alt` fork. Version numbers in this fork
+always end with `-arsydoni4326-alt`.
+
+### Changes
+
+- Add GHCR Docker build workflow and headplane submodule
 
 ## 0.29.3 (2026-07-29)
 

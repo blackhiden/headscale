@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	hsdb "github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 )
 
@@ -180,7 +180,7 @@ func (s *State) DebugSSHPolicies() map[string]*tailcfg.SSHPolicy {
 func (s *State) DebugRegistrationCache() map[string]any {
 	return map[string]any{
 		"type":        "expirable-lru",
-		"expiration":  registerCacheExpiration.String(),
+		"expiration":  s.authCacheExpiration.String(),
 		"max_entries": defaultRegisterCacheMaxEntries,
 		"current_len": s.authCache.Len(),
 		"status":      "active",

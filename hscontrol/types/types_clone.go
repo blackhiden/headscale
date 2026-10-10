@@ -23,6 +23,7 @@ func (src *User) Clone() *User {
 	}
 	dst := new(User)
 	*dst = *src
+	dst.OIDCGroups = append(src.OIDCGroups[:0:0], src.OIDCGroups...)
 	return dst
 }
 
@@ -34,6 +35,7 @@ var _UserCloneNeedsRegeneration = User(struct {
 	Email              string
 	ProviderIdentifier sql.NullString
 	Provider           string
+	OIDCGroups         []string
 	ProfilePicURL      string
 }{})
 
@@ -56,9 +58,7 @@ func (src *Node) Clone() *Node {
 	if dst.UserID != nil {
 		dst.UserID = new(*src.UserID)
 	}
-	if dst.User != nil {
-		dst.User = new(*src.User)
-	}
+	dst.User = src.User.Clone()
 	dst.Tags = append(src.Tags[:0:0], src.Tags...)
 	if dst.AuthKeyID != nil {
 		dst.AuthKeyID = new(*src.AuthKeyID)
@@ -122,9 +122,7 @@ func (src *PreAuthKey) Clone() *PreAuthKey {
 	if dst.UserID != nil {
 		dst.UserID = new(*src.UserID)
 	}
-	if dst.User != nil {
-		dst.User = new(*src.User)
-	}
+	dst.User = src.User.Clone()
 	dst.Tags = append(src.Tags[:0:0], src.Tags...)
 	if dst.CreatedAt != nil {
 		dst.CreatedAt = new(*src.CreatedAt)

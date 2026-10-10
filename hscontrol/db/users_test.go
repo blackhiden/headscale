@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -93,7 +93,7 @@ func TestDestroyUserErrors(t *testing.T) {
 			},
 		},
 		{
-			// https://github.com/juanfont/headscale/issues/3077
+			// https://github.com/arsydoni4326-alt/headscale/issues/3077
 			// Tagged nodes have user_id = NULL, so they do not block
 			// user deletion and are unaffected by ON DELETE CASCADE.
 			name: "success_user_only_has_tagged_nodes",
@@ -164,7 +164,7 @@ func TestDestroyUserErrors(t *testing.T) {
 			},
 		},
 		{
-			// Regression test for https://github.com/juanfont/headscale/issues/3154
+			// Regression test for https://github.com/arsydoni4326-alt/headscale/issues/3154
 			// DestroyUser must only delete the target user's pre-auth keys,
 			// not all pre-auth keys in the database.
 			name: "success_only_deletes_own_preauthkeys",

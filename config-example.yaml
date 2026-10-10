@@ -135,6 +135,15 @@ derp:
 
 # Disables the automatic check for headscale updates on startup
 disable_check_updates: false
+# When true, the fork's update-check endpoint (/api/v1/update-check) skips the
+# remote comparison and returns the running binary's version info only, even
+# when ?check=true is requested.
+
+# Remote repository for the update-check endpoint (/api/v1/update-check).
+# Overrides the default (arsydoni4326-alt/headscale).
+# Can also be set via the HEADSCALE_UPDATE_CHECK_REPO environment variable.
+# update_check:
+#   repo: "arsydoni4326-alt/headscale"
 
 # Node lifecycle configuration.
 node:
@@ -433,6 +442,20 @@ unix_socket_permission: "0770"
 #     # - S256: Use SHA256 hashed code verifier (default, recommended)
 #     method: S256
 
+# Headplane configuration
+# https://headscale.net/stable/ref/headplane/
+# headplane:
+#   # Password for Headplane web UI authentication.
+#   # This provides a simpler alternative to API keys for accessing the Headplane web interface.
+#   # Can be overridden by the HEADSCALE_HEADPLANE_PASSWORD environment variable.
+#   #
+#   # SECURITY WARNING: Change this password in production deployments.
+#   # Use a strong, randomly-generated password for production use.
+#   # The password is transmitted over HTTPS and should never be hardcoded in scripts.
+#   #
+#   # Example: password: "your-secure-password-here"
+#   password: ""
+
 # Logtail configuration
 # Logtail is Tailscales logging and auditing infrastructure, it allows the
 # control panel to instruct tailscale nodes to log their activity to a remote
@@ -462,6 +485,30 @@ taildrop:
 # choice.
 auto_update:
   enabled: false
+
+# Headplane web UI configuration
+headplane:
+  # Password for Headplane web UI login.
+  # This password grants access to the Headplane web interface only,
+  # not the Headscale API. For API access, use API keys.
+  #
+  # ⚠️  SECURITY WARNING:
+  # - Change this password before deploying to production
+  # - Use a strong, randomly generated password (minimum 16 characters)
+  # - Never commit passwords to version control
+  # - Use HTTPS in production to protect credentials in transit
+  #
+  # Can also be set via the HEADSCALE_HEADPLANE_PASSWORD environment variable,
+  # which takes precedence over this config file value.
+  #
+  # Authentication details:
+  # - Scope: Headplane web UI access only (not for API automation)
+  # - Rate limiting: 5 login attempts per minute per IP address
+  # - Session duration: 24 hours from login
+  # - API endpoint: POST /api/v1/headplane/login
+  #
+  # See https://headscale.net/stable/usage/authentication/ for details.
+  password: "change-this-secure-password-in-production"
 
 # Advanced performance tuning parameters.
 # The defaults are carefully chosen and should rarely need adjustment.

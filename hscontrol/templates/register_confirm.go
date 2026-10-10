@@ -43,6 +43,11 @@ type RegisterConfirmInfo struct {
 	// MachineKey is the short fingerprint of the registering machine
 	// key. The full key is intentionally not shown.
 	MachineKey string
+
+	// QRCodeDataURL is a base64-encoded data URL of the QR code PNG
+	// image for Headplane mobile scanning. Empty string if QR generation
+	// failed; the template omits the QR section when empty.
+	QRCodeDataURL string
 }
 
 // RegisterConfirm renders an interstitial page that asks the
@@ -61,6 +66,22 @@ func RegisterConfirm(info RegisterConfirmInfo) *elem.Element {
 		},
 	)
 
+	// Build content nodes: device table, optional QR section, then form
+	content := []elem.Node{
+		H2(elem.Text("Confirm node registration")),
+		P(elem.Text(
+			"A device is asking to be added to your tailnet. " +
+				"Please review the details below and confirm that this device is yours.",
+		)),
+		deviceList,
+	}
+
+	// Add QR code section if available
+	if info.QRCodeDataURL != "" {
+		content = append(content, qrSection(info.QRCodeDataURL))
+	}
+
+	// Add confirmation form
 	form := elem.Form(
 		attrs.Props{
 			attrs.Method: "POST",
@@ -76,21 +97,15 @@ func RegisterConfirm(info RegisterConfirmInfo) *elem.Element {
 			elem.Text("Confirm registration"),
 		),
 	)
+	content = append(content, form)
 
-	return page(
-		"Headscale - Confirm node registration",
-		H2(elem.Text("Confirm node registration")),
-		P(elem.Text(
-			"A device is asking to be added to your tailnet. "+
-				"Please review the details below and confirm that this device is yours.",
-		)),
-		deviceList,
-		form,
-		P(elem.Text(
-			"If you do not recognise this device, close this window. "+
-				"The registration request will expire automatically.",
-		)),
-	)
+	// Add footer text
+	content = append(content, P(elem.Text(
+		"If you do not recognise this device, close this window. "+
+			"The registration request will expire automatically.",
+	)))
+
+	return page("Headscale - Confirm node registration", content...)
 }
 
 type deviceRow struct {
@@ -129,4 +144,46 @@ func deviceTable(rows []deviceRow) *elem.Element {
 			styles.MarginBottom:   "1.5em",
 		}.ToInline(),
 	}, tableRows...)
+}
+
+// qrSection creates a section displaying a QR code for Headplane mobile scanning.
+// The QR code is embedded as a base64 data URL and styled to be responsive.
+func qrSection(dataURL string) *elem.Element {
+	return elem.Div(
+		attrs.Props{
+			attrs.Style: styles.Props{
+				styles.MarginTop:    "2rem",
+				styles.MarginBottom: "2rem",
+				styles.Padding:      spaceL,
+				styles.Background:   "var(--hs-bg)",
+				styles.Border:       cssBorderHS,
+				styles.BorderRadius: "0.5rem",
+				styles.TextAlign:    cssCenter,
+			}.ToInline(),
+		},
+		H3(elem.Text("Or scan with Headplane")),
+		elem.P(
+			attrs.Props{
+				attrs.Style: styles.Props{
+					styles.MarginBottom: spaceM,
+					styles.Color:        "var(--md-default-fg-color--light)",
+				}.ToInline(),
+			},
+			elem.Text("Navigate to: "),
+			elem.Strong(nil, elem.Text("Machines → Scan QR")),
+		),
+		elem.Img(attrs.Props{
+			attrs.Src: dataURL,
+			attrs.Alt: "Registration QR Code",
+			attrs.Style: styles.Props{
+				styles.MaxWidth:     "256px",
+				styles.Width:        "100%",
+				styles.Height:       "auto",
+				styles.Display:      "block",
+				styles.MarginLeft:   "auto",
+				styles.MarginRight:  "auto",
+				styles.BorderRadius: "0.375rem",
+			}.ToInline(),
+		}),
+	)
 }

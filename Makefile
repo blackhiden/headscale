@@ -3,6 +3,8 @@
 
 # Version calculation
 VERSION ?= $(shell git describe --always --tags --dirty)
+COMMIT ?= $(shell git rev-parse --short HEAD)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Build configuration
 GOOS ?= $(shell uname | tr '[:upper:]' '[:lower:]')
@@ -39,7 +41,7 @@ check-deps:
 .PHONY: build
 build: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Building headscale..."
-	go build $(PIE_FLAGS) -ldflags "-X main.version=$(VERSION)" -o headscale ./cmd/headscale
+	go build $(PIE_FLAGS) -ldflags "-X github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=$(VERSION) -X github.com/arsydoni4326-alt/headscale/hscontrol/types.Commit=$(COMMIT) -X github.com/arsydoni4326-alt/headscale/hscontrol/types.BuildDate=$(BUILD_DATE)" -o headscale ./cmd/headscale
 
 # Test targets
 .PHONY: test

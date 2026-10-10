@@ -3,7 +3,7 @@ package hscontrol
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/templates"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/templates"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/puzpuzpuz/xsync/v4"
@@ -668,7 +668,7 @@ func (b *Batcher) addToBatch(changes ...change.Change) {
 	// [change.Change.PeersRemoved] remains only the protocol delta sent to clients
 	// when peers disappear from their view.
 	//
-	// See: https://github.com/juanfont/headscale/issues/2924
+	// See: https://github.com/arsydoni4326-alt/headscale/issues/2924
 	for _, ch := range changes {
 		for _, removedID := range ch.DeletedNodes {
 			if nc, existed := b.nodes.LoadAndDelete(removedID); existed {
@@ -679,7 +679,7 @@ func (b *Batcher) addToBatch(changes ...change.Change) {
 				// longer exists: [Batcher.Close] ranges b.nodes and can no
 				// longer reach it, so shutdown blocks on clientStreamsOpen, and
 				// the client keeps polling a node it should be re-authenticating.
-				// See: https://github.com/juanfont/headscale/issues/3410
+				// See: https://github.com/arsydoni4326-alt/headscale/issues/3410
 				if nc != nil {
 					nc.close()
 				}

@@ -1,10 +1,10 @@
 package templates
 
 import (
+	"github.com/arsydoni4326-alt/headscale/hscontrol/assets"
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 	"github.com/chasefleming/elem-go/styles"
-	"github.com/juanfont/headscale/hscontrol/assets"
 )
 
 // mdTypesetBody creates a body element with md-typeset styling
@@ -104,7 +104,7 @@ func pageFooter() *elem.Element {
 		},
 		elem.Text("Powered by "),
 		elem.A(attrs.Props{
-			attrs.Href:   "https://github.com/juanfont/headscale",
+			attrs.Href:   "https://github.com/arsydoni4326-alt/headscale",
 			attrs.Rel:    "noreferrer noopener",
 			attrs.Target: "_blank",
 		}, elem.Text("Headscale")),

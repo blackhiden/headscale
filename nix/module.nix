@@ -96,7 +96,7 @@ in
       settings = lib.mkOption {
         description = ''
           Overrides to {file}`config.yaml` as a Nix attribute set.
-          Check the [example config](https://github.com/juanfont/headscale/blob/main/config-example.yaml)
+          Check the [example config](https://github.com/arsydoni4326-alt/headscale/blob/main/config-example.yaml)
           for possible options.
         '';
         type = lib.types.submodule {

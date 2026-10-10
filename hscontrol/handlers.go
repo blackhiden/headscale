@@ -2,6 +2,7 @@ package hscontrol
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/assets"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/assets"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/qr"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/templates"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -205,7 +207,7 @@ func (h *Headscale) KeyHandler(
 	// isSupportedVersion in noise.go) keeps /key consistent with /ts2021:
 	// versions the handshake would reject get a clear rejection here
 	// instead of a key that only serves as a version-boundary oracle.
-	// See https://github.com/juanfont/headscale/issues/3380.
+	// See https://github.com/arsydoni4326-alt/headscale/issues/3380.
 	if !isSupportedVersion(capVer) {
 		httpError(writer, NewHTTPError(http.StatusBadRequest, "unsupported client version", unsupportedClientError(capVer)))
 		return
@@ -258,6 +260,47 @@ func (h *Headscale) HealthHandler(
 	respond(nil)
 }
 
+// ReadyHandler returns the readiness status of the Headscale server.
+// This endpoint is intended for Kubernetes-style readiness probes.
+// It checks if the server is ready to accept traffic (database connectivity).
+// Unlike /health, this may return 503 during startup or maintenance windows.
+func (h *Headscale) ReadyHandler(
+	writer http.ResponseWriter,
+	req *http.Request,
+) {
+	respond := func(ready bool, err error) {
+		writer.Header().Set("Content-Type", "application/json")
+
+		res := struct {
+			Ready  bool   `json:"ready"`
+			Status string `json:"status"`
+		}{
+			Ready:  ready,
+			Status: "ready",
+		}
+
+		if !ready {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			res.Status = "not ready"
+		}
+
+		encErr := json.NewEncoder(writer).Encode(res)
+		if encErr != nil {
+			log.Error().Err(encErr).Msg("failed to encode readiness response")
+		}
+	}
+
+	// Check database connectivity
+	err := h.state.PingDB(req.Context())
+	if err != nil {
+		log.Warn().Err(err).Msg("readiness check failed: database not reachable")
+		respond(false, err)
+		return
+	}
+
+	respond(true, nil)
+}
+
 func (h *Headscale) RobotsHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
@@ -295,11 +338,13 @@ func (h *Headscale) VersionHandler(
 }
 
 type AuthProviderWeb struct {
+	h         *Headscale
 	serverURL string
 }
 
-func NewAuthProviderWeb(serverURL string) *AuthProviderWeb {
+func NewAuthProviderWeb(h *Headscale, serverURL string) *AuthProviderWeb {
 	return &AuthProviderWeb{
+		h:         h,
 		serverURL: serverURL,
 	}
 }
@@ -340,6 +385,7 @@ func (a *AuthProviderWeb) AuthHandler(
 		"Authentication check",
 		"Run the command below in the headscale server to approve this authentication request:",
 		"headscale auth approve --auth-id "+authID.String(),
+		"",
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write auth response")
@@ -378,6 +424,21 @@ func (a *AuthProviderWeb) RegisterHandler(
 		return
 	}
 
+	qrCodeDataURL := ""
+	if authReq, ok := a.h.state.GetAuthCacheEntry(authId); ok && authReq.IsRegistration() {
+		qrPNG, qrErr := qr.GenerateRegistrationQR(
+			authId.String(),
+			a.serverURL,
+			authReq.ExpiresAt(),
+		)
+		if qrErr != nil {
+			log.Warn().Err(qrErr).Msg("failed to generate registration QR code")
+		} else {
+			qrCodeDataURL = "data:image/png;base64," + base64.StdEncoding.EncodeToString(qrPNG)
+		}
+	}
+
+	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 
@@ -385,6 +446,7 @@ func (a *AuthProviderWeb) RegisterHandler(
 		"Node registration",
 		"Run the command below in the headscale server to add this node to your network:",
 		fmt.Sprintf("headscale auth register --auth-id %s --user USERNAME", authId.String()),
+		qrCodeDataURL,
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write register response")

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,13 +13,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/qr"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/templates"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 	"tailscale.com/util/rands"
@@ -861,6 +863,19 @@ func (a *AuthProviderOIDC) RegisterConfirmGetHandler(
 	}
 	if regData.Hostinfo != nil {
 		info.OS = regData.Hostinfo.OS
+	}
+
+	// Generate QR code for Headplane mobile scanning. Graceful fallback:
+	// if generation fails, the template omits the QR section.
+	// Default to 15 minutes from now to match auth cache TTL if no explicit expiry.
+	expiresAt := time.Now().Add(15 * time.Minute)
+	if pending.NodeExpiry != nil {
+		expiresAt = *pending.NodeExpiry
+	}
+	if qrPNG, err := qr.GenerateRegistrationQR(authID.String(), a.serverURL, expiresAt); err == nil {
+		info.QRCodeDataURL = "data:image/png;base64," + base64.StdEncoding.EncodeToString(qrPNG)
+	} else {
+		log.Warn().Err(err).Msg("Failed to generate registration QR code")
 	}
 
 	// The page carries the token that finalises the registration, so no

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -1012,7 +1012,7 @@ func TestSSHPolicyRemovalClearsRules(t *testing.T) {
 
 // TestTagPropagationToPeerMap tests that when a node's tags change,
 // the peer map is correctly updated. This is a regression test for
-// https://github.com/juanfont/headscale/issues/2389
+// https://github.com/arsydoni4326-alt/headscale/issues/2389
 func TestTagPropagationToPeerMap(t *testing.T) {
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
@@ -2982,7 +2982,7 @@ func TestValidateUserReferences_AllSites(t *testing.T) {
 }
 
 // TestPeerRelayGrantMakesRelayVisible is a regression test for
-// https://github.com/juanfont/headscale/issues/3256.
+// https://github.com/arsydoni4326-alt/headscale/issues/3256.
 //
 // A grant that uses only `app: { "tailscale.com/cap/relay": [] }` must
 // make the relay node visible to the source nodes (and vice-versa).

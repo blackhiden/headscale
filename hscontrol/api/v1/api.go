@@ -15,9 +15,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/scope"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
 )
 
 // Backend is the dependency surface the v1 API needs from the control plane:
@@ -111,9 +112,23 @@ func Handler(backend Backend) (*chi.Mux, huma.API) {
 // the auth middleware skips authentication for such requests.
 type localTrustKey struct{}
 
+// principalKey is the context key under which the auth middleware records the
+// caller's principal: principalAdminKey is set for an all-access admin API key
+// (or a locally-trusted request) and principalScopesKey carries the granted
+// scopes of an OAuth access token. Handlers use these to apply capability-level
+// RBAC beyond authentication, e.g. [registerMachines] requires the
+// devices:core scope.
+type principalKey int
+
+const (
+	principalAdminKey principalKey = iota
+	principalScopesKey
+)
+
 // WithLocalTrust wraps a handler so its requests bypass API-key authentication.
 // The unix socket uses this — access to the socket is the trust boundary — as
-// do in-process tests that exercise the mux directly.
+// do in-process tests that exercise the mux directly. Such requests are treated
+// as all-access (admin), since the transport itself is privileged.
 func WithLocalTrust(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		next.ServeHTTP(w, req.WithContext(
@@ -122,15 +137,18 @@ func WithLocalTrust(next http.Handler) http.Handler {
 	})
 }
 
-// authMiddleware is a pure gate enforcing the bearer API key for any operation
-// that declares security; the v1 handlers do not read caller identity.
-// Locally-trusted requests and operations without declared security pass
-// through. b.State is nil only during spec emission, where no request is
-// served, so it is never dereferenced there.
+// authMiddleware enforces the bearer credential for any operation that declares
+// security and records the caller's principal on the context so handlers can
+// apply capability-level RBAC. An admin API key is all-access (recorded as
+// principalAdminKey); an OAuth access token is scope-limited (its granted
+// scopes recorded under principalScopesKey) and rejected when it lacks the
+// operation's declared scope (see [requireScope]). Locally-trusted requests and
+// operations without declared security pass through. b.State is nil only during
+// spec emission, where no request is served, so it is never dereferenced there.
 func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		if ctx.Context().Value(localTrustKey{}) != nil {
-			next(ctx)
+			next(huma.WithValue(ctx, principalAdminKey, true))
 
 			return
 		}
@@ -142,8 +160,31 @@ func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Contex
 		}
 
 		token, ok := strings.CutPrefix(ctx.Header("Authorization"), "Bearer ")
-		if !ok {
+		if !ok || token == "" {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+
+			return
+		}
+
+		// An OAuth access token is scope-limited; an admin API key is
+		// all-access. They are told apart by prefix so a scoped token can never
+		// be mistaken for an all-access key.
+		if strings.HasPrefix(token, types.AccessTokenPrefix) {
+			at, err := b.State.AuthenticateAccessToken(token)
+			if err != nil {
+				_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+
+				return
+			}
+
+			if want, ok := requiredScope(ctx.Operation()); ok && !scope.Grants(scope.Parse(at.Scopes), want) {
+				_ = huma.WriteErr(api, ctx, http.StatusForbidden,
+					"credential is missing the required scope "+string(want))
+
+				return
+			}
+
+			next(huma.WithValue(ctx, principalScopesKey, at.Scopes))
 
 			return
 		}
@@ -155,6 +196,66 @@ func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Contex
 			return
 		}
 
-		next(ctx)
+		next(huma.WithValue(ctx, principalAdminKey, true))
 	}
+}
+
+// isAdmin reports whether the request's principal holds all-access admin
+// rights: an admin API key or a locally-trusted request. A scope-limited OAuth
+// token is not admin.
+func isAdmin(ctx context.Context) bool {
+	admin, _ := ctx.Value(principalAdminKey).(bool)
+
+	return admin
+}
+
+// principalScopes returns the scopes granted to the request's OAuth access
+// token, and whether the request authenticated with one. ok is false for an
+// admin API key, which is all-access and not scope-checked.
+func principalScopes(ctx context.Context) ([]string, bool) {
+	scopes, ok := ctx.Value(principalScopesKey).([]string)
+
+	return scopes, ok
+}
+
+// scopeMetaKey keys the per-operation required scope in huma.Operation.Metadata.
+const scopeMetaKey = "headscale.scope"
+
+// requireScope records op's required scope, both in its Metadata (where the
+// auth middleware reads it back) and in the generated OpenAPI document: an
+// x-required-scope extension for machine consumers and a Description line so
+// the rendered docs state what each operation needs. An admin API key is
+// all-access and is never scope-checked.
+func requireScope(op huma.Operation, s scope.Scope) huma.Operation {
+	if op.Metadata == nil {
+		op.Metadata = map[string]any{}
+	}
+
+	op.Metadata[scopeMetaKey] = s
+
+	if op.Extensions == nil {
+		op.Extensions = map[string]any{}
+	}
+
+	op.Extensions["x-required-scope"] = string(s)
+
+	note := "Requires the `" + string(s) + "` OAuth scope (an admin API key is all-access)."
+	if op.Description == "" {
+		op.Description = note
+	} else {
+		op.Description += "\n\n" + note
+	}
+
+	return op
+}
+
+// requiredScope returns the scope an operation declared via requireScope, if any.
+func requiredScope(op *huma.Operation) (scope.Scope, bool) {
+	if op == nil || op.Metadata == nil {
+		return "", false
+	}
+
+	s, ok := op.Metadata[scopeMetaKey].(scope.Scope)
+
+	return s, ok
 }

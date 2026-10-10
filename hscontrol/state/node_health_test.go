@@ -3,8 +3,8 @@ package state
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 )
 

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
+	apiv1 "github.com/arsydoni4326-alt/headscale/hscontrol/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,6 +69,29 @@ func callHandler(handler http.Handler, method, path string, body []byte) httpRes
 	req := httptest.NewRequestWithContext(context.Background(), method, path, reader)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	return httpResult{status: rec.Code, body: rec.Body.Bytes()}
+}
+
+// callHandlerAuth issues a request with an Authorization header and WITHOUT the
+// local-trust bypass, so the auth middleware runs. Used to exercise RBAC.
+func callHandlerAuth(handler http.Handler, method, path, authHeader string, body []byte) httpResult {
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+
+	req := httptest.NewRequestWithContext(context.Background(), method, path, reader)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
 	}
 
 	rec := httptest.NewRecorder()

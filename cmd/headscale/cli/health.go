@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
+	clientv1 "github.com/arsydoni4326-alt/headscale/gen/client/v1"
 	"github.com/spf13/cobra"
 )
 

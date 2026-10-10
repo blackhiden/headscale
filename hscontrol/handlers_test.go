@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/capver"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -54,6 +54,28 @@ func TestHandleVerifyRequest_OversizedBodyRejected(t *testing.T) {
 
 	assert.Equal(t, http.StatusRequestEntityTooLarge, httpErr.Code,
 		"oversized body must surface 413")
+}
+
+func TestRegisterHandlerRendersQRForPendingRegistration(t *testing.T) {
+	app := createTestApp(t)
+	authID := types.MustAuthID()
+	app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(&types.RegistrationData{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/register/"+authID.String(), nil)
+	rec := httptest.NewRecorder()
+	app.HTTPHandler().ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	assert.Contains(t, rec.Body.String(), "headscale auth register --auth-id "+authID.String())
+	assert.Contains(t, rec.Body.String(), "Or scan with Headplane")
+	assert.Contains(t, rec.Body.String(), `src="data:image/png;base64,`)
+
+	pending, ok := app.state.GetAuthCacheEntry(authID)
+	require.True(t, ok)
+	assert.False(t, pending.ExpiresAt().IsZero())
+	assert.True(t, pending.ExpiresAt().After(time.Now()))
 }
 
 // TestVerifyHandler_SuccessSetsJSONContentType verifies that a successful
@@ -214,7 +236,7 @@ func TestHandleVerifyRequest_AdmitsByNodeKey(t *testing.T) {
 }
 
 // TestKeyHandler_UnsupportedCapVerDoesNotLeakKey reproduces
-// https://github.com/juanfont/headscale/issues/3380. The /key handler
+// https://github.com/arsydoni4326-alt/headscale/issues/3380. The /key handler
 // must gate key disclosure on the same floor the Noise handshake
 // enforces (capver.MinSupportedCapabilityVersion). A capability version
 // below that floor can never complete a handshake, so it must be
@@ -349,4 +371,137 @@ func TestHttpUserError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHealthHandler(t *testing.T) {
+	tmpDir := t.TempDir()
+	prefixV4 := netip.MustParsePrefix("100.64.0.0/10")
+	prefixV6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
+
+	cfg := &types.Config{
+		ServerURL:           "http://localhost:0",
+		NoisePrivateKeyPath: tmpDir + "/noise_private.key",
+		PrefixV4:            &prefixV4,
+		PrefixV6:            &prefixV6,
+		IPAllocation:        types.IPAllocationStrategySequential,
+		Database: types.DatabaseConfig{
+			Type: "sqlite3",
+			Sqlite: types.SqliteConfig{
+				Path: tmpDir + "/headscale_test.db",
+			},
+		},
+		Policy: types.PolicyConfig{
+			Mode: types.PolicyModeDB,
+		},
+	}
+
+	h, err := NewHeadscale(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = h.state.Close()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rr := httptest.NewRecorder()
+
+	h.HealthHandler(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/health+json; charset=utf-8", rr.Header().Get("Content-Type"))
+
+	var resp struct {
+		Status string `json:"status"`
+	}
+	err = json.Unmarshal(rr.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, "pass", resp.Status)
+}
+
+func TestReadyHandler(t *testing.T) {
+	tmpDir := t.TempDir()
+	prefixV4 := netip.MustParsePrefix("100.64.0.0/10")
+	prefixV6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
+
+	cfg := &types.Config{
+		ServerURL:           "http://localhost:0",
+		NoisePrivateKeyPath: tmpDir + "/noise_private.key",
+		PrefixV4:            &prefixV4,
+		PrefixV6:            &prefixV6,
+		IPAllocation:        types.IPAllocationStrategySequential,
+		Database: types.DatabaseConfig{
+			Type: "sqlite3",
+			Sqlite: types.SqliteConfig{
+				Path: tmpDir + "/headscale_test.db",
+			},
+		},
+		Policy: types.PolicyConfig{
+			Mode: types.PolicyModeDB,
+		},
+	}
+
+	h, err := NewHeadscale(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = h.state.Close()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rr := httptest.NewRecorder()
+
+	h.ReadyHandler(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+	var resp struct {
+		Ready  bool   `json:"ready"`
+		Status string `json:"status"`
+	}
+	err = json.Unmarshal(rr.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.True(t, resp.Ready)
+	assert.Equal(t, "ready", resp.Status)
+}
+
+func TestVersionHandler(t *testing.T) {
+	tmpDir := t.TempDir()
+	prefixV4 := netip.MustParsePrefix("100.64.0.0/10")
+	prefixV6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
+
+	cfg := &types.Config{
+		ServerURL:           "http://localhost:0",
+		NoisePrivateKeyPath: tmpDir + "/noise_private.key",
+		PrefixV4:            &prefixV4,
+		PrefixV6:            &prefixV6,
+		IPAllocation:        types.IPAllocationStrategySequential,
+		Database: types.DatabaseConfig{
+			Type: "sqlite3",
+			Sqlite: types.SqliteConfig{
+				Path: tmpDir + "/headscale_test.db",
+			},
+		},
+		Policy: types.PolicyConfig{
+			Mode: types.PolicyModeDB,
+		},
+	}
+
+	h, err := NewHeadscale(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = h.state.Close()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/version", nil)
+	rr := httptest.NewRecorder()
+
+	h.VersionHandler(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+	var resp types.VersionInfo
+	err = json.Unmarshal(rr.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	// Version info should be present (may be "dev" in test environment)
+	assert.NotEmpty(t, resp.Version)
 }

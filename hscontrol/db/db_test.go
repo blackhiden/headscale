@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -119,7 +119,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// already upgraded to 0.29.0 had user_id wrongly cleared on untagged
 		// nodes with tags='null'. The recovery migration re-derives user_id
 		// from the node's pre-auth key where one exists.
-		// Fixes: https://github.com/juanfont/headscale/issues/3323
+		// Fixes: https://github.com/arsydoni4326-alt/headscale/issues/3323
 		{
 			dbPath: "testdata/sqlite/recover_null_tags_user_id_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
@@ -167,7 +167,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// a key expiry on tagged nodes, which never expire (KB 1068), leaving
 		// them permanently Expired. The migration clears expiry on tagged rows
 		// only, preserving user-owned nodes' expiry.
-		// Fixes: https://github.com/juanfont/headscale/issues/3371
+		// Fixes: https://github.com/arsydoni4326-alt/headscale/issues/3371
 		{
 			dbPath: "testdata/sqlite/clear_tagged_node_expiry_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
@@ -808,6 +808,49 @@ func sqliteTestConfig(path string) *types.Config {
 			Sqlite: types.SqliteConfig{Path: path},
 		},
 		Policy: types.PolicyConfig{Mode: types.PolicyModeDB},
+	}
+}
+
+// TestHeadplaneSchemaRecovery, TestFreshDatabaseCreatesHeadplaneSchema,
+// TestHeadplaneSchemaRecoveryPreservesExistingUsers removed as part of Phase 13c
+// retirement. Legacy tables are preserved but password authentication and admin
+// user creation are no longer tested.
+
+func TestHeadplaneIndexNormalization(t *testing.T) {
+	dbPath := t.TempDir() + "/headscale_test.db"
+	cfg := sqliteTestConfig(dbPath)
+
+	hsdb, err := NewHeadscaleDatabase(cfg)
+	require.NoError(t, err)
+	require.NoError(t, hsdb.Close())
+
+	raw, err := sql.Open("sqlite", dbPath)
+	require.NoError(t, err)
+
+	for _, stmt := range []string{
+		`DROP INDEX idx_headplane_settings_user_id`,
+		`DROP INDEX idx_headplane_users_username`,
+		"CREATE UNIQUE INDEX `idx_headplane_users_username` ON `headplane_users`(`username`)",
+		"CREATE UNIQUE INDEX `idx_headplane_settings_user_id` ON `headplane_settings`(`user_id`)",
+		`DELETE FROM migrations WHERE id = '` + headplaneIndexNormalizationMigrationID + `'`,
+	} {
+		_, err := raw.ExecContext(t.Context(), stmt)
+		require.NoError(t, err, stmt)
+	}
+	require.NoError(t, raw.Close())
+
+	hsdb, err = NewHeadscaleDatabase(cfg)
+	require.NoError(t, err)
+	defer hsdb.Close()
+
+	for _, index := range headplaneIndexes {
+		var current string
+		require.NoError(
+			t,
+			hsdb.DB.Raw(`SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?`, index.name).
+				Scan(&current).Error,
+		)
+		assert.Equal(t, index.ddl, current)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 )
 
 // TestIPAllocatorRandomExhaustionReturnsError ensures the random allocation

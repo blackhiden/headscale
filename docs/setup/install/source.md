@@ -9,7 +9,7 @@
 
 Headscale can be built from source using the latest version of [Go](https://golang.org) and [Buf](https://buf.build)
 (Protobuf generator). See the [Contributing section in the GitHub
-README](https://github.com/juanfont/headscale#contributing) for more information.
+README](https://github.com/arsydoni4326-alt/headscale#contributing) for more information.
 
 ## OpenBSD
 
@@ -19,18 +19,22 @@ README](https://github.com/juanfont/headscale#contributing) for more information
 # Install prerequisites
 pkg_add go git
 
-git clone https://github.com/juanfont/headscale.git
+git clone https://github.com/arsydoni4326-alt/headscale.git
 
 cd headscale
 
 # optionally checkout a release
-# option a. you can find official release at https://github.com/juanfont/headscale/releases/latest
+# option a. you can find official release at https://github.com/arsydoni4326-alt/headscale/releases/latest
 # option b. get latest tag, this may be a beta release
 latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
 
 git checkout $latestTag
 
-go build -ldflags="-s -w -X github.com/juanfont/headscale/hscontrol/types.Version=$latestTag" -X github.com/juanfont/headscale/hscontrol/types.GitCommitHash=HASH" github.com/juanfont/headscale
+go build -ldflags="-s -w \
+  -X github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=$latestTag \
+  -X github.com/arsydoni4326-alt/headscale/hscontrol/types.Commit=$(git rev-parse --short HEAD) \
+  -X github.com/arsydoni4326-alt/headscale/hscontrol/types.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -o headscale ./cmd/headscale
 
 # make it executable
 chmod a+x headscale
@@ -46,12 +50,12 @@ cp headscale /usr/local/sbin
 # 1. go v1.27+: see the go directive in go.mod for the exact minimum
 # 2. gmake: Makefile in the headscale repo is written in GNU make syntax
 
-git clone https://github.com/juanfont/headscale.git
+git clone https://github.com/arsydoni4326-alt/headscale.git
 
 cd headscale
 
 # optionally checkout a release
-# option a. you can find official release at https://github.com/juanfont/headscale/releases/latest
+# option a. you can find official release at https://github.com/arsydoni4326-alt/headscale/releases/latest
 # option b. get latest tag, this may be a beta release
 latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
 

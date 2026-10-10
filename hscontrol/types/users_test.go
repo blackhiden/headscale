@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -428,7 +428,7 @@ func TestOIDCClaimsJSONToUser(t *testing.T) {
 			},
 		},
 		{
-			// From https://github.com/juanfont/headscale/issues/2333
+			// From https://github.com/arsydoni4326-alt/headscale/issues/2333
 			name:                  "okta-oidc-claim-20250121",
 			emailVerifiedRequired: true,
 			jsonstr: `
@@ -464,7 +464,7 @@ func TestOIDCClaimsJSONToUser(t *testing.T) {
 			},
 		},
 		{
-			// From https://github.com/juanfont/headscale/issues/2333
+			// From https://github.com/arsydoni4326-alt/headscale/issues/2333
 			name:                  "okta-oidc-claim-20250121",
 			emailVerifiedRequired: true,
 			jsonstr: `
@@ -499,7 +499,7 @@ func TestOIDCClaimsJSONToUser(t *testing.T) {
 			},
 		},
 		{
-			// From https://github.com/juanfont/headscale/issues/2333
+			// From https://github.com/arsydoni4326-alt/headscale/issues/2333
 			name:                  "casby-oidc-claim-20250513",
 			emailVerifiedRequired: true,
 			jsonstr: `
@@ -528,6 +528,7 @@ func TestOIDCClaimsJSONToUser(t *testing.T) {
 					Valid:  true,
 				},
 				ProfilePicURL: "https://cdn.casbin.org/img/casbin.svg",
+				OIDCGroups:    []string{"org1/department1", "org1/department2"},
 			},
 		},
 	}

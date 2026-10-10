@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
@@ -184,7 +184,7 @@ func (m *mapSession) serveLongPoll() {
 		// take the node offline (the relogin flake).
 		// A deleted or expired node cannot return online through a map
 		// reconnect, so release its session without the reconnect grace.
-		// See: https://github.com/juanfont/headscale/issues/3410
+		// See: https://github.com/arsydoni4326-alt/headscale/issues/3410
 		node, nodeExists := m.h.state.GetNodeByID(m.node.ID)
 
 		if !stillConnected && nodeExists && !node.IsExpired() {

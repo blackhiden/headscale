@@ -26,23 +26,23 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "github.com/arsydoni4326-alt/headscale/hscontrol/api/v1"
+	apiv2 "github.com/arsydoni4326-alt/headscale/hscontrol/api/v2"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/capver"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/derp"
+	derpServer "github.com/arsydoni4326-alt/headscale/hscontrol/derp/server"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/dns"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/mapper"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
 	"github.com/cenkalti/backoff/v5"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/derp"
-	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
-	"github.com/juanfont/headscale/hscontrol/dns"
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog/log"
 	"github.com/sasha-s/go-deadlock"
@@ -184,7 +184,7 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 
 	var authProvider AuthProvider
 
-	authProvider = NewAuthProviderWeb(cfg.ServerURL)
+	authProvider = NewAuthProviderWeb(&app, cfg.ServerURL)
 	if cfg.OIDC.Issuer != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -494,6 +494,7 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 
 	r.Get("/robots.txt", h.RobotsHandler)
 	r.Get("/health", h.HealthHandler)
+	r.Get("/ready", h.ReadyHandler)
 	r.Get("/version", h.VersionHandler)
 	r.Get("/key", h.KeyHandler)
 	r.Get("/register/{auth_id}", h.authProvider.RegisterHandler)

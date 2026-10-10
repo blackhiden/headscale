@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
 )
 
 // credentialToAPIKey projects a unified credentials row onto the [types.APIKey]
