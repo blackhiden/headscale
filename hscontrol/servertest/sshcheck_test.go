@@ -144,7 +144,7 @@ func authIDFromHoldURL(t *testing.T, holdURL string) types.AuthID {
 // removed or turned into accept, a client still holding the check gets a
 // Reject on both the initial and the follow-up poll, not a hold it could
 // pass by authenticating.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHCheckRejectedAfterRuleRemoved(t *testing.T) {
 	t.Parallel()
 
@@ -203,7 +203,7 @@ func expandHoldURL(holdURL string, srcID, dstID types.NodeID, localUser string) 
 // expand the HoldAndDelegate URL from the netmap, poll it, then poll the
 // URL the server returns. The follow-up must still carry the login user,
 // or a root-only rule denies a user who already authenticated.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHCheckFollowsReturnedHoldURL(t *testing.T) {
 	t.Parallel()
 

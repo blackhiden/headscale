@@ -3,7 +3,7 @@
 # This file demonstrates how to use the headscale NixOS module from this flake.
 # To use in your own configuration, add this to your flake.nix inputs:
 #
-#   inputs.headscale.url = "github:juanfont/headscale";
+#   inputs.headscale.url = "github:blackhiden/headscale";
 #
 # Then import the module:
 #

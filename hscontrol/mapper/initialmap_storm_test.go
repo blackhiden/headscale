@@ -105,7 +105,7 @@ func setupStormBatcher(tb testing.TB, nodeCount, workers int, policy string) (*T
 	}
 }
 
-// TestInitialMapNotStarvedByReconnectStorm reproduces juanfont/headscale#3346.
+// TestInitialMapNotStarvedByReconnectStorm reproduces blackhiden/headscale#3346.
 //
 // When every node redials at once (e.g. after a server upgrade restart), each
 // connection writes the NodeStore (UpdateNodeFromMapRequest + Connect) and the

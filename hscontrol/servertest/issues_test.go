@@ -227,7 +227,7 @@ func TestIssuesRoutes(t *testing.T) {
 	// captures show approved exit routes on the exit node's own SelfNode
 	// (routes-ea*, routes-b17/b18). Peers are the control: they must see
 	// the routes, proving the change was dispatched.
-	// https://github.com/juanfont/headscale/issues/3502
+	// https://github.com/blackhiden/headscale/issues/3502
 	t.Run("exit_route_approval_reaches_self", func(t *testing.T) {
 		t.Parallel()
 

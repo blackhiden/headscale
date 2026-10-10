@@ -48,7 +48,7 @@ jobs:
     # WORKFLOW_SECRET, which a fork only has if its owner deliberately added
     # one. That is what makes the whole thing testable on a fork before it is
     # trusted here. A schedule, when one is added, stays upstream-only.
-    if: github.event_name == 'workflow_dispatch' || github.repository == 'juanfont/headscale'
+    if: github.event_name == 'workflow_dispatch' || github.repository == 'blackhiden/headscale'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     defaults:

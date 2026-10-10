@@ -124,7 +124,7 @@ func TestBuildPeerMapFromPolicy(t *testing.T) {
 			// autogroup:internet emits no client packet filter, but it
 			// must still produce a matcher: Node.CanAccess uses
 			// matcher.DestsIsTheInternet() + IsExitNode() to surface
-			// exit-node peers (juanfont/headscale#3212).
+			// exit-node peers (blackhiden/headscale#3212).
 			want: types.Nodes{
 				n(2, "100.64.0.2", "server", "server"),
 				n(3, "100.64.0.3", "exit", "server", "0.0.0.0/0", "::/0"),

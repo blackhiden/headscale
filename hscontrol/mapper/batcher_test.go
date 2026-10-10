@@ -2423,7 +2423,7 @@ func (failingSSHPolicyManager) SSHPolicy(string, types.NodeView) (*tailcfg.SSHPo
 // TestSSHPolicyEmptyOnWire pins that a node without SSH rules, or whose SSH
 // policy fails to compile, gets "SSHPolicy":{"rules":[]}. A nil SSHPolicy
 // leaves the client's previous rules in force.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHPolicyEmptyOnWire(t *testing.T) {
 	for name, failCompile := range map[string]bool{
 		"no ssh rules":  false,
@@ -2829,7 +2829,7 @@ func TestSelfSentOnlyWhenChanged(t *testing.T) {
 // TestSSHPolicySentOnlyWhenChanged pins that policy frames drop an SSHPolicy
 // the client already holds, since any non-nil SSHPolicy forces a full client
 // netmap rebuild, while initial maps and real changes still carry it.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHPolicySentOnlyWhenChanged(t *testing.T) {
 	testData, cleanup := setupBatcherWithTestData(t, NewBatcherAndMapper, 1, 2, normalBufferSize)
 	defer cleanup()

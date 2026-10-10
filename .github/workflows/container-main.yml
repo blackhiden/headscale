@@ -22,7 +22,7 @@ defaults:
 
 jobs:
   container:
-    if: github.repository == 'juanfont/headscale'
+    if: github.repository == 'blackhiden/headscale'
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -52,7 +52,7 @@ jobs:
 
       - name: Build and push to GHCR
         env:
-          KO_DOCKER_REPO: ghcr.io/juanfont/headscale
+          KO_DOCKER_REPO: ghcr.io/blackhiden/headscale
           KO_DEFAULTBASEIMAGE: gcr.io/distroless/base-debian13
           CGO_ENABLED: "0"
         run: |
@@ -79,7 +79,7 @@ jobs:
             ./cmd/headscale
 
   binaries:
-    if: github.repository == 'juanfont/headscale'
+    if: github.repository == 'blackhiden/headscale'
     runs-on: ubuntu-latest
     strategy:
       matrix:

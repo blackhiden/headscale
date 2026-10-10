@@ -776,7 +776,7 @@ func TestGrantViaSubnetFilterRules(t *testing.T) {
 // TestGrantViaSubnetBroaderDstFilterRules verifies that a via grant
 // whose destination is broader than the router's advertised subnet
 // still produces a filter rule on the router and surfaces the route in
-// the client's AllowedIPs. Reproduces juanfont/headscale#3267 at the
+// the client's AllowedIPs. Reproduces blackhiden/headscale#3267 at the
 // server level. Pre-fix the policy compiler required exact prefix
 // equality, so the router's PacketFilter had no rule for the steered
 // destination and traffic was silently dropped.

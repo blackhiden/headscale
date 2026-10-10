@@ -1702,7 +1702,7 @@ func TestEnablingExitRoutes(t *testing.T) {
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.SlowPoll, "clients should see new routes")
 }
 
-// TestExitRoutesWithAutogroupInternetACL reproduces juanfont/headscale#3212.
+// TestExitRoutesWithAutogroupInternetACL reproduces blackhiden/headscale#3212.
 // When an ACL grants access via autogroup:internet, the source nodes must
 // still see approved exit nodes as peers with 0.0.0.0/0 and ::/0 in their
 // AllowedIPs — that visibility is what drives `tailscale exit-node list`.

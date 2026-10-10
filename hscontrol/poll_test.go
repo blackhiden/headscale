@@ -344,7 +344,7 @@ func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 
 // TestEphemeralGCDoesNotDeleteReconnectedNode replays, in order, the
 // interleaving of two sessions from
-// https://github.com/juanfont/headscale/issues/3535: the old session takes the
+// https://github.com/blackhiden/headscale/issues/3535: the old session takes the
 // node offline, a reconnect brings it back online and cancels the GC before
 // the old session arms its timer. The armed timer is stale; firing it must not
 // delete a node that has a live session.

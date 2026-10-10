@@ -685,7 +685,7 @@ dns:
 
 // The unset case is the regression: the default is spelled "0o770", which a
 // base-8 parse rejects, so the socket silently became 0700.
-// https://github.com/juanfont/headscale/issues/3529
+// https://github.com/blackhiden/headscale/issues/3529
 func TestUnixSocketPermission(t *testing.T) {
 	tests := []struct {
 		name    string

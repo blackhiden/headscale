@@ -281,7 +281,7 @@ func TestSSHNoSSHConfigured(t *testing.T) {
 // TestSSHRulesRemovedDeniesAccess verifies that removing every SSH rule
 // from the policy revokes SSH that worked before, on every client version.
 // The ACL stays open so the deny can only come from the SSH policy.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHRulesRemovedDeniesAccess(t *testing.T) {
 	IntegrationSkip(t)
 

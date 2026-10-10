@@ -13,7 +13,7 @@ import (
 )
 
 // TestApplePlatformConfig_ServesProfilesViaChiRouter is the regression
-// guard for issue juanfont/headscale#3296.
+// guard for issue blackhiden/headscale#3296.
 //
 // The Apple profile download endpoints (`/apple/macos-app-store`,
 // `/apple/macos-standalone`, `/apple/ios`) are registered on the chi

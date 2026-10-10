@@ -687,7 +687,7 @@ func TestSSHActionHoldAndDelegate_PersistsAuthSession(t *testing.T) {
 // poll. Such a call comes from a client holding a stale check rule; an HTTP
 // error would make tailssh retry for up to 30 minutes. Re-delegation for a
 // missing session (issue #3305) applies only while a check is required.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHActionHandler_RejectsWithoutCheck(t *testing.T) {
 	t.Parallel()
 
@@ -719,7 +719,7 @@ func TestSSHActionHandler_RejectsWithoutCheck(t *testing.T) {
 // TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved verifies the check is
 // re-evaluated once the user authenticates: a rule removed while the login
 // prompt was open must not grant access.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved(t *testing.T) {
 	t.Parallel()
 
