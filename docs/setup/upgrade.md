@@ -7,7 +7,7 @@
 
 Update an existing Headscale installation to a new version:
 
-- Read the announcement on the [GitHub releases](https://github.com/arsydoni4326-alt/headscale/releases) page for the new
+- Read the announcement on the [GitHub releases](https://github.com/blackhiden/headscale/releases) page for the new
   version. It lists the changes of the release along with possible breaking changes and version-specific upgrade
   instructions.
 - Stop Headscale
@@ -126,5 +126,5 @@ make build VERSION=v0.35.5-arsydoni4326-alt
 make release VERSION=v0.35.5-arsydoni4326-alt
 ```
 
-Alternatively, use pre-built binaries from [GitHub releases](https://github.com/arsydoni4326-alt/headscale/releases),
+Alternatively, use pre-built binaries from [GitHub releases](https://github.com/blackhiden/headscale/releases),
 which always include proper version information.

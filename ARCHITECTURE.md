@@ -165,5 +165,5 @@ The frontend features:
 - Node >= 24.2, PNPM >= 10.4 for Headplane.
 - The `headplane/` submodule is pinned to a fork release
   (`v0.7.6-arsydoni4326-alt`).
-- The fork repository targets are `github.com/arsydoni4326-alt/headscale` and
+- The fork repository targets are `github.com/blackhiden/headscale` and
   `github.com/arsydoni4326-alt/headplane`.

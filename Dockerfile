@@ -42,9 +42,9 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -buildmode=pie \
   -ldflags="-s -w \
-    -X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=${APP_VERSION}' \
-    -X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Commit=${APP_COMMIT}' \
-    -X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.BuildDate=${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}'" \
+    -X 'github.com/blackhiden/headscale/hscontrol/types.Version=${APP_VERSION}' \
+    -X 'github.com/blackhiden/headscale/hscontrol/types.Commit=${APP_COMMIT}' \
+    -X 'github.com/blackhiden/headscale/hscontrol/types.BuildDate=${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}'" \
   -o /go/bin/headscale ./cmd/headscale
 
 # Runtime stage

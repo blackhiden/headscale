@@ -720,7 +720,7 @@ always end with `-arsydoni4326-alt`.
 ### Changes
 
 - Added `GET /api/v1/update-check` endpoint for checking updates against the
-  fork repository (`github.com/arsydoni4326-alt/headscale`). Returns current
+  fork repository (`github.com/blackhiden/headscale`). Returns current
   version info; optionally fetches remote latest commit with `?check=true`.
 - Fixed `CPA_VERSION`/`CPA_COMMIT` naming inconsistency in Dockerfile
   (renamed to `APP_VERSION`/`APP_COMMIT`).

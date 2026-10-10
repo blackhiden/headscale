@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/netip"
 
-	clientv1 "github.com/arsydoni4326-alt/headscale/gen/client/v1"
-	"github.com/arsydoni4326-alt/headscale/hscontrol"
-	policyv2 "github.com/arsydoni4326-alt/headscale/hscontrol/policy/v2"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/integration/hsic"
+	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
+	"github.com/blackhiden/headscale/hscontrol"
+	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/integration/hsic"
 	"github.com/ory/dockertest/v3"
 	"tailscale.com/tailcfg"
 )

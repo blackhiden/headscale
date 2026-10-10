@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"

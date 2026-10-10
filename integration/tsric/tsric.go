@@ -15,8 +15,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/arsydoni4326-alt/headscale/integration/dockertestutil"
-	"github.com/arsydoni4326-alt/headscale/integration/integrationutil"
+	"github.com/blackhiden/headscale/integration/dockertestutil"
+	"github.com/blackhiden/headscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/util/rands"

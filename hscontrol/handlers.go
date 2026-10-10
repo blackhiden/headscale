@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/assets"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/qr"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/templates"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/assets"
+	"github.com/blackhiden/headscale/hscontrol/qr"
+	"github.com/blackhiden/headscale/hscontrol/templates"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -207,7 +207,7 @@ func (h *Headscale) KeyHandler(
 	// isSupportedVersion in noise.go) keeps /key consistent with /ts2021:
 	// versions the handshake would reject get a clear rejection here
 	// instead of a key that only serves as a version-boundary oracle.
-	// See https://github.com/arsydoni4326-alt/headscale/issues/3380.
+	// See https://github.com/blackhiden/headscale/issues/3380.
 	if !isSupportedVersion(capVer) {
 		httpError(writer, NewHTTPError(http.StatusBadRequest, "unsupported client version", unsupportedClientError(capVer)))
 		return

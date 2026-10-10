@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/integration/dockertestutil"
+	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

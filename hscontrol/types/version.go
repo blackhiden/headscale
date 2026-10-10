@@ -42,9 +42,9 @@ func (v *VersionInfo) String() string {
 //
 // These are set via -ldflags -X by the Docker/CI pipeline:
 //
-//	-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=...'
-//	-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Commit=...'
-//	-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.BuildDate=...'
+//	-X 'github.com/blackhiden/headscale/hscontrol/types.Version=...'
+//	-X 'github.com/blackhiden/headscale/hscontrol/types.Commit=...'
+//	-X 'github.com/blackhiden/headscale/hscontrol/types.BuildDate=...'
 //
 // They take precedence over the VCS info embedded by the Go toolchain, which
 // is unavailable in Docker builds because .git is excluded from the build

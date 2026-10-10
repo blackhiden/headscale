@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/scope"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/scope"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"gorm.io/gorm"
 	"tailscale.com/util/multierr"
 	"tailscale.com/util/set"

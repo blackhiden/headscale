@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
 )
 
 // TestSSHCheckReDelegatesWhenSessionMissing exercises the fix for
-// https://github.com/arsydoni4326-alt/headscale/issues/3305 with a real control
+// https://github.com/blackhiden/headscale/issues/3305 with a real control
 // client. The dst node runs the SSH-check poll over its actual Noise
 // connection: it first obtains a genuine HoldAndDelegate auth_id, that auth
 // session is then dropped from the cache (as it would be on expiry, eviction,

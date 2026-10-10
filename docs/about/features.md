@@ -25,7 +25,7 @@ provides on overview of Headscale's feature and compatibility with the Tailscale
 - [x] Ephemeral nodes
 - [x] Embedded [DERP server](../ref/derp.md)
 - [x] [Peer relays](https://tailscale.com/docs/features/peer-relay)
-- [x] [Policy](../ref/policy.md) ([GitHub label "policy"](https://github.com/arsydoni4326-alt/headscale/labels/policy%20%F0%9F%93%9D))
+- [x] [Policy](../ref/policy.md) ([GitHub label "policy"](https://github.com/blackhiden/headscale/labels/policy%20%F0%9F%93%9D))
     - [x] ACLs
     - [x] Grants
     - [x] Some [Autogroups](../ref/policy.md#autogroups)
@@ -36,10 +36,10 @@ provides on overview of Headscale's feature and compatibility with the Tailscale
     - [x] [Node attributes](../ref/policy.md#node-attributes)
     - [x] [Tests](https://tailscale.com/docs/reference/syntax/policy-file#tests) and
       [sshTests](https://tailscale.com/docs/reference/syntax/policy-file#ssh-tests)
-- [x] [Node registration using Single-Sign-On (OpenID Connect)](../ref/oidc.md) ([GitHub label "OIDC"](https://github.com/arsydoni4326-alt/headscale/labels/OIDC))
+- [x] [Node registration using Single-Sign-On (OpenID Connect)](../ref/oidc.md) ([GitHub label "OIDC"](https://github.com/blackhiden/headscale/labels/OIDC))
     - [x] Basic registration
     - [x] Update user profile from identity provider
     - [x] [OIDC groups in ACLs](../ref/policy.md#oidc-groups)
-- [ ] [Funnel](https://tailscale.com/docs/features/tailscale-funnel) ([#1040](https://github.com/arsydoni4326-alt/headscale/issues/1040))
-- [ ] [Serve](https://tailscale.com/docs/features/tailscale-serve) ([#1234](https://github.com/arsydoni4326-alt/headscale/issues/1921))
-- [ ] [Network flow logs](https://tailscale.com/docs/features/logging/network-flow-logs) ([#1687](https://github.com/arsydoni4326-alt/headscale/issues/1687))
+- [ ] [Funnel](https://tailscale.com/docs/features/tailscale-funnel) ([#1040](https://github.com/blackhiden/headscale/issues/1040))
+- [ ] [Serve](https://tailscale.com/docs/features/tailscale-serve) ([#1234](https://github.com/blackhiden/headscale/issues/1921))
+- [ ] [Network flow logs](https://tailscale.com/docs/features/logging/network-flow-logs) ([#1687](https://github.com/blackhiden/headscale/issues/1687))

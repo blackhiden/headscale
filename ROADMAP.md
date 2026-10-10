@@ -21,7 +21,7 @@ must be preserved. This includes, but is not limited to:
 - The `GET /api/v1/update-check` endpoint and its no-auth behavior.
 - The Dockerfile build args (`APP_VERSION`, `APP_COMMIT`, `BUILD_DATE`) and the
   `__COMMIT_HASH__` Vite global.
-- The fork repository targets (`github.com/arsydoni4326-alt/headscale` and
+- The fork repository targets (`github.com/blackhiden/headscale` and
   `github.com/arsydoni4326-alt/headplane`).
 
 Every roadmap item below is **additive and non-destructive**. No item may remove,
@@ -936,7 +936,7 @@ This permanent fix will be included in v1.0.1-arsydoni4326.
 
 ---
 
-## Phase 14 — Module Path Rewrite to `github.com/arsydoni4326-alt/headscale` [Planned]
+## Phase 14 — Module Path Rewrite to `github.com/blackhiden/headscale` [Planned]
 
 **Status:** Planned  
 **Priority:** High  
@@ -945,7 +945,7 @@ This permanent fix will be included in v1.0.1-arsydoni4326.
 ### Objective
 
 Rewrite the Go module path from `github.com/juanfont/headscale` to
-`github.com/arsydoni4326-alt/headscale` to properly reflect the fork's
+`github.com/blackhiden/headscale` to properly reflect the fork's
 independent identity and fix version reporting issues in built binaries.
 
 ### Motivation
@@ -954,7 +954,7 @@ Currently, the Go module path still references the upstream repository, which
 causes:
 
 1. **Version reporting issues**: Build-time ldflags with
-   `-X 'github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=...'`
+   `-X 'github.com/blackhiden/headscale/hscontrol/types.Version=...'`
    fail to inject version information because the actual module path is
    `github.com/juanfont/headscale`.
 2. **Import confusion**: Internal imports reference the upstream path, making
@@ -983,11 +983,11 @@ causes:
 #### Part 2: Core Module Path Update [Planned]
 
 - [ ] Update `go.mod` module declaration to
-      `github.com/arsydoni4326-alt/headscale`
+      `github.com/blackhiden/headscale`
 - [ ] Run automated find-and-replace for all Go import statements:
   ```bash
   find . -name "*.go" -type f -exec sed -i \
-    's|github.com/juanfont/headscale|github.com/arsydoni4326-alt/headscale|g' {} +
+    's|github.com/juanfont/headscale|github.com/blackhiden/headscale|g' {} +
   ```
 - [ ] Update `go.sum` by running `go mod tidy`
 - [ ] Verify no references to the old path remain in Go files:

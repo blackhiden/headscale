@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	clientv1 "github.com/arsydoni4326-alt/headscale/gen/client/v1"
-	"github.com/arsydoni4326-alt/headscale/integration/hsic"
-	"github.com/arsydoni4326-alt/headscale/integration/tsic"
+	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
+	"github.com/blackhiden/headscale/integration/hsic"
+	"github.com/blackhiden/headscale/integration/tsic"
 	"github.com/stretchr/testify/require"
 )
 

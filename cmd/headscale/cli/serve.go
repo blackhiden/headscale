@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"syscall"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/spf13/cobra"
 	"github.com/tailscale/squibble"
 )

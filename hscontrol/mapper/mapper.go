@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/state"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"

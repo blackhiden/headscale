@@ -251,7 +251,7 @@ endpoint.
     - It must only contain letters, digits, hyphens, dots, underscores, and up to a single `@`.
     - The username must start with a letter.
 
-Please see the [GitHub label "OIDC"](https://github.com/arsydoni4326-alt/headscale/labels/OIDC) for OIDC related issues.
+Please see the [GitHub label "OIDC"](https://github.com/blackhiden/headscale/labels/OIDC) for OIDC related issues.
 
 ## Identity provider specific configuration
 
@@ -276,7 +276,7 @@ Authelia is fully supported by Headscale.
 ### Authentik
 
 - Authentik is fully supported by Headscale.
-- [Headscale does not support JSON Web Encryption](https://github.com/arsydoni4326-alt/headscale/issues/2446). Leave the field
+- [Headscale does not support JSON Web Encryption](https://github.com/blackhiden/headscale/issues/2446). Leave the field
   `Encryption Key` in the providers section unset.
 - See Authentik's [Integrate with Headscale](https://integrations.goauthentik.io/networking/headscale/)
 

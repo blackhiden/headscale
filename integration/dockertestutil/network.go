@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 )

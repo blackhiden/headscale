@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -1265,7 +1265,7 @@ func decodeMapResponse(t *testing.T, compress string, body []byte) tailcfg.MapRe
 // the map path identically and retries forever with loggedIn still set; only a
 // self node whose KeyExpiry is in the past moves it to NeedsLogin.
 //
-// See: https://github.com/arsydoni4326-alt/headscale/issues/3410
+// See: https://github.com/blackhiden/headscale/issues/3410
 func TestPollNetMapHandler_DeletedNodeGetsExpiredSelf(t *testing.T) {
 	t.Parallel()
 

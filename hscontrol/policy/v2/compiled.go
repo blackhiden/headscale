@@ -6,8 +6,8 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"
 	"tailscale.com/tailcfg"

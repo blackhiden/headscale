@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	hscontrol "github.com/arsydoni4326-alt/headscale/hscontrol"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	hscontrol "github.com/blackhiden/headscale/hscontrol"
+	"github.com/blackhiden/headscale/hscontrol/state"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"tailscale.com/net/memnet"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/dnstype"

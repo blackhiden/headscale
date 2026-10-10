@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

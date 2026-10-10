@@ -1,4 +1,4 @@
-module github.com/arsydoni4326-alt/headscale
+module github.com/blackhiden/headscale
 
 go 1.27.0
 

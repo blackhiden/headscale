@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
+	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

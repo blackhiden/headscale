@@ -10,7 +10,7 @@
 //     scenarios that the SaaS rejected)
 //
 // Test data source: testdata/acl_results/acl-*.hujson
-// Source format:    github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture
+// Source format:    github.com/blackhiden/headscale/hscontrol/types/testcapture
 
 package v2
 
@@ -24,9 +24,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/policyutil"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
+	"github.com/blackhiden/headscale/hscontrol/policy/policyutil"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )

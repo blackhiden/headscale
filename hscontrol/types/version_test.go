@@ -19,7 +19,7 @@ func TestBuildVersionInfoDefaults(t *testing.T) {
 func TestBuildVersionInfoFromBuildInfo(t *testing.T) {
 	bi := &debug.BuildInfo{
 		Main: debug.Module{
-			Path:    "github.com/arsydoni4326-alt/headscale",
+			Path:    "github.com/blackhiden/headscale",
 			Version: "v0.29.11-arsydoni4326-alt",
 		},
 		Settings: []debug.BuildSetting{
@@ -39,7 +39,7 @@ func TestBuildVersionInfoFromBuildInfo(t *testing.T) {
 
 func TestBuildVersionInfoInjectedTakesPrecedence(t *testing.T) {
 	bi := &debug.BuildInfo{
-		Main: debug.Module{Path: "github.com/arsydoni4326-alt/headscale", Version: "(devel)"},
+		Main: debug.Module{Path: "github.com/blackhiden/headscale", Version: "(devel)"},
 		Settings: []debug.BuildSetting{
 			{Key: "vcs.revision", Value: "oldcommit"},
 			{Key: "vcs.modified", Value: "true"},
@@ -65,7 +65,7 @@ func TestBuildVersionInfoInjectedTakesPrecedence(t *testing.T) {
 func TestBuildVersionInfoInjectedEmptyKeepsBuildInfo(t *testing.T) {
 	bi := &debug.BuildInfo{
 		Main: debug.Module{
-			Path:    "github.com/arsydoni4326-alt/headscale",
+			Path:    "github.com/blackhiden/headscale",
 			Version: "v0.29.10-arsydoni4326-alt",
 		},
 		Settings: []debug.BuildSetting{

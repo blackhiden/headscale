@@ -1,6 +1,6 @@
 ![headscale logo](./docs/assets/logo/headscale3_header_stacked_left.png)
 
-![ci](https://github.com/arsydoni4326-alt/headscale/actions/workflows/test.yml/badge.svg)
+![ci](https://github.com/blackhiden/headscale/actions/workflows/test.yml/badge.svg)
 
 An open source, self-hosted implementation of the Tailscale control server.
 
@@ -190,7 +190,7 @@ The Makefile will warn you if any required tools are missing and suggest running
 
 ## Contributors
 
-<a href="https://github.com/arsydoni4326-alt/headscale/graphs/contributors">
+<a href="https://github.com/blackhiden/headscale/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=arsydoni4326-alt/headscale" />
 </a>
 

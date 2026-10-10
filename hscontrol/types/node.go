@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
+	"github.com/blackhiden/headscale/hscontrol/policy/matcher"
+	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"go4.org/netipx"
 	"tailscale.com/net/tsaddr"

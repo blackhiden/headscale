@@ -85,7 +85,7 @@ present in version numbers, tags, and changelog entries.
 
 This fork's repository targets are:
 
-- **Headscale**: `github.com/arsydoni4326-alt/headscale`
+- **Headscale**: `github.com/blackhiden/headscale`
 - **Headplane**: `github.com/arsydoni4326-alt/headplane`
 
 The `headplane/` submodule is pinned to a fork release. When contributing
@@ -96,7 +96,7 @@ frontend changes, ensure the submodule points to the correct fork release.
 - **Discord**: Join our [Discord server](https://discord.gg/c84AZQhmpx) for
   announcements, community support, and real-time discussion.
 - **Issue tracker**: Use the [GitHub issue
-  tracker](https://github.com/arsydoni4326-alt/headscale/issues) for bug reports,
+  tracker](https://github.com/blackhiden/headscale/issues) for bug reports,
   feature requests, and UX feedback. Please check the existing issues before
   opening a new one.
 - **Code of Conduct**: All contributors must follow our [Code of

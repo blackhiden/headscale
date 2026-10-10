@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	policyv2 "github.com/arsydoni4326-alt/headscale/hscontrol/policy/v2"
-	"github.com/arsydoni4326-alt/headscale/integration/dockertestutil"
-	"github.com/arsydoni4326-alt/headscale/integration/hsic"
-	"github.com/arsydoni4326-alt/headscale/integration/integrationutil"
-	"github.com/arsydoni4326-alt/headscale/integration/tsic"
+	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
+	"github.com/blackhiden/headscale/integration/dockertestutil"
+	"github.com/blackhiden/headscale/integration/hsic"
+	"github.com/blackhiden/headscale/integration/integrationutil"
+	"github.com/blackhiden/headscale/integration/tsic"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1352,7 +1352,7 @@ func TestSSHCheckModeAutoApprove(t *testing.T) {
 }
 
 // TestSSHCheckModeSessionLossReDelegates reproduces the failure in
-// https://github.com/arsydoni4326-alt/headscale/issues/3305 with a real client: an SSH
+// https://github.com/blackhiden/headscale/issues/3305 with a real client: an SSH
 // connection in check mode is pending a verdict when the control plane
 // restarts, which drops the in-memory auth cache so the session the client is
 // still polling for is gone. The client must recover — the server re-delegates

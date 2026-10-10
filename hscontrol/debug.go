@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/arl/statsviz"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/templates"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/templates"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsweb"

@@ -522,7 +522,7 @@ If you've tried the solutions above and still have issues:
    - [API Reference](ref/api.md)
 
 2. **Search existing issues:**
-   - [Headscale GitHub Issues](https://github.com/arsydoni4326-alt/headscale/issues)
+   - [Headscale GitHub Issues](https://github.com/blackhiden/headscale/issues)
 
 3. **Join the community:**
    - [Discord server](https://discord.gg/c84AZQhmpx) for real-time help

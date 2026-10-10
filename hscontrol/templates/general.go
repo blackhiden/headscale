@@ -1,7 +1,7 @@
 package templates
 
 import (
-	"github.com/arsydoni4326-alt/headscale/hscontrol/assets"
+	"github.com/blackhiden/headscale/hscontrol/assets"
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 	"github.com/chasefleming/elem-go/styles"
@@ -104,7 +104,7 @@ func pageFooter() *elem.Element {
 		},
 		elem.Text("Powered by "),
 		elem.A(attrs.Props{
-			attrs.Href:   "https://github.com/arsydoni4326-alt/headscale",
+			attrs.Href:   "https://github.com/blackhiden/headscale",
 			attrs.Rel:    "noreferrer noopener",
 			attrs.Target: "_blank",
 		}, elem.Text("Headscale")),

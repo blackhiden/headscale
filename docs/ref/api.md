@@ -336,7 +336,7 @@ The `headscale` binary can control a Headscale instance from a remote machine ov
 
 ### Setup remote control
 
-1. Download the [`headscale` binary from GitHub's release page](https://github.com/arsydoni4326-alt/headscale/releases). Make
+1. Download the [`headscale` binary from GitHub's release page](https://github.com/blackhiden/headscale/releases). Make
    sure to use the same version as on the server.
 
 1. Put the binary somewhere in your `PATH`, e.g. `/usr/local/bin/headscale`

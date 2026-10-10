@@ -9,7 +9,7 @@ This guide provides visual references and flow diagrams for the Headscale
 user interface. It is intended for contributors and maintainers who need
 to understand, update, or test the UI.
 
-> **Note:** Screenshots in this guide are tracked as a [maintenance task](https://github.com/arsydoni4326-alt/headscale/issues). When the UI changes, contributors should update the corresponding images to keep this guide accurate. See [How to take and update screenshots](#how-to-take-and-update-screenshots) below.
+> **Note:** Screenshots in this guide are tracked as a [maintenance task](https://github.com/blackhiden/headscale/issues). When the UI changes, contributors should update the corresponding images to keep this guide accurate. See [How to take and update screenshots](#how-to-take-and-update-screenshots) below.
 
 ---
 
@@ -221,7 +221,7 @@ The Headplane UI includes automated accessibility testing:
 ### Reporting Accessibility Issues
 
 If you encounter an accessibility barrier, please report it via the
-[GitHub issue tracker](https://github.com/arsydoni4326-alt/headscale/issues).
+[GitHub issue tracker](https://github.com/blackhiden/headscale/issues).
 Include:
 
 - Description of the issue

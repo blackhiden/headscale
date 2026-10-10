@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
+	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
