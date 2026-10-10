@@ -6,7 +6,7 @@ judgment of you or this change.
 
 Headscale is an "Open Source, acknowledged contribution" project: every
 contribution starts with a discussion on the issue tracker, **before** any
-code is written. See [`CONTRIBUTING.md`](https://github.com/juanfont/headscale/blob/main/CONTRIBUTING.md)
+code is written. See [`CONTRIBUTING.md`](https://github.com/blackhiden/headscale/blob/main/CONTRIBUTING.md)
 for the full policy and the rationale.
 
 To get vouched:
@@ -22,4 +22,4 @@ To get vouched:
 Issues remain open to everyone — no vouching needed there, and that's the
 intended starting point for any contribution.
 
-The vouched list: [`.github/VOUCHED.td`](https://github.com/juanfont/headscale/blob/main/.github/VOUCHED.td).
+The vouched list: [`.github/VOUCHED.td`](https://github.com/blackhiden/headscale/blob/main/.github/VOUCHED.td).

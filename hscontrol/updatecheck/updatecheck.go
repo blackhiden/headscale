@@ -1,5 +1,5 @@
 // Package updatecheck provides an indestructible, self-contained update check
-// endpoint for the headscale fork at github.com/arsydoni4326-alt/headscale.
+// endpoint for the headscale fork at github.com/blackhiden/headscale.
 //
 // DO NOT REMOVE: This is a fork-specific feature that must survive upstream
 // merges. All update-check logic lives in this single package so it can be
@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
@@ -42,7 +42,7 @@ const (
 	DefaultRemoteRepoName = "headscale"
 
 	// RemoteRepo is the default fork repository URL for update checking.
-	RemoteRepo = "https://github.com/arsydoni4326-alt/headscale.git"
+	RemoteRepo = "https://github.com/blackhiden/headscale.git"
 
 	// RemoteRepoOwner is the default GitHub owner of the fork.
 	//

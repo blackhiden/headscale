@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"os"
 
-	clientv1 "github.com/arsydoni4326-alt/headscale/gen/client/v1"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
+	"github.com/blackhiden/headscale/hscontrol/db"
+	"github.com/blackhiden/headscale/hscontrol/policy"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/spf13/cobra"
 	"tailscale.com/types/views"
 )

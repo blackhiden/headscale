@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
@@ -130,7 +130,7 @@ func TestPolicyChanges(t *testing.T) {
 		}
 	})
 
-	// https://github.com/juanfont/headscale/issues/3508
+	// https://github.com/blackhiden/headscale/issues/3508
 	t.Run("ssh_removal_clears_client_ssh_policy", func(t *testing.T) {
 		t.Parallel()
 		h := servertest.NewHarness(t, 2)

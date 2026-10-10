@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	hsdb "github.com/arsydoni4326-alt/headscale/hscontrol/db"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	hsdb "github.com/blackhiden/headscale/hscontrol/db"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 )
 

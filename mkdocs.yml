@@ -1,14 +1,14 @@
 ---
 site_name: Headscale
-site_url: https://juanfont.github.io/headscale/
+site_url: https://blackhiden.github.io/headscale/
 edit_uri: blob/main/docs/
 site_author: Headscale authors
 site_description: >-
   An open source, self-hosted implementation of the Tailscale control server.
 
 # Repository
-repo_name: juanfont/headscale
-repo_url: https://github.com/arsydoni4326-alt/headscale
+repo_name: blackhiden/headscale
+repo_url: https://github.com/blackhiden/headscale
 
 # Copyright
 copyright: Copyright &copy; 2026 Headscale authors
@@ -105,11 +105,11 @@ extra:
     json: [.s2]
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/arsydoni4326-alt/headscale
+      link: https://github.com/blackhiden/headscale
     - icon: material/coffee
       link: https://ko-fi.com/headscale
     - icon: fontawesome/brands/docker
-      link: https://github.com/arsydoni4326-alt/headscale/pkgs/container/headscale
+      link: https://github.com/blackhiden/headscale/pkgs/container/headscale
     - icon: fontawesome/brands/discord
       link: https://discord.gg/c84AZQhmpx
   headscale:

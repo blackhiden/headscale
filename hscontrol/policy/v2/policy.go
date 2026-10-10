@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/policyutil"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/policy/matcher"
+	"github.com/blackhiden/headscale/hscontrol/policy/policyutil"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"

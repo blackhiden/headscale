@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 )
 

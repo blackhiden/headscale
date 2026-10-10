@@ -33,6 +33,8 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     formats:
       - binary
+      - tar.gz
+      - zip
 
 source:
   enabled: true
@@ -55,8 +57,8 @@ nfpms:
     package_name: headscale
     priority: optional
     vendor: headscale
-    maintainer: Kristoffer Dalby <kristoffer@dalby.cc>
-    homepage: https://github.com/arsydoni4326-alt/headscale
+    maintainer: Denny Lastpaste <blackhiden@gmail.com>
+    homepage: https://github.com/blackhiden/headscale
     description: |-
       Open source implementation of the Tailscale control server.
       Headscale aims to implement a self-hosted, open source alternative to the
@@ -95,7 +97,7 @@ nfpms:
 kos:
   - id: ghcr
     repositories:
-      - ghcr.io/juanfont/headscale
+      - ghcr.io/blackhiden/headscale
       - headscale/headscale
 
     # bare tells KO to only use the repository
@@ -103,9 +105,9 @@ kos:
     bare: true
     base_image: gcr.io/distroless/base-debian13
     labels:
-      org.opencontainers.image.source: https://github.com/arsydoni4326-alt/headscale
+      org.opencontainers.image.source: https://github.com/blackhiden/headscale
     annotations:
-      org.opencontainers.image.source: https://github.com/arsydoni4326-alt/headscale
+      org.opencontainers.image.source: https://github.com/blackhiden/headscale
     build: headscale
     main: ./cmd/headscale
     env:
@@ -130,15 +132,15 @@ kos:
 
   - id: ghcr-debug
     repositories:
-      - ghcr.io/juanfont/headscale
+      - ghcr.io/blackhiden/headscale
       - headscale/headscale
 
     bare: true
     base_image: gcr.io/distroless/base-debian13:debug
     labels:
-      org.opencontainers.image.source: https://github.com/arsydoni4326-alt/headscale
+      org.opencontainers.image.source: https://github.com/blackhiden/headscale
     annotations:
-      org.opencontainers.image.source: https://github.com/arsydoni4326-alt/headscale
+      org.opencontainers.image.source: https://github.com/blackhiden/headscale
     build: headscale
     main: ./cmd/headscale
     env:

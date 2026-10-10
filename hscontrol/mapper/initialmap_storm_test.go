@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/derp"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/db"
+	"github.com/blackhiden/headscale/hscontrol/derp"
+	"github.com/blackhiden/headscale/hscontrol/state"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -105,7 +105,7 @@ func setupStormBatcher(tb testing.TB, nodeCount, workers int, policy string) (*T
 	}
 }
 
-// TestInitialMapNotStarvedByReconnectStorm reproduces juanfont/headscale#3346.
+// TestInitialMapNotStarvedByReconnectStorm reproduces blackhiden/headscale#3346.
 //
 // When every node redials at once (e.g. after a server upgrade restart), each
 // connection writes the NodeStore (UpdateNodeFromMapRequest + Connect) and the

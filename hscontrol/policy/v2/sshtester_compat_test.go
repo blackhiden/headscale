@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 )
 

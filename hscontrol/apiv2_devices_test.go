@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
-	apiv2 "github.com/arsydoni4326-alt/headscale/hscontrol/api/v2"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	apiv2 "github.com/blackhiden/headscale/hscontrol/api/v2"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

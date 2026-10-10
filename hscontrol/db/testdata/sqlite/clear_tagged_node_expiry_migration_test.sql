@@ -5,7 +5,7 @@
 -- nodes are owned by their tags and never expire (KB 1068), so such a row is
 -- reported as permanently Expired and can never re-authenticate. The migration
 -- clears expiry on tagged rows while leaving user-owned nodes untouched.
--- Fixes: https://github.com/juanfont/headscale/issues/3371
+-- Fixes: https://github.com/blackhiden/headscale/issues/3371
 
 PRAGMA foreign_keys=OFF;
 BEGIN TRANSACTION;

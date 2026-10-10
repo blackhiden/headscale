@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
 )
 
 // TestSSHCheckReDelegatesWhenSessionMissing exercises the fix for
-// https://github.com/arsydoni4326-alt/headscale/issues/3305 with a real control
+// https://github.com/blackhiden/headscale/issues/3305 with a real control
 // client. The dst node runs the SSH-check poll over its actual Noise
 // connection: it first obtains a genuine HoldAndDelegate auth_id, that auth
 // session is then dropped from the cache (as it would be on expiry, eviction,
@@ -144,7 +144,7 @@ func authIDFromHoldURL(t *testing.T, holdURL string) types.AuthID {
 // removed or turned into accept, a client still holding the check gets a
 // Reject on both the initial and the follow-up poll, not a hold it could
 // pass by authenticating.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHCheckRejectedAfterRuleRemoved(t *testing.T) {
 	t.Parallel()
 
@@ -203,7 +203,7 @@ func expandHoldURL(holdURL string, srcID, dstID types.NodeID, localUser string) 
 // expand the HoldAndDelegate URL from the netmap, poll it, then poll the
 // URL the server returns. The follow-up must still carry the login user,
 // or a root-only rule denies a user who already authenticated.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHCheckFollowsReturnedHoldURL(t *testing.T) {
 	t.Parallel()
 

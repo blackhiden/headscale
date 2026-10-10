@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"

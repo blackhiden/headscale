@@ -5,7 +5,7 @@
 // regular grants, and multiple HA pairs.
 //
 // Test data source: ../policy/v2/testdata/grant_results/via-grant-v{37..46}.hujson
-// Source format:    github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture
+// Source format:    github.com/blackhiden/headscale/hscontrol/types/testcapture
 
 package servertest_test
 
@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -119,7 +119,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// already upgraded to 0.29.0 had user_id wrongly cleared on untagged
 		// nodes with tags='null'. The recovery migration re-derives user_id
 		// from the node's pre-auth key where one exists.
-		// Fixes: https://github.com/arsydoni4326-alt/headscale/issues/3323
+		// Fixes: https://github.com/blackhiden/headscale/issues/3323
 		{
 			dbPath: "testdata/sqlite/recover_null_tags_user_id_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
@@ -167,7 +167,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// a key expiry on tagged nodes, which never expire (KB 1068), leaving
 		// them permanently Expired. The migration clears expiry on tagged rows
 		// only, preserving user-owned nodes' expiry.
-		// Fixes: https://github.com/arsydoni4326-alt/headscale/issues/3371
+		// Fixes: https://github.com/blackhiden/headscale/issues/3371
 		{
 			dbPath: "testdata/sqlite/clear_tagged_node_expiry_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {

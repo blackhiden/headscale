@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 )
 
 // The v1 contract follows protojson: 64-bit integers are JSON strings (avoiding

@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/capver"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/capver"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -236,7 +236,7 @@ func TestHandleVerifyRequest_AdmitsByNodeKey(t *testing.T) {
 }
 
 // TestKeyHandler_UnsupportedCapVerDoesNotLeakKey reproduces
-// https://github.com/arsydoni4326-alt/headscale/issues/3380. The /key handler
+// https://github.com/blackhiden/headscale/issues/3380. The /key handler
 // must gate key disclosure on the same floor the Noise handshake
 // enforces (capver.MinSupportedCapabilityVersion). A capability version
 // below that floor can never complete a handshake, so it must be

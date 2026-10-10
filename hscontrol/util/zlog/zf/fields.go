@@ -3,7 +3,7 @@
 // Using constants ensures typos are caught at compile time and enables
 // easy refactoring. Import as:
 //
-//	import "github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
+//	import "github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
 //
 // Usage:
 //

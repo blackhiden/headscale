@@ -8,8 +8,8 @@ import (
 
 	"github.com/creachadair/command"
 	"github.com/creachadair/flax"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/mapper"
-	"github.com/arsydoni4326-alt/headscale/integration/integrationutil"
+	"github.com/blackhiden/headscale/hscontrol/mapper"
+	"github.com/blackhiden/headscale/integration/integrationutil"
 )
 
 type MapConfig struct {

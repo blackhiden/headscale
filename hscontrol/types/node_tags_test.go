@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -24,10 +24,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/scope"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/scope"
+	"github.com/blackhiden/headscale/hscontrol/state"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 )
 
 // Backend is the dependency surface the v2 API needs from the control plane:

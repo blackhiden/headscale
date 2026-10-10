@@ -41,7 +41,7 @@ check-deps:
 .PHONY: build
 build: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Building headscale..."
-	go build $(PIE_FLAGS) -ldflags "-X github.com/arsydoni4326-alt/headscale/hscontrol/types.Version=$(VERSION) -X github.com/arsydoni4326-alt/headscale/hscontrol/types.Commit=$(COMMIT) -X github.com/arsydoni4326-alt/headscale/hscontrol/types.BuildDate=$(BUILD_DATE)" -o headscale ./cmd/headscale
+	go build $(PIE_FLAGS) -ldflags "-X github.com/blackhiden/headscale/hscontrol/types.Version=$(VERSION) -X github.com/blackhiden/headscale/hscontrol/types.Commit=$(COMMIT) -X github.com/blackhiden/headscale/hscontrol/types.BuildDate=$(BUILD_DATE)" -o headscale ./cmd/headscale
 
 # Test targets
 .PHONY: test

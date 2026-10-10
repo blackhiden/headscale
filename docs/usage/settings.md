@@ -363,7 +363,7 @@ If you encounter a bug or unexpected behavior:
 
 1. Check the [Headscale logs](../../troubleshooting.md#checking-logs) for errors
 2. Review this troubleshooting section for known solutions
-3. Report issues on GitHub: [arsydoni4326-alt/headscale](https://github.com/arsydoni4326-alt/headscale/issues)
+3. Report issues on GitHub: [arsydoni4326-alt/headscale](https://github.com/blackhiden/headscale/issues)
 4. Include:
    - Headscale version (`headscale version`)
    - Steps to reproduce

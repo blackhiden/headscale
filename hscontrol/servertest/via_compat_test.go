@@ -4,7 +4,7 @@
 // exit nodes.
 //
 // Test data source: ../policy/v2/testdata/grant_results/, see viaCompatTests
-// Source format:    github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture
+// Source format:    github.com/blackhiden/headscale/hscontrol/types/testcapture
 package servertest_test
 
 import (
@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"

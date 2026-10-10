@@ -1,4 +1,4 @@
-// Tests pinned against captures for juanfont/headscale#3212.
+// Tests pinned against captures for blackhiden/headscale#3212.
 //
 // The captures were taken on 2026-04-28 against a live Tailscale SaaS
 // tailnet. They reproduce the literal #3212 setup: an ACL granting
@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/testcapture"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"

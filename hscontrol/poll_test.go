@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/db"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/mapper"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/state"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/db"
+	"github.com/blackhiden/headscale/hscontrol/mapper"
+	"github.com/blackhiden/headscale/hscontrol/state"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -285,7 +285,7 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 // long-poll reconnect attempt which fails before [state.State.Connect] must
 // not cancel a previously armed ephemeral GC timer. Cancelling at the start of
 // [mapSession.serveLongPoll] left departed ephemeral nodes stuck offline with
-// no deletion scheduled (https://github.com/arsydoni4326-alt/headscale/issues/3382).
+// no deletion scheduled (https://github.com/blackhiden/headscale/issues/3382).
 func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 	t.Parallel()
 
@@ -344,7 +344,7 @@ func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 
 // TestEphemeralGCDoesNotDeleteReconnectedNode replays, in order, the
 // interleaving of two sessions from
-// https://github.com/juanfont/headscale/issues/3535: the old session takes the
+// https://github.com/blackhiden/headscale/issues/3535: the old session takes the
 // node offline, a reconnect brings it back online and cancels the GC before
 // the old session arms its timer. The armed timer is stale; firing it must not
 // delete a node that has a live session.
@@ -426,7 +426,7 @@ func TestEphemeralGCDoesNotDeleteReconnectedNode(t *testing.T) {
 
 // TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession
 // tests the scenario reported in
-// https://github.com/arsydoni4326-alt/headscale/issues/3129.
+// https://github.com/blackhiden/headscale/issues/3129.
 //
 // Scenario:
 //  1. Start a real long-poll session for one node.
@@ -541,7 +541,7 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 // It also pins the teardown latency: a deleted node cannot reconnect, so the
 // session must not spend the reconnect grace period waiting for one.
 //
-// See: https://github.com/arsydoni4326-alt/headscale/issues/3410
+// See: https://github.com/blackhiden/headscale/issues/3410
 func TestDeletedNodeEndsLongPoll(t *testing.T) {
 	t.Parallel()
 

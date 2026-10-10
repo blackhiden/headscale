@@ -24,14 +24,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	hsdb "github.com/arsydoni4326-alt/headscale/hscontrol/db"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util/zlog/zf"
+	hsdb "github.com/blackhiden/headscale/hscontrol/db"
+	"github.com/blackhiden/headscale/hscontrol/policy"
+	"github.com/blackhiden/headscale/hscontrol/policy/matcher"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/util/zlog"
+	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -2644,7 +2644,7 @@ func (s *State) findExistingNodeForPAK(
 		// It is still the same machine, proven by the machine key, so recognise
 		// it for re-registration instead of re-validating the spent key or
 		// creating a duplicate node. Re-registration preserves the node's tagged
-		// ownership. See https://github.com/arsydoni4326-alt/headscale/issues/3312.
+		// ownership. See https://github.com/blackhiden/headscale/issues/3312.
 		if node, ok := all[0]; ok && node.IsTagged() {
 			return node, true, nil
 		}

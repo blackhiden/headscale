@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/ory/dockertest/v3"
 )
 

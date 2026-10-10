@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -687,7 +687,7 @@ func TestSSHActionHoldAndDelegate_PersistsAuthSession(t *testing.T) {
 // poll. Such a call comes from a client holding a stale check rule; an HTTP
 // error would make tailssh retry for up to 30 minutes. Re-delegation for a
 // missing session (issue #3305) applies only while a check is required.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHActionHandler_RejectsWithoutCheck(t *testing.T) {
 	t.Parallel()
 
@@ -719,7 +719,7 @@ func TestSSHActionHandler_RejectsWithoutCheck(t *testing.T) {
 // TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved verifies the check is
 // re-evaluated once the user authenticates: a rule removed while the login
 // prompt was open must not grant access.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved(t *testing.T) {
 	t.Parallel()
 
@@ -1265,7 +1265,7 @@ func decodeMapResponse(t *testing.T, compress string, body []byte) tailcfg.MapRe
 // the map path identically and retries forever with loggedIn still set; only a
 // self node whose KeyExpiry is in the past moves it to NeedsLogin.
 //
-// See: https://github.com/arsydoni4326-alt/headscale/issues/3410
+// See: https://github.com/blackhiden/headscale/issues/3410
 func TestPollNetMapHandler_DeletedNodeGetsExpiredSelf(t *testing.T) {
 	t.Parallel()
 

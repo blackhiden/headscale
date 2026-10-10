@@ -3,9 +3,9 @@ package integration
 import (
 	"testing"
 
-	"github.com/arsydoni4326-alt/headscale/integration/dockertestutil"
-	"github.com/arsydoni4326-alt/headscale/integration/hsic"
-	"github.com/arsydoni4326-alt/headscale/integration/tsic"
+	"github.com/blackhiden/headscale/integration/dockertestutil"
+	"github.com/blackhiden/headscale/integration/hsic"
+	"github.com/blackhiden/headscale/integration/tsic"
 	"github.com/stretchr/testify/require"
 )
 

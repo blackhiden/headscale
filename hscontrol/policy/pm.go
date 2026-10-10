@@ -4,9 +4,9 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
-	policyv2 "github.com/arsydoni4326-alt/headscale/hscontrol/policy/v2"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/policy/matcher"
+	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 )

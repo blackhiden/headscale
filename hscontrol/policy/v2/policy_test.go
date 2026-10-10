@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/policy/matcher"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/policy/matcher"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -961,7 +961,7 @@ func TestAutogroupSelfPolicyUpdateTriggersMapResponse(t *testing.T) {
 // revoked SSH access in force. SaaS sends {"rules":[]} for policies
 // without SSH rules; see the netmap in any testdata capture whose
 // policy lacks an "ssh" key.
-// https://github.com/juanfont/headscale/issues/3508
+// https://github.com/blackhiden/headscale/issues/3508
 func TestSSHPolicyRemovalClearsRules(t *testing.T) {
 	users := types.Users{{Name: "user1", Email: "user1@headscale.net"}}
 	users[0].ID = 1
@@ -1012,7 +1012,7 @@ func TestSSHPolicyRemovalClearsRules(t *testing.T) {
 
 // TestTagPropagationToPeerMap tests that when a node's tags change,
 // the peer map is correctly updated. This is a regression test for
-// https://github.com/arsydoni4326-alt/headscale/issues/2389
+// https://github.com/blackhiden/headscale/issues/2389
 func TestTagPropagationToPeerMap(t *testing.T) {
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
@@ -2460,7 +2460,7 @@ func TestViaRoutesForPeer(t *testing.T) {
 		require.Empty(t, result.Exclude)
 	})
 
-	// juanfont/headscale#3513: a group member must get via-steered exit
+	// blackhiden/headscale#3513: a group member must get via-steered exit
 	// routes even when another member of the group has not registered.
 	// The group resolves to the registered members' IPs plus an error
 	// for the missing one; the error must not drop the resolved IPs.
@@ -2531,7 +2531,7 @@ func TestViaRoutesForPeer(t *testing.T) {
 }
 
 // TestBuildPeerMap_AutogroupInternetMakesExitNodeVisible reproduces
-// juanfont/headscale#3212. An ACL that grants access only via
+// blackhiden/headscale#3212. An ACL that grants access only via
 // `autogroup:internet` must keep the exit node visible to the source
 // in BuildPeerMap so the Tailscale client surfaces it in
 // `tailscale exit-node list`. Authoritative SaaS captures
@@ -2982,7 +2982,7 @@ func TestValidateUserReferences_AllSites(t *testing.T) {
 }
 
 // TestPeerRelayGrantMakesRelayVisible is a regression test for
-// https://github.com/arsydoni4326-alt/headscale/issues/3256.
+// https://github.com/blackhiden/headscale/issues/3256.
 //
 // A grant that uses only `app: { "tailscale.com/cap/relay": [] }` must
 // make the relay node visible to the source nodes (and vice-versa).

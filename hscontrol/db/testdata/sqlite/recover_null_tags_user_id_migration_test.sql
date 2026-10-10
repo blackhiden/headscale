@@ -5,7 +5,7 @@
 -- user_id on untagged nodes whose tags column held 'null'. The recovery
 -- migration runs against this state and re-derives user_id from the node's
 -- pre-auth key where possible.
--- Fixes: https://github.com/juanfont/headscale/issues/3323
+-- Fixes: https://github.com/blackhiden/headscale/issues/3323
 
 PRAGMA foreign_keys=OFF;
 BEGIN TRANSACTION;

@@ -10,15 +10,15 @@
     - the environment variable `HEADSCALE_CONFIG`
 - Validate the configuration file with: `headscale configtest`
 
-!!! example "Get the [example configuration from the GitHub repository](https://github.com/arsydoni4326-alt/headscale/blob/main/config-example.yaml)"
+!!! example "Get the [example configuration from the GitHub repository](https://github.com/blackhiden/headscale/blob/main/config-example.yaml)"
 
-    Always select the [same GitHub tag](https://github.com/arsydoni4326-alt/headscale/tags) as the released version you use to
+    Always select the [same GitHub tag](https://github.com/blackhiden/headscale/tags) as the released version you use to
     ensure you have the correct example configuration. The `main` branch might contain unreleased changes.
 
     === "View on GitHub"
 
-        - Development version: <https://github.com/arsydoni4326-alt/headscale/blob/main/config-example.yaml>
-        - Version {{ headscale.version }}: https://github.com/arsydoni4326-alt/headscale/blob/v{{ headscale.version }}/config-example.yaml
+        - Development version: <https://github.com/blackhiden/headscale/blob/main/config-example.yaml>
+        - Version {{ headscale.version }}: https://github.com/blackhiden/headscale/blob/v{{ headscale.version }}/config-example.yaml
 
     === "Download with `wget`"
 

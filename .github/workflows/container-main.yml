@@ -22,7 +22,7 @@ defaults:
 
 jobs:
   container:
-    if: github.repository == 'juanfont/headscale'
+    if: github.repository == 'blackhiden/headscale'
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -52,14 +52,14 @@ jobs:
 
       - name: Build and push to GHCR
         env:
-          KO_DOCKER_REPO: ghcr.io/juanfont/headscale
+          KO_DOCKER_REPO: ghcr.io/blackhiden/headscale
           KO_DEFAULTBASEIMAGE: gcr.io/distroless/base-debian13
           CGO_ENABLED: "0"
         run: |
           ko build \
             --bare \
-            --image-annotation=org.opencontainers.image.source=https://github.com/arsydoni4326-alt/headscale \
-            --image-label=org.opencontainers.image.source=https://github.com/arsydoni4326-alt/headscale \
+            --image-annotation=org.opencontainers.image.source=https://github.com/blackhiden/headscale \
+            --image-label=org.opencontainers.image.source=https://github.com/blackhiden/headscale \
             --platform=linux/amd64,linux/arm64 \
             --tags=main-${GITHUB_SHA::7},development \
             ./cmd/headscale
@@ -72,14 +72,14 @@ jobs:
         run: |
           ko build \
             --bare \
-            --image-annotation=org.opencontainers.image.source=https://github.com/arsydoni4326-alt/headscale \
-            --image-label=org.opencontainers.image.source=https://github.com/arsydoni4326-alt/headscale \
+            --image-annotation=org.opencontainers.image.source=https://github.com/blackhiden/headscale \
+            --image-label=org.opencontainers.image.source=https://github.com/blackhiden/headscale \
             --platform=linux/amd64,linux/arm64 \
             --tags=main-${GITHUB_SHA::7},development \
             ./cmd/headscale
 
   binaries:
-    if: github.repository == 'juanfont/headscale'
+    if: github.repository == 'blackhiden/headscale'
     runs-on: ubuntu-latest
     strategy:
       matrix:

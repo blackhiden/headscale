@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/go-json-experiment/json"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/util"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 )

@@ -36,7 +36,7 @@ and must be preserved. This includes, but is not limited to:
 - The `GET /api/v1/update-check` endpoint and its no-auth behavior.
 - The Dockerfile build args (`APP_VERSION`, `APP_COMMIT`, `BUILD_DATE`) and the
   `__COMMIT_HASH__` Vite global.
-- The fork repository targets (`github.com/arsydoni4326-alt/headscale` and
+- The fork repository targets (`github.com/blackhiden/headscale` and
   `github.com/arsydoni4326-alt/headplane`).
 
 Every change must be **additive and non-destructive**. No change may remove,

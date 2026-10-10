@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arsydoni4326-alt/headscale/hscontrol/servertest"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types/change"
+	"github.com/blackhiden/headscale/hscontrol/servertest"
+	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"
@@ -227,7 +227,7 @@ func TestIssuesRoutes(t *testing.T) {
 	// captures show approved exit routes on the exit node's own SelfNode
 	// (routes-ea*, routes-b17/b18). Peers are the control: they must see
 	// the routes, proving the change was dispatched.
-	// https://github.com/juanfont/headscale/issues/3502
+	// https://github.com/blackhiden/headscale/issues/3502
 	t.Run("exit_route_approval_reaches_self", func(t *testing.T) {
 		t.Parallel()
 

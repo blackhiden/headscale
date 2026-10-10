@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/arsydoni4326-alt/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestApplePlatformConfig_ServesProfilesViaChiRouter is the regression
-// guard for issue juanfont/headscale#3296.
+// guard for issue blackhiden/headscale#3296.
 //
 // The Apple profile download endpoints (`/apple/macos-app-store`,
 // `/apple/macos-standalone`, `/apple/ios`) are registered on the chi
