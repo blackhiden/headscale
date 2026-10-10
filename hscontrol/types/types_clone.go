@@ -165,9 +165,7 @@ func (src *Credential) Clone() *Credential {
 	if dst.UserID != nil {
 		dst.UserID = new(*src.UserID)
 	}
-	if dst.User != nil {
-		dst.User = new(*src.User)
-	}
+	dst.User = src.User.Clone()
 	dst.Scopes = append(src.Scopes[:0:0], src.Scopes...)
 	dst.Tags = append(src.Tags[:0:0], src.Tags...)
 	if dst.LastSeen != nil {
