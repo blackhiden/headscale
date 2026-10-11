@@ -14,6 +14,7 @@ import (
 
 	"github.com/blackhiden/headscale/hscontrol/db"
 	"github.com/blackhiden/headscale/hscontrol/derp"
+	"github.com/blackhiden/headscale/hscontrol/policy"
 	"github.com/blackhiden/headscale/hscontrol/state"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/types/change"
