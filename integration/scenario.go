@@ -24,6 +24,7 @@ import (
 	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
 	"github.com/blackhiden/headscale/hscontrol/capver"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/blackhiden/headscale/integration/dsic"
 	"github.com/blackhiden/headscale/integration/hsic"

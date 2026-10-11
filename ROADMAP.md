@@ -1431,7 +1431,7 @@ Cards span the full width of the content container, with appropriate responsive 
   user:
     username: admin
     password: <bcrypt-hash>
-    avatar: https://example.com/avatar.jpg  # Optional
+    avatar: https://example.com/avatar.jpg # Optional
   ```
 
 ---

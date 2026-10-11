@@ -9,6 +9,7 @@ import (
 	"time"
 
 	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/blackhiden/headscale/integration/hsic"
 	"github.com/blackhiden/headscale/integration/integrationutil"

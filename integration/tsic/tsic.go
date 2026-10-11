@@ -20,11 +20,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/blackhiden/headscale/integration/integrationutil"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/ipn"

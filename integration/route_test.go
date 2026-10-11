@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	cmpdiff "github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
 	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
@@ -21,6 +19,8 @@ import (
 	"github.com/blackhiden/headscale/integration/hsic"
 	"github.com/blackhiden/headscale/integration/integrationutil"
 	"github.com/blackhiden/headscale/integration/tsic"
+	cmpdiff "github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	xmaps "golang.org/x/exp/maps"

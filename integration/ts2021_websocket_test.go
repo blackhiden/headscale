@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/blackhiden/headscale/integration/hsic"
 	"github.com/blackhiden/headscale/integration/tsic"
+	"github.com/coder/websocket"
 	"github.com/ory/dockertest/v3"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"

@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
 	clientv2 "github.com/blackhiden/headscale/gen/client/v2"
 	"github.com/blackhiden/headscale/hscontrol"
@@ -33,6 +32,7 @@ import (
 	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/blackhiden/headscale/integration/integrationutil"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"gopkg.in/yaml.v3"

@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	tcmp "github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
 	"github.com/blackhiden/headscale/integration/hsic"
 	"github.com/blackhiden/headscale/integration/integrationutil"
 	"github.com/blackhiden/headscale/integration/tsic"
+	tcmp "github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
