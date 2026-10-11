@@ -1807,7 +1807,7 @@ func (s *State) SetAuthCacheEntry(id types.AuthID, entry *types.AuthRequest) {
 	if entry.ExpiresAt().IsZero() {
 		entry.SetExpiry(time.Now().Add(s.authCacheExpiration))
 	}
-	
+
 	// Check if entry already exists - if so, don't overwrite with new expiry
 	if existing, ok := s.authCache.Get(id); ok {
 		// Entry already exists - preserve original expiry, don't allow bypass
@@ -1816,9 +1816,10 @@ func (s *State) SetAuthCacheEntry(id types.AuthID, entry *types.AuthRequest) {
 			Time("existing_expiry", existing.ExpiresAt()).
 			Time("attempted_expiry", entry.ExpiresAt()).
 			Msg("auth cache entry already exists, preserving original expiry")
+
 		return
 	}
-	
+
 	s.authCache.Add(id, entry)
 }
 

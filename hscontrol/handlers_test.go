@@ -61,7 +61,7 @@ func TestRegisterHandlerRendersQRForPendingRegistration(t *testing.T) {
 	authID := types.MustAuthID()
 	app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(&types.RegistrationData{}))
 
-	req := httptest.NewRequest(http.MethodGet, "/register/"+authID.String(), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/register/"+authID.String(), nil)
 	rec := httptest.NewRecorder()
 	app.HTTPHandler().ServeHTTP(rec, req)
 
@@ -401,7 +401,7 @@ func TestHealthHandler(t *testing.T) {
 		_ = h.state.Close()
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/health", nil)
 	rr := httptest.NewRecorder()
 
 	h.HealthHandler(rr, req)
@@ -412,6 +412,7 @@ func TestHealthHandler(t *testing.T) {
 	var resp struct {
 		Status string `json:"status"`
 	}
+
 	err = json.Unmarshal(rr.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "pass", resp.Status)
@@ -445,7 +446,7 @@ func TestReadyHandler(t *testing.T) {
 		_ = h.state.Close()
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/ready", nil)
 	rr := httptest.NewRecorder()
 
 	h.ReadyHandler(rr, req)
@@ -457,6 +458,7 @@ func TestReadyHandler(t *testing.T) {
 		Ready  bool   `json:"ready"`
 		Status string `json:"status"`
 	}
+
 	err = json.Unmarshal(rr.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.True(t, resp.Ready)
@@ -491,7 +493,7 @@ func TestVersionHandler(t *testing.T) {
 		_ = h.state.Close()
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/version", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/version", nil)
 	rr := httptest.NewRecorder()
 
 	h.VersionHandler(rr, req)
@@ -500,6 +502,7 @@ func TestVersionHandler(t *testing.T) {
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 
 	var resp types.VersionInfo
+
 	err = json.Unmarshal(rr.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	// Version info should be present (may be "dev" in test environment)

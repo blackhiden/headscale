@@ -25,8 +25,9 @@ const (
 
 // Shared CSS value constants used across templates.
 const (
-	cssBorderHS = "1px solid var(--hs-border)" //nolint:unused // Shared HS border
-	cssCenter   = "center"                     //nolint:unused // Center alignment
+	cssBorderHS               = "1px solid var(--hs-border)" //nolint:unused // Shared HS border
+	cssCenter                 = "center"                     //nolint:unused // Center alignment
+	cssDefaultForegroundLight = "var(--md-default-fg-color--light)"
 )
 
 // Typography System
@@ -67,7 +68,7 @@ func orDivider() *elem.Element {
 		elem.Div(attrs.Props{attrs.Style: lineStyle}),
 		elem.Strong(attrs.Props{
 			attrs.Style: styles.Props{
-				styles.Color:      "var(--md-default-fg-color--light)",
+				styles.Color:      cssDefaultForegroundLight,
 				styles.FontSize:   fontSizeBase,
 				styles.FontWeight: "500",
 				"text-transform":  "uppercase",

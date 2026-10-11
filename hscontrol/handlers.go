@@ -268,7 +268,7 @@ func (h *Headscale) ReadyHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
-	respond := func(ready bool, err error) {
+	respond := func(ready bool) {
 		writer.Header().Set("Content-Type", "application/json")
 
 		res := struct {
@@ -281,6 +281,7 @@ func (h *Headscale) ReadyHandler(
 
 		if !ready {
 			writer.WriteHeader(http.StatusServiceUnavailable)
+
 			res.Status = "not ready"
 		}
 
@@ -294,11 +295,12 @@ func (h *Headscale) ReadyHandler(
 	err := h.state.PingDB(req.Context())
 	if err != nil {
 		log.Warn().Err(err).Msg("readiness check failed: database not reachable")
-		respond(false, err)
+		respond(false)
+
 		return
 	}
 
-	respond(true, nil)
+	respond(true)
 }
 
 func (h *Headscale) RobotsHandler(
@@ -425,6 +427,7 @@ func (a *AuthProviderWeb) RegisterHandler(
 	}
 
 	qrCodeDataURL := ""
+
 	if authReq, ok := a.h.state.GetAuthCacheEntry(authId); ok && authReq.IsRegistration() {
 		qrPNG, qrErr := qr.GenerateRegistrationQR(
 			authId.String(),

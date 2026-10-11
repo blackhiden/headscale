@@ -18,6 +18,7 @@ var (
 	ErrHeadplaneUserExists           = errors.New("headplane user already exists")
 	ErrInvalidUsername               = errors.New("invalid username")
 	ErrInvalidPassword               = errors.New("invalid password")
+	ErrInvalidRole                   = errors.New("invalid role: must be 'user' or 'admin'")
 	ErrHeadplaneUserNotAuthenticated = errors.New("user not authenticated")
 	ErrHeadplaneUserForbidden        = errors.New("user forbidden")
 	ErrHeadplanePasswordAuthRequired = errors.New("password authentication required")
@@ -34,7 +35,7 @@ type HeadplaneUser struct {
 }
 
 // TableName specifies the table name for GORM.
-func (HeadplaneUser) TableName() string {
+func (*HeadplaneUser) TableName() string {
 	return "headplane_users"
 }
 
@@ -50,6 +51,7 @@ func (u *HeadplaneUser) SetPassword(password string) error {
 	}
 
 	u.PasswordHash = string(hash)
+
 	return nil
 }
 
@@ -76,10 +78,12 @@ func CreateHeadplaneUser(tx *gorm.DB, username, password, role string) (*Headpla
 
 	// Check if user already exists
 	var existing HeadplaneUser
+
 	err := tx.Where("username = ?", username).First(&existing).Error
 	if err == nil {
 		return nil, ErrHeadplaneUserExists
 	}
+
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -103,36 +107,44 @@ func CreateHeadplaneUser(tx *gorm.DB, username, password, role string) (*Headpla
 // GetHeadplaneUserByUsername retrieves a Headplane user by username.
 func GetHeadplaneUserByUsername(tx *gorm.DB, username string) (*HeadplaneUser, error) {
 	var user HeadplaneUser
+
 	err := tx.Where("username = ?", username).First(&user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrHeadplaneUserNotFound
 		}
+
 		return nil, err
 	}
+
 	return &user, nil
 }
 
 // GetHeadplaneUserByID retrieves a Headplane user by ID.
 func GetHeadplaneUserByID(tx *gorm.DB, id uint) (*HeadplaneUser, error) {
 	var user HeadplaneUser
+
 	err := tx.First(&user, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrHeadplaneUserNotFound
 		}
+
 		return nil, err
 	}
+
 	return &user, nil
 }
 
 // ListHeadplaneUsers lists all Headplane users.
 func ListHeadplaneUsers(tx *gorm.DB) ([]HeadplaneUser, error) {
 	var users []HeadplaneUser
+
 	err := tx.Order("created_at ASC").Find(&users).Error
 	if err != nil {
 		return nil, err
 	}
+
 	return users, nil
 }
 
@@ -142,9 +154,11 @@ func DeleteHeadplaneUser(tx *gorm.DB, id uint) error {
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return ErrHeadplaneUserNotFound
 	}
+
 	return nil
 }
 
@@ -169,27 +183,31 @@ func UpdateHeadplaneUser(tx *gorm.DB, id uint, username, role string) (*Headplan
 		return nil, err
 	}
 
-	updates := make(map[string]interface{})
+	updates := make(map[string]any)
 
 	// Only update username if provided and different
 	if username != "" && username != user.Username {
 		// Check if new username is already taken
 		var existing HeadplaneUser
+
 		err := tx.Where("username = ? AND id != ?", username, id).First(&existing).Error
 		if err == nil {
 			return nil, ErrHeadplaneUserExists
 		}
+
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
+
 		updates["username"] = username
 	}
 
 	// Only update role if provided and different
 	if role != "" && role != user.Role {
 		if role != "user" && role != "admin" {
-			return nil, errors.New("invalid role: must be 'user' or 'admin'")
+			return nil, ErrInvalidRole
 		}
+
 		updates["role"] = role
 	}
 
@@ -209,6 +227,8 @@ func UpdateHeadplaneUser(tx *gorm.DB, id uint, username, role string) (*Headplan
 // CountAdminUsers returns the number of users with admin role.
 func CountAdminUsers(tx *gorm.DB) (int64, error) {
 	var count int64
+
 	err := tx.Model(&HeadplaneUser{}).Where("role = ?", "admin").Count(&count).Error
+
 	return count, err
 }

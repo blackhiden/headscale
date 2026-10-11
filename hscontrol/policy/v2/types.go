@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-json-experiment/json"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/go-json-experiment/json"
 	"github.com/tailscale/hujson"
 	"go4.org/netipx"
 	"tailscale.com/net/tsaddr"
@@ -1363,10 +1363,8 @@ func (g *Groups) ContainsOrOIDC(group *Group, users types.Users) error {
 	}
 
 	for _, user := range users {
-		for _, ug := range user.OIDCGroups {
-			if ug == string(*group) {
-				return nil
-			}
+		if slices.Contains(user.OIDCGroups, string(*group)) {
+			return nil
 		}
 	}
 

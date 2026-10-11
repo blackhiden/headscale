@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main  # Triggers the workflow when code is pushed to the main branch
+      - main # Triggers the workflow when code is pushed to the main branch
 
 env:
   REGISTRY: ghcr.io
@@ -13,7 +13,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
+
     # Required permissions to write packages to GHCR
     permissions:
       contents: read

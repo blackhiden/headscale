@@ -36,6 +36,7 @@ func TestWebhookDispatcher_SendWebhook(t *testing.T) {
 	// Create a test HTTP server to receive webhook
 	receivedPayload := ""
 	receivedHeaders := http.Header{}
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
@@ -54,7 +55,9 @@ func TestWebhookDispatcher_SendWebhook(t *testing.T) {
 	defer server.Close()
 
 	// Create webhook with secret
-	eventsJSON, _ := json.Marshal([]string{"node_up"})
+	eventsJSON, err := json.Marshal([]string{"node_up"})
+	require.NoError(t, err)
+
 	webhook := &types.Webhook{
 		ID:             1,
 		Name:           "test-webhook",
@@ -65,12 +68,7 @@ func TestWebhookDispatcher_SendWebhook(t *testing.T) {
 		TimeoutSeconds: 5,
 	}
 
-	// Create a minimal app for testing
-	cfg := &types.Config{}
-	app, err := NewHeadscale(cfg)
-	require.NoError(t, err)
-
-	dispatcher := NewWebhookDispatcher(app)
+	dispatcher := &WebhookDispatcher{}
 
 	// Prepare payload
 	payload := types.WebhookPayload{
@@ -89,9 +87,6 @@ func TestWebhookDispatcher_SendWebhook(t *testing.T) {
 	// Send webhook
 	dispatcher.sendWebhook(webhook, payloadJSON, types.WebhookEventNodeUp)
 
-	// Give it a moment to complete
-	time.Sleep(100 * time.Millisecond)
-
 	// Verify payload was received
 	assert.NotEmpty(t, receivedPayload)
 
@@ -105,6 +100,7 @@ func TestWebhookDispatcher_SendWebhook(t *testing.T) {
 
 	// Verify payload content
 	var receivedWebhookPayload types.WebhookPayload
+
 	err = json.Unmarshal([]byte(receivedPayload), &receivedWebhookPayload)
 	require.NoError(t, err)
 	assert.Equal(t, types.WebhookEventNodeUp, receivedWebhookPayload.EventType)

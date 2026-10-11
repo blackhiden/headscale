@@ -88,6 +88,7 @@ func TestAuthCacheTTLExpiry(t *testing.T) {
 		10, // large capacity, we test TTL not size
 		func(id types.AuthID, rn *types.AuthRequest) {
 			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
+
 			evicted <- id
 		},
 		shortTTL,
@@ -101,12 +102,11 @@ func TestAuthCacheTTLExpiry(t *testing.T) {
 	_, ok := cache.Get(id)
 	require.True(t, ok, "entry should exist immediately after insertion")
 
-	// Wait for TTL to expire
-	time.Sleep(shortTTL + 50*time.Millisecond)
+	assert.Eventually(t, func() bool {
+		_, ok = cache.Get(id)
 
-	// Entry should be gone
-	_, ok = cache.Get(id)
-	assert.False(t, ok, "entry should be evicted after TTL expires")
+		return !ok
+	}, time.Second, 10*time.Millisecond, "entry should be evicted after TTL expires")
 
 	// Eviction callback should have been called
 	select {
@@ -144,19 +144,16 @@ func TestAuthCacheNoExpiryExtension(t *testing.T) {
 	entry1 := types.NewAuthRequest()
 	cache.Add(id, entry1)
 
-	// Wait half the TTL
-	time.Sleep(shortTTL / 2)
-
 	// Try to re-add with the same ID (simulating a refresh attempt)
 	entry2 := types.NewAuthRequest()
+
 	cache.Add(id, entry2)
 
-	// Wait for the original TTL to fully expire
-	time.Sleep(shortTTL/2 + 50*time.Millisecond)
+	assert.Eventually(t, func() bool {
+		_, ok := cache.Get(id)
 
-	// Entry should be gone regardless of the re-add
-	_, ok := cache.Get(id)
-	assert.False(t, ok, "re-adding an entry should not extend its TTL")
+		return !ok
+	}, time.Second, 10*time.Millisecond, "re-adding an entry should not extend its TTL")
 }
 
 // TestAuthCacheDoubleConsumption verifies that consuming an auth entry
@@ -204,10 +201,11 @@ func TestAuthCacheConcurrentAccess(t *testing.T) {
 	cache.Add(id, entry)
 
 	const numGoroutines = 10
+
 	successCount := make(chan bool, numGoroutines)
 
 	// Launch multiple goroutines trying to get the same entry
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			retrieved, ok := cache.Get(id)
 			successCount <- ok && retrieved != nil
@@ -216,7 +214,8 @@ func TestAuthCacheConcurrentAccess(t *testing.T) {
 
 	// All should succeed since we're only reading
 	successes := 0
-	for i := 0; i < numGoroutines; i++ {
+
+	for range numGoroutines {
 		if <-successCount {
 			successes++
 		}
@@ -242,15 +241,17 @@ func TestAuthCacheConcurrentRemoval(t *testing.T) {
 	cache.Add(id, entry)
 
 	const numGoroutines = 10
+
 	successCount := make(chan bool, numGoroutines)
 
 	// Launch multiple goroutines trying to consume the same entry
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			// Attempt to get and immediately remove
 			retrieved, ok := cache.Get(id)
 			if ok && retrieved != nil {
 				cache.Remove(id)
+
 				successCount <- true
 			} else {
 				successCount <- false
@@ -260,7 +261,8 @@ func TestAuthCacheConcurrentRemoval(t *testing.T) {
 
 	// At least one should succeed, others may fail
 	successes := 0
-	for i := 0; i < numGoroutines; i++ {
+
+	for range numGoroutines {
 		if <-successCount {
 			successes++
 		}
@@ -286,18 +288,19 @@ func TestAuthCacheMultipleEntries(t *testing.T) {
 	)
 
 	const numEntries = 10
+
 	ids := make([]types.AuthID, numEntries)
 	entries := make([]*types.AuthRequest, numEntries)
 
 	// Add multiple entries
-	for i := 0; i < numEntries; i++ {
+	for i := range numEntries {
 		ids[i] = types.MustAuthID()
 		entries[i] = types.NewAuthRequest()
 		cache.Add(ids[i], entries[i])
 	}
 
 	// All should be retrievable
-	for i := 0; i < numEntries; i++ {
+	for i := range numEntries {
 		retrieved, ok := cache.Get(ids[i])
 		assert.True(t, ok, "entry %d should be retrievable", i)
 		assert.Equal(t, entries[i], retrieved)
@@ -311,10 +314,11 @@ func TestAuthCacheMultipleEntries(t *testing.T) {
 	assert.False(t, ok, "removed entry should not be retrievable")
 
 	// Other entries should still exist
-	for i := 0; i < numEntries; i++ {
+	for i := range numEntries {
 		if i == 5 {
 			continue
 		}
+
 		retrieved, ok := cache.Get(ids[i])
 		assert.True(t, ok, "entry %d should still be retrievable", i)
 		assert.Equal(t, entries[i], retrieved)
@@ -338,7 +342,7 @@ func TestAuthCacheEvictionDoesNotAffectOthers(t *testing.T) {
 	entries := make([]*types.AuthRequest, maxEntries+2)
 
 	// Add maxEntries entries
-	for i := 0; i < maxEntries; i++ {
+	for i := range maxEntries {
 		ids[i] = types.MustAuthID()
 		entries[i] = types.NewAuthRequest()
 		cache.Add(ids[i], entries[i])
@@ -467,12 +471,11 @@ func TestAuthCacheExpiredEntryNotRetrievable(t *testing.T) {
 	_, ok := cache.Get(authID)
 	require.True(t, ok, "entry should be immediately retrievable")
 
-	// Wait for TTL expiry
-	time.Sleep(shortTTL + 50*time.Millisecond)
+	assert.Eventually(t, func() bool {
+		_, ok = cache.Get(authID)
 
-	// Should no longer be retrievable
-	_, ok = cache.Get(authID)
-	assert.False(t, ok, "expired entry should not be retrievable")
+		return !ok
+	}, time.Second, 10*time.Millisecond, "expired entry should not be retrievable")
 }
 
 // TestAuthCacheZeroExpiryGetsDefault verifies that entries without
@@ -489,7 +492,9 @@ func TestAuthCacheZeroExpiryGetsDefault(t *testing.T) {
 	// Don't set expiry - should get default
 
 	beforeAdd := time.Now()
+
 	s.SetAuthCacheEntry(authID, entry)
+
 	afterAdd := time.Now()
 
 	retrieved, ok := s.GetAuthCacheEntry(authID)
@@ -524,4 +529,3 @@ func TestAuthCacheCustomExpiryPreserved(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, customExpiry.Unix(), retrieved.ExpiresAt().Unix(), "custom expiry should be preserved")
 }
-

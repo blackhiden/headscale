@@ -872,7 +872,9 @@ func (a *AuthProviderOIDC) RegisterConfirmGetHandler(
 	if pending.NodeExpiry != nil {
 		expiresAt = *pending.NodeExpiry
 	}
-	if qrPNG, err := qr.GenerateRegistrationQR(authID.String(), a.serverURL, expiresAt); err == nil {
+
+	qrPNG, err := qr.GenerateRegistrationQR(authID.String(), a.serverURL, expiresAt)
+	if err == nil {
 		info.QRCodeDataURL = "data:image/png;base64," + base64.StdEncoding.EncodeToString(qrPNG)
 	} else {
 		log.Warn().Err(err).Msg("Failed to generate registration QR code")

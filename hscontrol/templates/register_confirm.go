@@ -123,7 +123,7 @@ func deviceTable(rows []deviceRow) *elem.Element {
 					styles.Padding:      "0.5rem 1rem 0.5rem 0",
 					styles.FontWeight:   "600",
 					styles.WhiteSpace:   "nowrap",
-					styles.Color:        "var(--md-default-fg-color--light)",
+					styles.Color:        cssDefaultForegroundLight,
 					styles.BorderBottom: cssBorderHS,
 				}.ToInline(),
 			}, elem.Text(row.label)),

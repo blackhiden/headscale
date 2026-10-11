@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blackhiden/headscale/hscontrol/types"
 	"gorm.io/gorm"
 )
 
@@ -110,9 +109,9 @@ func EnsureHeadplaneTables(tx *gorm.DB) error {
 	})
 }
 
-func repairHeadplaneSchema(tx *gorm.DB, cfg *types.Config) error {
+func repairHeadplaneSchema(tx *gorm.DB) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
-		if err := ensureHeadplaneUsersTable(tx, cfg); err != nil {
+		if err := ensureHeadplaneUsersTable(tx); err != nil {
 			return err
 		}
 

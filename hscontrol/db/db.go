@@ -759,10 +759,8 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				// Add webhooks table for monitoring/alerting integrations.
 				// Webhooks can be configured to receive HTTP POST notifications
 				// for events like node up/down, health check failures, and alerts.
-				ID: "202609301000-create-webhooks-table",
-				Migrate: func(tx *gorm.DB) error {
-					return ensureWebhooksTable(tx)
-				},
+				ID:      "202609301000-create-webhooks-table",
+				Migrate: ensureWebhooksTable,
 				Rollback: func(tx *gorm.DB) error {
 					return tx.Migrator().DropTable(&types.Webhook{})
 				},
@@ -772,10 +770,8 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				// This enables multiple users to log in to the Headplane UI with
 				// individual credentials (username + password) and role-based access.
 				// Migration auto-creates an admin user from the existing config password.
-				ID: "202610031721-create-headplane-users",
-				Migrate: func(tx *gorm.DB) error {
-					return ensureHeadplaneUsersTable(tx, cfg)
-				},
+				ID:      "202610031721-create-headplane-users",
+				Migrate: ensureHeadplaneUsersTable,
 				Rollback: func(tx *gorm.DB) error {
 					return tx.Migrator().DropTable(&HeadplaneUser{})
 				},
@@ -784,10 +780,8 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				// Migrate headplane_settings from single-user to per-user.
 				// Adds user_id column, removes single-row constraint, and migrates
 				// existing settings to the admin user.
-				ID: "202610041200-per-user-headplane-settings",
-				Migrate: func(tx *gorm.DB) error {
-					return migrateHeadplaneSettingsToPerUser(tx)
-				},
+				ID:      "202610041200-per-user-headplane-settings",
+				Migrate: migrateHeadplaneSettingsToPerUser,
 				Rollback: func(tx *gorm.DB) error {
 					return nil
 				},
@@ -795,19 +789,15 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			{
 				// Restore Headplane tables that were removed to work around the
 				// schema validator before they were added to schema.sql.
-				ID: headplaneSchemaRepairMigrationID,
-				Migrate: func(tx *gorm.DB) error {
-					return repairHeadplaneSchema(tx, cfg)
-				},
+				ID:       headplaneSchemaRepairMigrationID,
+				Migrate:  repairHeadplaneSchema,
 				Rollback: func(db *gorm.DB) error { return nil },
 			},
 			{
 				// GORM created the Headplane indexes with quoted identifiers,
 				// which does not match the canonical SQLite schema text.
-				ID: headplaneIndexNormalizationMigrationID,
-				Migrate: func(tx *gorm.DB) error {
-					return normalizeHeadplaneIndexes(tx)
-				},
+				ID:       headplaneIndexNormalizationMigrationID,
+				Migrate:  normalizeHeadplaneIndexes,
 				Rollback: func(db *gorm.DB) error { return nil },
 			},
 		},
@@ -839,7 +829,7 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			return err
 		}
 
-		err = ensureHeadplaneUsersTable(tx, cfg)
+		err = ensureHeadplaneUsersTable(tx)
 		if err != nil {
 			return err
 		}
@@ -1181,10 +1171,12 @@ func Write[T any](db *gorm.DB, fn func(tx *gorm.DB) (T, error)) (T, error) {
 
 // ensureHeadplaneUsersTable creates the headplane_users table and migrates
 // the existing single-user password to a default admin user.
-func ensureHeadplaneUsersTable(tx *gorm.DB, cfg *types.Config) error {
+func ensureHeadplaneUsersTable(tx *gorm.DB) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
 		usersTableMissing := !tx.Migrator().HasTable(headplaneUsersTableName)
-		if err := EnsureHeadplaneTables(tx); err != nil {
+
+		err := EnsureHeadplaneTables(tx)
+		if err != nil {
 			return err
 		}
 
@@ -1229,7 +1221,9 @@ func migrateHeadplaneSettingsToPerUser(tx *gorm.DB) error {
 		}
 
 		var oldSettings OldSettings
+
 		hasExisting := false
+
 		err := tx.Table("headplane_settings").First(&oldSettings).Error
 		if err == nil {
 			hasExisting = true
@@ -1238,12 +1232,14 @@ func migrateHeadplaneSettingsToPerUser(tx *gorm.DB) error {
 		}
 
 		// 2. Drop old table
-		if err := tx.Exec("DROP TABLE IF EXISTS headplane_settings").Error; err != nil {
+		err = tx.Exec("DROP TABLE IF EXISTS headplane_settings").Error
+		if err != nil {
 			return fmt.Errorf("dropping old headplane_settings table: %w", err)
 		}
 
 		// 3. Create the canonical per-user settings table.
-		if err := createHeadplaneSettingsTable(tx); err != nil {
+		err = createHeadplaneSettingsTable(tx)
+		if err != nil {
 			return err
 		}
 
@@ -1251,16 +1247,19 @@ func migrateHeadplaneSettingsToPerUser(tx *gorm.DB) error {
 		if hasExisting {
 			// Get admin user ID (should be 1, but verify)
 			var adminUser HeadplaneUser
-			err := tx.Where("role = ?", "admin").Order("id ASC").First(&adminUser).Error
+
+			err = tx.Where("role = ?", "admin").Order("id ASC").First(&adminUser).Error
 			if err != nil {
 				log.Warn().Msg("No admin user found, skipping settings migration")
 			} else {
-				if err := tx.Exec(`
+				err := tx.Exec(`
 					INSERT INTO headplane_settings (user_id, api_key_encrypted, api_key_nonce, api_key_salt, theme, profile_name, updated_at)
 					VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-				`, adminUser.ID, oldSettings.APIKeyEncrypted, oldSettings.APIKeyNonce, oldSettings.APIKeySalt, oldSettings.Theme, oldSettings.ProfileName).Error; err != nil {
+				`, adminUser.ID, oldSettings.APIKeyEncrypted, oldSettings.APIKeyNonce, oldSettings.APIKeySalt, oldSettings.Theme, oldSettings.ProfileName).Error
+				if err != nil {
 					return fmt.Errorf("migrating settings to admin user: %w", err)
 				}
+
 				log.Info().Uint("user_id", adminUser.ID).Msg("Migrated existing settings to admin user")
 			}
 		}
@@ -1268,29 +1267,35 @@ func migrateHeadplaneSettingsToPerUser(tx *gorm.DB) error {
 		// PostgreSQL: Can use ALTER TABLE
 
 		// 1. Add user_id column (nullable first)
-		if err := tx.Exec("ALTER TABLE headplane_settings ADD COLUMN user_id INTEGER").Error; err != nil {
+		err := tx.Exec("ALTER TABLE headplane_settings ADD COLUMN user_id INTEGER").Error
+		if err != nil {
 			return fmt.Errorf("adding user_id column: %w", err)
 		}
 
 		// 2. Get admin user ID
 		var adminUser HeadplaneUser
+
 		err := tx.Where("role = ?", "admin").Order("id ASC").First(&adminUser).Error
 		if err != nil {
 			log.Warn().Msg("No admin user found for settings migration")
 		} else {
 			// 3. Set user_id to admin for existing rows
-			if err := tx.Exec("UPDATE headplane_settings SET user_id = ? WHERE user_id IS NULL", adminUser.ID).Error; err != nil {
+			err := tx.Exec("UPDATE headplane_settings SET user_id = ? WHERE user_id IS NULL", adminUser.ID).Error
+			if err != nil {
 				return fmt.Errorf("setting user_id for existing settings: %w", err)
 			}
+
 			log.Info().Uint("user_id", adminUser.ID).Msg("Migrated existing settings to admin user")
 		}
 
 		// 4. Make user_id NOT NULL and add unique constraint
-		if err := tx.Exec("ALTER TABLE headplane_settings ALTER COLUMN user_id SET NOT NULL").Error; err != nil {
+		err = tx.Exec("ALTER TABLE headplane_settings ALTER COLUMN user_id SET NOT NULL").Error
+		if err != nil {
 			return fmt.Errorf("making user_id NOT NULL: %w", err)
 		}
 
-		if err := tx.Exec("CREATE UNIQUE INDEX idx_headplane_settings_user_id ON headplane_settings(user_id)").Error; err != nil {
+		err = tx.Exec("CREATE UNIQUE INDEX idx_headplane_settings_user_id ON headplane_settings(user_id)").Error
+		if err != nil {
 			return fmt.Errorf("adding unique index on user_id: %w", err)
 		}
 

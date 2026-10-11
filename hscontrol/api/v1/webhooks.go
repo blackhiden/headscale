@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/danielgtaylor/huma/v2"
 )
+
+const webhooksTag = "Webhooks"
 
 func init() {
 	registrations = append(registrations, registerWebhooks)
@@ -28,20 +30,20 @@ type Webhook struct {
 
 // CreateWebhookRequestBody is the request body for creating a webhook.
 type CreateWebhookRequestBody struct {
-	Name           string            `json:"name" minLength:"1" maxLength:"255" doc:"Human-readable webhook identifier"`
-	URL            string            `json:"url" format:"uri" doc:"Destination endpoint for webhook POST requests"`
-	Events         []string          `json:"events" minItems:"1" doc:"Event types that trigger this webhook"`
-	Headers        map[string]string `json:"headers,omitempty" doc:"Custom HTTP headers to include in requests"`
-	Secret         string            `json:"secret,omitempty" doc:"Secret for HMAC-SHA256 payload signing"`
-	Enabled        *bool             `json:"enabled,omitempty" doc:"Whether this webhook is active (default: true)"`
-	TimeoutSeconds *int              `json:"timeoutSeconds,omitempty" doc:"HTTP timeout in seconds (default: 10)"`
+	Name           string            `doc:"Human-readable webhook identifier"              json:"name"                     maxLength:"255" minLength:"1"`
+	URL            string            `doc:"Destination endpoint for webhook POST requests" format:"uri"                    json:"url"`
+	Events         []string          `doc:"Event types that trigger this webhook"          json:"events"                   minItems:"1"`
+	Headers        map[string]string `doc:"Custom HTTP headers to include in requests"     json:"headers,omitempty"`
+	Secret         string            `doc:"Secret for HMAC-SHA256 payload signing"         json:"secret,omitempty"`
+	Enabled        *bool             `doc:"Whether this webhook is active (default: true)" json:"enabled,omitempty"`
+	TimeoutSeconds *int              `doc:"HTTP timeout in seconds (default: 10)"          json:"timeoutSeconds,omitempty"`
 }
 
 // UpdateWebhookRequestBody is the request body for updating a webhook.
 type UpdateWebhookRequestBody struct {
-	Name           *string           `json:"name,omitempty" minLength:"1" maxLength:"255"`
-	URL            *string           `json:"url,omitempty" format:"uri"`
-	Events         []string          `json:"events,omitempty" minItems:"1"`
+	Name           *string           `json:"name,omitempty"           maxLength:"255"      minLength:"1"`
+	URL            *string           `format:"uri"                    json:"url,omitempty"`
+	Events         []string          `json:"events,omitempty"         minItems:"1"`
 	Headers        map[string]string `json:"headers,omitempty"`
 	Secret         *string           `json:"secret,omitempty"`
 	Enabled        *bool             `json:"enabled,omitempty"`
@@ -61,7 +63,7 @@ type (
 
 type (
 	getWebhookInput struct {
-		ID string `path:"id" format:"uint" doc:"Webhook ID"`
+		ID string `doc:"Webhook ID" format:"uint" path:"id"`
 	}
 	getWebhookOutput struct {
 		Body struct {
@@ -80,7 +82,7 @@ type (
 
 type (
 	updateWebhookInput struct {
-		ID   string `path:"id" format:"uint" doc:"Webhook ID"`
+		ID   string `doc:"Webhook ID" format:"uint" path:"id"`
 		Body UpdateWebhookRequestBody
 	}
 	updateWebhookOutput struct {
@@ -92,7 +94,7 @@ type (
 
 type (
 	deleteWebhookInput struct {
-		ID string `path:"id" format:"uint" doc:"Webhook ID"`
+		ID string `doc:"Webhook ID" format:"uint" path:"id"`
 	}
 	deleteWebhookOutput struct {
 		Body struct{}
@@ -106,7 +108,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Path:        "/api/v1/webhooks",
 		Summary:     "Create webhook",
 		Description: "Creates a new webhook configuration for monitoring and alerting integrations",
-		Tags:        []string{"Webhooks"},
+		Tags:        []string{webhooksTag},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, in *createWebhookInput) (*createWebhookOutput, error) {
 		// Validate events
@@ -125,11 +127,13 @@ func registerWebhooks(api huma.API, b Backend) {
 
 		// Marshal headers to JSON
 		headersJSON := ""
+
 		if in.Body.Headers != nil {
 			headersBytes, err := json.Marshal(in.Body.Headers)
 			if err != nil {
 				return nil, huma.Error400BadRequest("invalid headers", err)
 			}
+
 			headersJSON = string(headersBytes)
 		}
 
@@ -171,7 +175,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Path:        "/api/v1/webhooks/{id}",
 		Summary:     "Get webhook",
 		Description: "Retrieves a webhook configuration by ID",
-		Tags:        []string{"Webhooks"},
+		Tags:        []string{webhooksTag},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, in *getWebhookInput) (*getWebhookOutput, error) {
 		id, err := parseWebhookID(in.ID)
@@ -196,7 +200,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Path:        "/api/v1/webhooks",
 		Summary:     "List webhooks",
 		Description: "Lists all webhook configurations",
-		Tags:        []string{"Webhooks"},
+		Tags:        []string{webhooksTag},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, _ *struct{}) (*listWebhooksOutput, error) {
 		webhooks, err := b.State.ListWebhooks()
@@ -205,6 +209,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		}
 
 		out := &listWebhooksOutput{}
+
 		out.Body.Webhooks = make([]Webhook, len(webhooks))
 		for i, wh := range webhooks {
 			out.Body.Webhooks[i] = webhookFromState(wh)
@@ -219,7 +224,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Path:        "/api/v1/webhooks/{id}",
 		Summary:     "Update webhook",
 		Description: "Updates an existing webhook configuration",
-		Tags:        []string{"Webhooks"},
+		Tags:        []string{webhooksTag},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, in *updateWebhookInput) (*updateWebhookOutput, error) {
 		id, err := parseWebhookID(in.ID)
@@ -236,9 +241,11 @@ func registerWebhooks(api huma.API, b Backend) {
 		if in.Body.Name != nil {
 			webhook.Name = *in.Body.Name
 		}
+
 		if in.Body.URL != nil {
 			webhook.URL = *in.Body.URL
 		}
+
 		if in.Body.Events != nil {
 			// Validate events
 			for _, eventStr := range in.Body.Events {
@@ -252,21 +259,27 @@ func registerWebhooks(api huma.API, b Backend) {
 			if err != nil {
 				return nil, huma.Error400BadRequest("invalid events", err)
 			}
+
 			webhook.Events = string(eventsJSON)
 		}
+
 		if in.Body.Headers != nil {
 			headersJSON, err := json.Marshal(in.Body.Headers)
 			if err != nil {
 				return nil, huma.Error400BadRequest("invalid headers", err)
 			}
+
 			webhook.Headers = string(headersJSON)
 		}
+
 		if in.Body.Secret != nil {
 			webhook.Secret = *in.Body.Secret
 		}
+
 		if in.Body.Enabled != nil {
 			webhook.Enabled = *in.Body.Enabled
 		}
+
 		if in.Body.TimeoutSeconds != nil {
 			webhook.TimeoutSeconds = *in.Body.TimeoutSeconds
 		}
@@ -319,6 +332,7 @@ func parseWebhookID(s string) (uint, error) {
 func webhookFromState(wh *types.Webhook) Webhook {
 	// Unmarshal events
 	var events []string
+
 	_ = json.Unmarshal([]byte(wh.Events), &events)
 
 	return Webhook{

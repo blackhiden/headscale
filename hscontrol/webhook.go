@@ -77,7 +77,7 @@ func (wd *WebhookDispatcher) DispatchHealthCheckFail(endpoint, errorMsg string) 
 }
 
 // DispatchAlertFiring sends notifications for external alerts.
-func (wd *WebhookDispatcher) DispatchAlertFiring(alertName, severity string, labels map[string]string, details map[string]interface{}) {
+func (wd *WebhookDispatcher) DispatchAlertFiring(alertName, severity string, labels map[string]string, details map[string]any) {
 	data := types.AlertEventData{
 		AlertName: alertName,
 		Severity:  severity,
@@ -89,7 +89,7 @@ func (wd *WebhookDispatcher) DispatchAlertFiring(alertName, severity string, lab
 }
 
 // dispatch is the internal method that sends webhook requests.
-func (wd *WebhookDispatcher) dispatch(eventType types.WebhookEventType, data interface{}) {
+func (wd *WebhookDispatcher) dispatch(eventType types.WebhookEventType, data any) {
 	timer := prometheus.NewTimer(webhookDispatchDuration.WithLabelValues(string(eventType)))
 	defer timer.ObserveDuration()
 
@@ -101,6 +101,7 @@ func (wd *WebhookDispatcher) dispatch(eventType types.WebhookEventType, data int
 			Str("event_type", string(eventType)).
 			Msg("Failed to list webhooks for event")
 		webhookDispatchTotal.WithLabelValues(string(eventType), "list_error").Inc()
+
 		return
 	}
 
@@ -123,6 +124,7 @@ func (wd *WebhookDispatcher) dispatch(eventType types.WebhookEventType, data int
 			Str("event_type", string(eventType)).
 			Msg("Failed to marshal webhook payload")
 		webhookDispatchTotal.WithLabelValues(string(eventType), "marshal_error").Inc()
+
 		return
 	}
 
@@ -143,7 +145,7 @@ func (wd *WebhookDispatcher) sendWebhook(webhook *types.Webhook, payloadJSON []b
 	defer cancel()
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "POST", webhook.URL, bytes.NewReader(payloadJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhook.URL, bytes.NewReader(payloadJSON))
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -152,6 +154,7 @@ func (wd *WebhookDispatcher) sendWebhook(webhook *types.Webhook, payloadJSON []b
 			Str("event_type", string(eventType)).
 			Msg("Failed to create webhook request")
 		webhookDispatchTotal.WithLabelValues(string(eventType), "request_error").Inc()
+
 		return
 	}
 
@@ -161,7 +164,9 @@ func (wd *WebhookDispatcher) sendWebhook(webhook *types.Webhook, payloadJSON []b
 	// Add custom headers
 	if webhook.Headers != "" {
 		var headers map[string]string
-		if err := json.Unmarshal([]byte(webhook.Headers), &headers); err != nil {
+
+		err := json.Unmarshal([]byte(webhook.Headers), &headers)
+		if err != nil {
 			log.Error().
 				Err(err).
 				Uint("webhook_id", webhook.ID).
@@ -182,6 +187,7 @@ func (wd *WebhookDispatcher) sendWebhook(webhook *types.Webhook, payloadJSON []b
 
 	// Send request
 	client := &http.Client{}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Error().
@@ -192,6 +198,7 @@ func (wd *WebhookDispatcher) sendWebhook(webhook *types.Webhook, payloadJSON []b
 			Str("event_type", string(eventType)).
 			Msg("Failed to send webhook")
 		webhookDispatchTotal.WithLabelValues(string(eventType), "send_error").Inc()
+
 		return
 	}
 	defer resp.Body.Close()
@@ -224,5 +231,6 @@ func (wd *WebhookDispatcher) sendWebhook(webhook *types.Webhook, payloadJSON []b
 func computeHMAC(payload []byte, secret string) string {
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write(payload)
+
 	return hex.EncodeToString(h.Sum(nil))
 }

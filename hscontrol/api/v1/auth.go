@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/danielgtaylor/huma/v2"
 )
 
 func init() {

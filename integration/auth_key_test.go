@@ -210,7 +210,6 @@ func TestAuthKeyLogoutAndReloginSameUser(t *testing.T) {
 					assertLastSeenSetWithCollect(c, node)
 				}
 			}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for node list after relogin")
-
 		})
 	}
 }

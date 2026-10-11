@@ -1,6 +1,7 @@
 package types
 
 import (
+	"slices"
 	"time"
 
 	"gorm.io/gorm"
@@ -32,12 +33,7 @@ func AllWebhookEventTypes() []WebhookEventType {
 
 // IsValid returns true if the event type is valid.
 func (e WebhookEventType) IsValid() bool {
-	for _, valid := range AllWebhookEventTypes() {
-		if e == valid {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(AllWebhookEventTypes(), e)
 }
 
 // Webhook represents a webhook configuration in the database.
@@ -75,7 +71,7 @@ type Webhook struct {
 type WebhookPayload struct {
 	EventType WebhookEventType `json:"event_type"`
 	Timestamp time.Time        `json:"timestamp"`
-	Data      interface{}      `json:"data"`
+	Data      any              `json:"data"`
 }
 
 // NodeEventData contains node-specific event data.
@@ -93,8 +89,8 @@ type HealthCheckEventData struct {
 
 // AlertEventData contains generic alert data.
 type AlertEventData struct {
-	AlertName string                 `json:"alert_name"`
-	Severity  string                 `json:"severity"`
-	Labels    map[string]string      `json:"labels,omitempty"`
-	Details   map[string]interface{} `json:"details,omitempty"`
+	AlertName string            `json:"alert_name"`
+	Severity  string            `json:"severity"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	Details   map[string]any    `json:"details,omitempty"`
 }

@@ -837,10 +837,12 @@ func TestHeadplaneIndexNormalization(t *testing.T) {
 		_, err := raw.ExecContext(t.Context(), stmt)
 		require.NoError(t, err, stmt)
 	}
+
 	require.NoError(t, raw.Close())
 
 	hsdb, err = NewHeadscaleDatabase(cfg)
 	require.NoError(t, err)
+
 	defer hsdb.Close()
 
 	for _, index := range headplaneIndexes {

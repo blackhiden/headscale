@@ -3,9 +3,9 @@ package apiv1
 import (
 	"errors"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/db"
 	"github.com/blackhiden/headscale/hscontrol/state"
+	"github.com/danielgtaylor/huma/v2"
 	"gorm.io/gorm"
 )
 
