@@ -1,4 +1,4 @@
 [submodule "headplane"]
 	path = headplane
-	url = https://github.com/arsydoni4326-alt/headplane.git
+	url = http://github.com/blackhiden/headplane.git
 	branch = main
