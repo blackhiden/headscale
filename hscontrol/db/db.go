@@ -1275,7 +1275,7 @@ func migrateHeadplaneSettingsToPerUser(tx *gorm.DB) error {
 		// 2. Get admin user ID
 		var adminUser HeadplaneUser
 
-		err := tx.Where("role = ?", "admin").Order("id ASC").First(&adminUser).Error
+		err = tx.Where("role = ?", "admin").Order("id ASC").First(&adminUser).Error
 		if err != nil {
 			log.Warn().Msg("No admin user found for settings migration")
 		} else {
