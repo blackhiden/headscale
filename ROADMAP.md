@@ -1731,11 +1731,13 @@ is: **Machines → Scan QR → Select User → Start Scanning**.
 #### QR Code Library Selection
 
 **Backend (Go):**
+
 - Consider: `github.com/skip2/go-qrcode` (popular, maintained, MIT license)
 - Alternative: `github.com/yeqown/go-qrcode` (v2, modern API)
 - Evaluate based on: maintenance status, license compatibility, API simplicity
 
 **Frontend (TypeScript/React):**
+
 - Consider: `@yudiel/react-qr-scanner` (React hooks, TypeScript support)
 - Alternative: `react-qr-reader` or `html5-qrcode`
 - Evaluate based on: React 18 compatibility, TypeScript support, browser API usage
@@ -1743,11 +1745,13 @@ is: **Machines → Scan QR → Select User → Start Scanning**.
 #### QR Code Payload Format
 
 **Option A: Encoded URL**
+
 ```
 https://headscale.example.com/register?key=<hskey>&server=<server-url>
 ```
 
 **Option B: JSON payload**
+
 ```json
 {
   "type": "headscale-registration",

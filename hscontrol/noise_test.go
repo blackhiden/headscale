@@ -19,8 +19,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/blackhiden/headscale/hscontrol/capver"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
