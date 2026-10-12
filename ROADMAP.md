@@ -228,8 +228,8 @@ first-class, verifiable property.
 - [x] Contextual help provided through tooltip component on 12+ UI elements
       (form fields, attribute labels, chips, status indicators).
 - [ ] Extend the a11y suite beyond axe-core: keyboard navigation, focus
-  management, color contrast, and screen-reader flows; publish a conformance
-  statement (deferred to future phase).
+      management, color contrast, and screen-reader flows; publish a conformance
+      statement (deferred to future phase).
 - [ ] Add first-run onboarding flow (deferred to future phase).
 - [ ] Keep the UI guide screenshots (from Phase 7) current (tracked separately).
 
@@ -305,10 +305,10 @@ help/onboarding content.
 - [x] Machine management parity — route overview page (frontend) [Implemented].
 - [ ] Machine management parity — device posture [Deferred — requires significant policy engine changes].
 - [x] DNS management improvements — `extra_records_path` visibility, CNAME
-  records, and IP validation (frontend) [Implemented].
+      records, and IP validation (frontend) [Implemented].
 - [x] Extensibility foundation — documented extension points
-  (`docs/ref/extending.md`), added Grafana dashboard example, validated
-  Terraform/K8s operator support [Implemented].
+      (`docs/ref/extending.md`), added Grafana dashboard example, validated
+      Terraform/K8s operator support [Implemented].
 - Evaluate Funnel / Serve / network flow logs; implement only if stable
   upstream and justified by demand [Proposed].
 
@@ -798,12 +798,12 @@ Create migration script `/tmp/migrate-v0-to-v1.sql`:
 BEGIN TRANSACTION;
 
 -- Update the last_seen_version if it exists
-UPDATE kv 
-SET value = '1.0.0-arsydoni4326' 
+UPDATE kv
+SET value = '1.0.0-arsydoni4326'
 WHERE key = 'last_seen_version';
 
 -- If no version record exists, insert it
-INSERT OR IGNORE INTO kv (key, value) 
+INSERT OR IGNORE INTO kv (key, value)
 VALUES ('last_seen_version', '1.0.0-arsydoni4326');
 
 -- Verify the migration
@@ -830,11 +830,11 @@ Ensure Headplane is configured for Phase 13c (single local admin):
 # /etc/headplane/config.yaml or equivalent
 user:
   username: admin
-  password: "$2b$12$..."  # bcrypt hash, NOT plaintext
+  password: "$2b$12$..." # bcrypt hash, NOT plaintext
 
 headscale:
   url: "http://headscale:8080"
-  api_key: "your-admin-api-key"  # or api_key_path
+  api_key: "your-admin-api-key" # or api_key_path
 ```
 
 If not configured, run Headplane migration:
@@ -926,8 +926,8 @@ Update `hscontrol/db/db.go` to allow v0.36.3 → v1.0.0 migration:
 // In checkVersionUpgradePath()
 // Allow fork's v0.36.3-arsydoni4326-alt → v1.0.0-arsydoni4326 migration
 // This is safe because v1.0.0 has no schema changes from v0.36.3
-if lastVersion == "0.36.3-arsydoni4326-alt" && 
-   currentVersion == "1.0.0-arsydoni4326" {
+if lastVersion == "0.36.3-arsydoni4326-alt" &&
+    currentVersion == "1.0.0-arsydoni4326" {
     return nil  // Allow this specific migration
 }
 ```
@@ -1111,24 +1111,24 @@ Address critical UX inconsistencies and security issues in the Headplane web UI,
 
 #### Issue 1: Admin Menu Navigation Path
 
-**Problem:**  
+**Problem:**
+
 The Admin menu item in the main navigation bar incorrectly routes to `/admin/admin/users` instead of `/admin/admin`. This causes confusion and breaks the expected navigation hierarchy.
 
 **Current behavior:**
+
 ```html
-<a href="/admin/admin/users">
-  <svg>...</svg>Admin
-</a>
+<a href="/admin/admin/users"> <svg>...</svg>Admin </a>
 ```
 
 **Expected behavior:**
+
 ```html
-<a href="/admin/admin">
-  <svg>...</svg>Admin
-</a>
+<a href="/admin/admin"> <svg>...</svg>Admin </a>
 ```
 
 **Implementation:**
+
 - [ ] Locate the navigation component in `headplane/app/` (likely in a layout or navigation component)
 - [ ] Update the `href` attribute from `/admin/admin/users` to `/admin/admin`
 - [ ] Verify the Admin page (`/admin/admin`) has proper sub-navigation or default view
@@ -1136,15 +1136,18 @@ The Admin menu item in the main navigation bar incorrectly routes to `/admin/adm
 - [ ] Ensure backward compatibility if any bookmarks or external links reference the old path
 
 **Files likely affected:**
+
 - `headplane/app/components/navigation/*.tsx` or similar layout components
 - `headplane/app/routes/admin/layout.tsx` or routing configuration
 
 #### Issue 2: User Avatar Display
 
-**Problem:**  
+**Problem:**
+
 The user menu button displays a generic SVG icon instead of the user's avatar picture. The avatar URL should be retrieved from `config.yaml` and displayed when available.
 
 **Current behavior:**
+
 ```html
 <button>
   <svg class="lucide-circle-user">...</svg>
@@ -1152,6 +1155,7 @@ The user menu button displays a generic SVG icon instead of the user's avatar pi
 ```
 
 **Expected behavior:**
+
 ```html
 <button>
   <img src="{avatar_url_from_config}" alt="User avatar" />
@@ -1160,6 +1164,7 @@ The user menu button displays a generic SVG icon instead of the user's avatar pi
 ```
 
 **Implementation:**
+
 - [ ] Identify where `config.yaml` is loaded and parsed in the Headplane backend
 - [ ] Add avatar URL field to the config schema if not present:
   ```typescript
@@ -1181,12 +1186,14 @@ The user menu button displays a generic SVG icon instead of the user's avatar pi
 - [ ] Add accessibility attributes: `alt` text, proper ARIA labels
 
 **Files likely affected:**
+
 - `headplane/app/server/config/config-schema.ts` (config schema)
 - `headplane/app/components/user-menu/*.tsx` (user menu component)
 - `headplane/app/server/auth/*.ts` (if avatar is included in auth response)
 - `headplane/config.example.yaml` (documentation)
 
 **Testing:**
+
 - [ ] With avatar URL in config: displays image
 - [ ] Without avatar URL in config: displays SVG fallback
 - [ ] With invalid avatar URL: displays SVG fallback
@@ -1198,16 +1205,19 @@ The user menu button displays a generic SVG icon instead of the user's avatar pi
 In the `/admin/admin` page, the browser attempts to retrieve API keys directly from the `headscale` service. This exposes internal service endpoints to the client and violates the principle of backend-for-frontend (BFF) architecture. All headscale communication should be proxied through the headplane backend.
 
 **Current (insecure) flow:**
+
 ```
 Browser → headscale:8080/api/v1/apikeys (direct)
 ```
 
 **Expected (secure) flow:**
+
 ```
 Browser → headplane:3000/api/admin/apikeys → headscale:8080/api/v1/apikeys
 ```
 
 **Security implications:**
+
 - Exposes internal headscale API endpoints to clients
 - May bypass headplane authentication/authorization checks
 - Reveals internal network topology
@@ -1216,42 +1226,47 @@ Browser → headplane:3000/api/admin/apikeys → headscale:8080/api/v1/apikeys
 **Implementation:**
 
 **Backend changes (Headplane):**
+
 - [ ] Create a new API endpoint in headplane for API key management:
+
   ```typescript
   // In headplane/app/server/api/admin/apikeys.ts or similar
   export async function getApiKeys() {
     // Internal authenticated call to headscale
-    const response = await headscaleClient.get('/api/v1/apikeys');
+    const response = await headscaleClient.get("/api/v1/apikeys");
     return response.data;
   }
-  
+
   export async function createApiKey(data: ApiKeyRequest) {
-    const response = await headscaleClient.post('/api/v1/apikeys', data);
+    const response = await headscaleClient.post("/api/v1/apikeys", data);
     return response.data;
   }
-  
+
   export async function deleteApiKey(keyId: string) {
     const response = await headscaleClient.delete(`/api/v1/apikeys/${keyId}`);
     return response.data;
   }
   ```
+
 - [ ] Ensure proper authentication: verify the requesting user is an admin
 - [ ] Add rate limiting to prevent abuse
 - [ ] Log all API key operations for audit trail
 
 **Backend changes (Headscale - if needed):**
+
 - [ ] Review existing API key endpoints in `hscontrol/api/v1/apikey.go` (or similar)
 - [ ] Ensure endpoints support service-to-service authentication from headplane
 - [ ] Consider adding an internal-only flag or separate endpoint for headplane access
 - [ ] Update CORS configuration to restrict direct browser access if needed
 
 **Frontend changes (Headplane):**
+
 - [ ] Update the API keys section in `/admin/admin` to call headplane endpoints:
   ```typescript
   // Replace direct headscale calls with headplane proxy calls
   // Before:
   // fetch('http://headscale:8080/api/v1/apikeys')
-  
+
   // After:
   // fetch('/api/admin/apikeys') // routed through headplane backend
   ```
@@ -1260,6 +1275,7 @@ Browser → headplane:3000/api/admin/apikeys → headscale:8080/api/v1/apikeys
 - [ ] Update API client configuration to use headplane routes
 
 **Files likely affected:**
+
 - `headplane/app/server/api/admin/*.ts` (new proxy endpoints)
 - `headplane/app/routes/admin/admin/page.tsx` (or wherever API keys UI lives)
 - `headplane/app/lib/api-client.ts` (API client configuration)
@@ -1267,6 +1283,7 @@ Browser → headplane:3000/api/admin/apikeys → headscale:8080/api/v1/apikeys
 - `hscontrol/grpcv1.go` or relevant API handler files
 
 **Testing:**
+
 - [ ] Verify browser never makes direct requests to headscale:8080
 - [ ] Check browser network tab: all requests go to headplane:3000
 - [ ] Test API key creation through the proxy
@@ -1287,6 +1304,7 @@ Cards have constrained width with excessive margins/padding
 Cards span the full width of the content container, with appropriate responsive behavior
 
 **Implementation:**
+
 - [ ] Locate the card components in `/admin/admin` page
 - [ ] Update card container classes to use `w-full` or equivalent
 - [ ] Remove any fixed-width or max-width constraints on cards
@@ -1298,6 +1316,7 @@ Cards span the full width of the content container, with appropriate responsive 
 - [ ] Preserve visual hierarchy and readability at larger widths
 
 **Example fix (Tailwind CSS):**
+
 ```tsx
 // Before:
 <div className="max-w-2xl mx-auto">
@@ -1311,11 +1330,13 @@ Cards span the full width of the content container, with appropriate responsive 
 ```
 
 **Files likely affected:**
+
 - `headplane/app/routes/admin/admin/page.tsx` (or similar)
 - `headplane/app/components/cards/*.tsx` (if using reusable card components)
 - Tailwind configuration or CSS files
 
 **Testing:**
+
 - [ ] Verify cards are full-width on desktop (1920px, 1440px, 1280px)
 - [ ] Test responsive behavior on tablet (768px, 1024px)
 - [ ] Test responsive behavior on mobile (375px, 428px)
@@ -1327,7 +1348,7 @@ Cards span the full width of the content container, with appropriate responsive 
 ### Implementation Order
 
 1. **Issue 1** (Admin navigation) — Quick win, low risk
-2. **Issue 4** (Full-width cards) — Quick win, low risk  
+2. **Issue 4** (Full-width cards) — Quick win, low risk
 3. **Issue 2** (Avatar display) — Medium complexity, requires config changes
 4. **Issue 3** (API keys proxy) — High complexity, security-critical, requires backend changes
 
@@ -1335,7 +1356,7 @@ Cards span the full width of the content container, with appropriate responsive 
 
 - **Blocks**: None
 - **Blocked by**: None (can proceed immediately)
-- **Related**: 
+- **Related**:
   - Phase 13c (config-based authentication) — avatar config extends this
   - Phase 12 (Headplane admin UI) — these improvements enhance that interface
   - Security best practices — API key proxying aligns with BFF architecture
@@ -1356,11 +1377,13 @@ Cards span the full width of the content container, with appropriate responsive 
 ### Testing Checklist
 
 **Navigation (Issue 1):**
+
 - [ ] Click Admin menu item → lands on `/admin/admin`
 - [ ] Bookmark test: `/admin/admin/users` redirects or displays appropriate content
 - [ ] Navigation breadcrumb reflects correct hierarchy
 
 **Avatar (Issue 2):**
+
 - [ ] Config with avatar URL → displays image
 - [ ] Config without avatar URL → displays SVG fallback
 - [ ] Invalid image URL → displays SVG fallback
@@ -1368,6 +1391,7 @@ Cards span the full width of the content container, with appropriate responsive 
 - [ ] Avatar has proper alt text and accessibility
 
 **API Keys (Issue 3):**
+
 - [ ] Open browser DevTools Network tab
 - [ ] Navigate to `/admin/admin`
 - [ ] Verify all API requests go to `headplane:3000/*`, not `headscale:8080/*`
@@ -1378,6 +1402,7 @@ Cards span the full width of the content container, with appropriate responsive 
 - [ ] Headscale unavailable → graceful error handling
 
 **Full-Width Cards (Issue 4):**
+
 - [ ] Desktop 1920px: cards are full-width
 - [ ] Desktop 1440px: cards are full-width
 - [ ] Desktop 1280px: cards are full-width

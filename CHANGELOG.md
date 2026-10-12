@@ -209,14 +209,14 @@ Added password-based authentication for Headplane web UI as an alternative to AP
   - `docs/ref/configuration.md` — Updated with password configuration reference and security best practices
   - `config-example.yaml` — Added `headplane.password` field with inline documentation
   - `README.md` — Updated with authentication overview
-  
+
 - **Security Features**:
   - HTTPS required for production use (secure cookies)
   - Rate limiting prevents brute-force attacks
   - Constant-time password comparison prevents timing attacks
   - Session tokens never logged or exposed
   - Password never serialized in JSON output
-  
+
 - **Backward Compatibility**:
   - No database migrations required
   - API key authentication fully preserved and unchanged
@@ -226,6 +226,7 @@ Added password-based authentication for Headplane web UI as an alternative to AP
 This feature provides administrators with a simpler login method for Headplane web UI access while maintaining the existing API key method for programmatic access and automation.
 
 Files changed:
+
 - `hscontrol/headplane_auth.go` (new) — Authentication handler
 - `hscontrol/headplane_auth_test.go` (new) — Unit tests
 - `hscontrol/types/config.go` — Added HeadplaneConfig
@@ -246,14 +247,14 @@ Files changed:
 Added web interface support for approving pending machines through API, UI, and documentation:
 
 - **Machine approval API** — REST endpoints for single and bulk machine approval
-  - `POST /api/v1/machines/{id}/approve` — Approve a single machine by ID and return its full record
-  - `POST /api/v1/machines/approve` — Bulk approve multiple machines from a `nodeIds` array, 
-    reporting per-node success/failure (non-atomic: one failure does not affect others)
-  - **RBAC** — v1 auth middleware distinguishes admin API keys from scope-limited OAuth tokens. 
-    Approval requires admin rights or the `devices:core` OAuth scope; read-only tokens are 
-    rejected with `403`. Required scope is emitted in OpenAPI as `x-required-scope`
-  - **Audit logging** — each approval emits structured log entries (actions: `machine_approve`, `machine_approve_bulk`)
-  - Approving a machine clears its key expiry (Headscale treats machines as authorized when not expired)
+- `POST /api/v1/machines/{id}/approve` — Approve a single machine by ID and return its full record
+- `POST /api/v1/machines/approve` — Bulk approve multiple machines from a `nodeIds` array,
+  reporting per-node success/failure (non-atomic: one failure does not affect others)
+- **RBAC** — v1 auth middleware distinguishes admin API keys from scope-limited OAuth tokens.
+  Approval requires admin rights or the `devices:core` OAuth scope; read-only tokens are
+  rejected with `403`. Required scope is emitted in OpenAPI as `x-required-scope`
+- **Audit logging** — each approval emits structured log entries (actions: `machine_approve`, `machine_approve_bulk`)
+- Approving a machine clears its key expiry (Headscale treats machines as authorized when not expired)
 - **Headplane UI integration** — View and approve pending machines through the web interface
   - Pending machines list with status badges and metadata
   - Single machine approval with user assignment confirmation
@@ -269,10 +270,10 @@ Added web interface support for approving pending machines through API, UI, and 
 This complements existing CLI (`headscale auth register`) and API-only approval methods,
 providing a streamlined workflow for administrators managing multiple machines.
 
-**Bug fix**: Fixed a pre-existing schema-validation failure that broke every SQLite test: 
-`hscontrol/db/schema.sql` was missing the Phase 11 `webhooks` table, and the webhook migration 
-used `AutoMigrate` (whose backticked index DDL never matched the schema file). The table now 
-uses explicit per-dialect DDL (`hscontrol/db/migrate_webhooks.go`) and is recorded in `schema.sql`. 
+**Bug fix**: Fixed a pre-existing schema-validation failure that broke every SQLite test:
+`hscontrol/db/schema.sql` was missing the Phase 11 `webhooks` table, and the webhook migration
+used `AutoMigrate` (whose backticked index DDL never matched the schema file). The table now
+uses explicit per-dialect DDL (`hscontrol/db/migrate_webhooks.go`) and is recorded in `schema.sql`.
 A latent `TestAPIV1Derp` JSON type-assertion bug surfaced by the fix was also corrected.
 
 ### Monitoring/Alerting Webhooks (Phase 11, Task 3)
@@ -445,6 +446,7 @@ clients, and how to run the same setup without Nix.
 - Fix an exit node or subnet router not seeing its own approved routes until it reconnected, so `tailscale status` did not show it offering an exit node [#3518](https://github.com/juanfont/headscale/pull/3518)
 
 # Next
+
 - **Phase 10: Core Feature Expansion (IN PROGRESS)**:
   - **Part 1: OIDC Group Support in ACLs**:
     - Added `oidc_groups` column to the `users` table to store OIDC group
@@ -514,16 +516,16 @@ clients, and how to run the same setup without Nix.
   - Added unit tests: `TestHealthHandler`, `TestReadyHandler`, `TestVersionHandler`
   - All tests pass successfully
 - **Phase 8: UI/UX and Accessibility Refinement (COMPLETED)**:
-  - Created standardized UI state components: `EmptyState` (with `default`, 
-    `filtered`, and `error` variants) and `LoadingSpinner` (with accessible 
+  - Created standardized UI state components: `EmptyState` (with `default`,
+    `filtered`, and `error` variants) and `LoadingSpinner` (with accessible
     ARIA attributes).
   - Refactored all data-displaying routes to use standardized components:
     - machines, users, audit, derp, topology, and auth-keys all use `EmptyState`
-    - Configuration routes (ACLs, DNS, settings) use appropriate patterns for 
+    - Configuration routes (ACLs, DNS, settings) use appropriate patterns for
       their editor-based UIs
   - Verified all 25 dialogs use standardized `Dialog` + `DialogPanel` pattern
     with proper variants (`destructive`, `normal`, `unactionable`)
-  - Confirmed tooltip component is in use on 12+ UI elements providing 
+  - Confirmed tooltip component is in use on 12+ UI elements providing
     contextual help
   - All component tests pass (51/51) and typecheck passes with no errors
   - Documentation: Added comprehensive accessibility section to
