@@ -39,11 +39,13 @@ Resolved the Known Gap in Phase 13c multi-user implementation, enabling full adm
   - Added screenshots showing unified admin UI (placeholders for actual implementation)
 
 **What Changed:**
+
 - Prior to this fix, admin user management UI was only accessible when logged in with Headplane password
 - API key authentication did not provide access to the "Add Headplane User" functionality
 - After fix: Admin API keys have full parity with password authentication for user management
 
 **Files changed:**
+
 - `docs/ref/api/headplane-users.md` (new, comprehensive API reference)
 - `docs/usage/authentication.md` (added admin API key section)
 - `docs/usage/settings.md` (updated Known Issues section)
@@ -79,6 +81,7 @@ Added comprehensive settings management for Headplane authenticated users:
   - Integration testing guide: `docs/phase13b-integration-testing.md`
 
 **Security features:**
+
 - AES-256-GCM encryption for API key storage
 - PBKDF2 key derivation (100,000 iterations) with random salt
 - Constant-time password comparison
@@ -86,6 +89,7 @@ Added comprehensive settings management for Headplane authenticated users:
 - No secrets in logs or responses
 
 **Files changed:**
+
 - `hscontrol/headplane_settings.go` (new, 402 lines)
 - `hscontrol/headplane_settings_test.go` (new, 497 lines)
 - `hscontrol/app.go` (register endpoints)
@@ -105,36 +109,36 @@ Added a Settings menu to Headplane for managing user preferences and Headscale i
   - Preferences section: Select theme (light/dark) with instant application
   - Profile section: Set optional display name
   - All settings persist across login sessions
-  
+
 - **Backend API Endpoints** — RESTful API for settings management
   - `GET /api/v1/headplane/settings` — Retrieve current settings (decrypts API key)
   - `POST /api/v1/headplane/settings` — Update settings (encrypts API key before storage)
   - `POST /api/v1/headplane/change-password` — Change password with verification
   - All endpoints require valid session token authentication
   - Full OpenAPI-style schema documentation
-  
+
 - **API Key Storage** — Secure encrypted storage eliminates re-entry at each login
   - AES-256-GCM encryption with PBKDF2-derived keys
   - Session-token-based key derivation for security
   - Automatic loading on login with valid password
   - Support for update, removal, and rotation workflows
-  
+
 - **Password Management** — Self-service password changes
   - Current password verification required (constant-time comparison)
   - Updates config file or environment variable
   - Existing sessions remain valid after change
   - Comprehensive error handling and user feedback
-  
+
 - **Theme System** — Persistent light/dark theme preferences
   - Immediate application without page reload
   - Server-side storage survives logout/login
   - Pre-render application prevents theme flash
-  
+
 - **Profile Customization** — Optional display name for personalization
   - Appears in navigation bar and UI
   - Up to 100 characters
   - Server-side persistence
-  
+
 - **Security Features**:
   - API key encrypted at rest with AES-256-GCM
   - Session-derived encryption keys for per-user security
@@ -142,18 +146,18 @@ Added a Settings menu to Headplane for managing user preferences and Headscale i
   - Constant-time password comparison prevents timing attacks
   - No secrets logged or exposed in responses
   - HTTPS required for production use
-  
+
 - **Single-User Model** (Phase 13b):
   - Single settings row in SQLite database
   - Single-row constraint enforces one user
   - Multi-user support planned for Phase 13c
-  
+
 - **Documentation** — Comprehensive user and API documentation
   - `docs/usage/settings.md` — Complete user guide with troubleshooting
   - `docs/ref/api/headplane-settings.md` — Full OpenAPI-style API reference
   - `docs/usage/authentication.md` — Updated with settings integration
   - Security best practices and known limitations documented
-  
+
 - **Backward Compatibility**:
   - No breaking changes to Phase 13a password authentication
   - API key authentication fully preserved
@@ -163,6 +167,7 @@ Added a Settings menu to Headplane for managing user preferences and Headscale i
 This feature enhances the single-user experience by eliminating API key re-entry, providing self-service password management, and allowing UI customization through persistent theme preferences.
 
 Files changed:
+
 - `hscontrol/headplane_settings.go` (new) — Settings API handlers
 - `hscontrol/headplane_settings_test.go` (new) — Backend unit tests
 - `hscontrol/app.go` — Registered settings endpoints
@@ -189,7 +194,7 @@ Added password-based authentication for Headplane web UI as an alternative to AP
   - Automatic session cleanup every 5 minutes
   - Configuration via `headplane.password` in `config.yaml` or `HEADSCALE_HEADPLANE_PASSWORD` environment variable
   - Comprehensive unit tests covering success, failure, and rate limiting scenarios
-  
+
 - **Frontend UI** — Password login interface in Headplane
   - Password/API Key toggle in login form (password is default)
   - Password visibility toggle for improved UX
@@ -197,7 +202,7 @@ Added password-based authentication for Headplane web UI as an alternative to AP
   - Session token management in secure HTTP-only cookies
   - Unit and E2E tests for all login flows
   - Complete backward compatibility with API key authentication
-  
+
 - **Documentation** — Comprehensive guides for setup and usage
   - `docs/usage/authentication.md` — Complete authentication guide covering both password and API key methods
   - `docs/troubleshooting.md` — Troubleshooting guide for authentication, configuration, and network issues
