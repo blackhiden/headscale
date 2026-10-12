@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blackhiden/headscale/integration/dockertestutil"
 	"github.com/cenkalti/backoff/v5"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/blackhiden/headscale/integration/dockertestutil"
 )
 
 const defaultDirPerm = 0o755

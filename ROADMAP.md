@@ -1417,15 +1417,18 @@ Cards span the full width of the content container, with appropriate responsive 
 **Version: v0.9.0-arsydoni4326-alt (Headplane)**
 
 **Improvements:**
+
 - Fixed Admin menu navigation to route to `/admin/admin` instead of `/admin/admin/users`
 - Added user avatar display support from `config.yaml` with fallback to icon
 - Improved layout consistency with full-width cards in Admin dashboard
 - **SECURITY**: API keys are now retrieved through Headplane proxy instead of direct browser-to-Headscale requests
 
 **Breaking Changes:**
+
 - None (all changes are backward compatible)
 
 **Migration Notes:**
+
 - To display a custom avatar, add `user.avatar` field to your Headplane `config.yaml`:
   ```yaml
   user:

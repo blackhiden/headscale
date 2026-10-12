@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/creachadair/command"
 	"github.com/blackhiden/headscale/hscontrol/capver"
+	"github.com/creachadair/command"
 )
 
 var (

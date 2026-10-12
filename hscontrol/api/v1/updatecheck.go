@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/updatecheck"
+	"github.com/danielgtaylor/huma/v2"
 )
 
 // updateCheckInput mirrors the query parameters of the update-check endpoint.

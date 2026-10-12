@@ -45,6 +45,7 @@ func (hsdb *HSDatabase) CreateWebhook(webhook *types.Webhook) error {
 // GetWebhook retrieves a webhook by ID.
 func (hsdb *HSDatabase) GetWebhook(id uint) (*types.Webhook, error) {
 	var webhook types.Webhook
+
 	err := hsdb.DB.First(&webhook, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,6 +61,7 @@ func (hsdb *HSDatabase) GetWebhook(id uint) (*types.Webhook, error) {
 // ListWebhooks returns all webhooks.
 func (hsdb *HSDatabase) ListWebhooks() ([]*types.Webhook, error) {
 	var webhooks []*types.Webhook
+
 	err := hsdb.DB.Order("name ASC").Find(&webhooks).Error
 	if err != nil {
 		return nil, fmt.Errorf("listing webhooks: %w", err)
@@ -83,6 +85,7 @@ func (hsdb *HSDatabase) ListWebhooksForEvent(eventType types.WebhookEventType) (
 
 	for _, wh := range webhooks {
 		var events []types.WebhookEventType
+
 		err := json.Unmarshal([]byte(wh.Events), &events)
 		if err != nil {
 			// Skip malformed webhooks, log elsewhere
@@ -107,6 +110,7 @@ func (hsdb *HSDatabase) UpdateWebhook(webhook *types.Webhook) error {
 
 	// Check if exists
 	var existing types.Webhook
+
 	err = hsdb.DB.First(&existing, webhook.ID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -118,6 +122,7 @@ func (hsdb *HSDatabase) UpdateWebhook(webhook *types.Webhook) error {
 
 	// Check for duplicate name (excluding self)
 	var duplicate types.Webhook
+
 	err = hsdb.DB.Where("name = ? AND id != ?", webhook.Name, webhook.ID).First(&duplicate).Error
 	if err == nil {
 		return ErrWebhookNameExists
@@ -150,6 +155,7 @@ func (hsdb *HSDatabase) DeleteWebhook(id uint) error {
 // validateWebhookEvents validates that the events JSON contains valid event types.
 func validateWebhookEvents(eventsJSON string) error {
 	var events []types.WebhookEventType
+
 	err := json.Unmarshal([]byte(eventsJSON), &events)
 	if err != nil {
 		return fmt.Errorf("invalid events JSON: %w", err)

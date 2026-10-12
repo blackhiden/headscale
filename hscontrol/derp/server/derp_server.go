@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/coder/websocket"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/derp"
 	"tailscale.com/derp/derpserver"

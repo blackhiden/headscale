@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/scope"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/danielgtaylor/huma/v2"
 )
 
 func init() {

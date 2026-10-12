@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/creachadair/command"
-	"github.com/creachadair/flax"
 	"github.com/blackhiden/headscale/hscontrol/mapper"
 	"github.com/blackhiden/headscale/integration/integrationutil"
+	"github.com/creachadair/command"
+	"github.com/creachadair/flax"
 )
 
 type MapConfig struct {

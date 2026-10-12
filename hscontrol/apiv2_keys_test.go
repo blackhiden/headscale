@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/blackhiden/headscale/hscontrol/api/v2"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	apiv2 "github.com/blackhiden/headscale/hscontrol/api/v2"
-	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -3,9 +3,9 @@ package apiv2
 import (
 	"testing"
 
+	"github.com/blackhiden/headscale/hscontrol/scope"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/blackhiden/headscale/hscontrol/scope"
 )
 
 // selfEnforcedKeyOps are the authenticated operations that intentionally declare

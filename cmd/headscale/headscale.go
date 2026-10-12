@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/jagottsicher/termcolor"
 	"github.com/blackhiden/headscale/cmd/headscale/cli"
+	"github.com/jagottsicher/termcolor"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

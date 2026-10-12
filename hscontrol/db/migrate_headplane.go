@@ -84,23 +84,29 @@ var headplaneIndexes = []headplaneIndex{
 // canonical schema.
 func EnsureHeadplaneTables(tx *gorm.DB) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
+		var err error
+
 		if !tx.Migrator().HasTable(headplaneUsersTableName) {
-			if err := createHeadplaneUsersTable(tx); err != nil {
+			err = createHeadplaneUsersTable(tx)
+			if err != nil {
 				return err
 			}
 		} else if !tx.Migrator().HasIndex(headplaneUsersTableName, headplaneUsersUsernameIndex) {
-			if err := tx.Exec(headplaneUserIndexes[0]).Error; err != nil {
+			err = tx.Exec(headplaneUserIndexes[0]).Error
+			if err != nil {
 				return fmt.Errorf("creating headplane users index: %w", err)
 			}
 		}
 
 		if !tx.Migrator().HasTable(headplaneSettingsTableName) {
-			if err := createHeadplaneSettingsTable(tx); err != nil {
+			err = createHeadplaneSettingsTable(tx)
+			if err != nil {
 				return err
 			}
 		} else if tx.Migrator().HasColumn(headplaneSettingsTableName, "user_id") &&
 			!tx.Migrator().HasIndex(headplaneSettingsTableName, headplaneSettingsUserIDIndex) {
-			if err := tx.Exec(headplaneSettingsIndexes[0]).Error; err != nil {
+			err = tx.Exec(headplaneSettingsIndexes[0]).Error
+			if err != nil {
 				return fmt.Errorf("creating headplane settings index: %w", err)
 			}
 		}
@@ -111,7 +117,8 @@ func EnsureHeadplaneTables(tx *gorm.DB) error {
 
 func repairHeadplaneSchema(tx *gorm.DB) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
-		if err := ensureHeadplaneUsersTable(tx); err != nil {
+		err := ensureHeadplaneUsersTable(tx)
+		if err != nil {
 			return err
 		}
 
@@ -120,7 +127,8 @@ func repairHeadplaneSchema(tx *gorm.DB) error {
 		}
 
 		for _, table := range []string{headplaneUsersTableName, headplaneSettingsTableName} {
-			if err := rebuildLegacyHeadplaneTable(tx, table); err != nil {
+			err = rebuildLegacyHeadplaneTable(tx, table)
+			if err != nil {
 				return err
 			}
 		}
@@ -137,10 +145,12 @@ func normalizeHeadplaneIndexes(tx *gorm.DB) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
 		for _, index := range headplaneIndexes {
 			var current string
-			if err := tx.Raw(
+
+			err := tx.Raw(
 				`SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?`,
 				index.name,
-			).Scan(&current).Error; err != nil {
+			).Scan(&current).Error
+			if err != nil {
 				return fmt.Errorf("reading %s definition: %w", index.name, err)
 			}
 
@@ -148,10 +158,13 @@ func normalizeHeadplaneIndexes(tx *gorm.DB) error {
 				continue
 			}
 
-			if err := tx.Exec(`DROP INDEX IF EXISTS ` + index.name).Error; err != nil {
+			err = tx.Exec(`DROP INDEX IF EXISTS ` + index.name).Error
+			if err != nil {
 				return fmt.Errorf("dropping %s: %w", index.name, err)
 			}
-			if err := tx.Exec(index.ddl).Error; err != nil {
+
+			err = tx.Exec(index.ddl).Error
+			if err != nil {
 				return fmt.Errorf("creating %s: %w", index.name, err)
 			}
 		}
@@ -162,8 +175,10 @@ func normalizeHeadplaneIndexes(tx *gorm.DB) error {
 
 func rebuildLegacyHeadplaneTable(tx *gorm.DB, table string) error {
 	var ddl string
-	if err := tx.Raw(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`, table).
-		Scan(&ddl).Error; err != nil {
+
+	err := tx.Raw(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`, table).
+		Scan(&ddl).Error
+	if err != nil {
 		return fmt.Errorf("reading %s schema: %w", table, err)
 	}
 
@@ -177,37 +192,50 @@ func rebuildLegacyHeadplaneTable(tx *gorm.DB, table string) error {
 	}
 
 	legacyTable := table + "_legacy"
-	if err := tx.Exec(`ALTER TABLE ` + table + ` RENAME TO ` + legacyTable).Error; err != nil {
+
+	err = tx.Exec(`ALTER TABLE ` + table + ` RENAME TO ` + legacyTable).Error
+	if err != nil {
 		return fmt.Errorf("renaming %s table: %w", table, err)
 	}
 
 	if table == headplaneUsersTableName {
-		if err := tx.Exec(`DROP INDEX IF EXISTS ` + headplaneUsersUsernameIndex).Error; err != nil {
+		err = tx.Exec(`DROP INDEX IF EXISTS ` + headplaneUsersUsernameIndex).Error
+		if err != nil {
 			return fmt.Errorf("dropping headplane users index: %w", err)
 		}
-		if err := createHeadplaneUsersTable(tx); err != nil {
+
+		err = createHeadplaneUsersTable(tx)
+		if err != nil {
 			return err
 		}
-		if err := tx.Exec(`INSERT INTO headplane_users (id, username, password_hash, role, created_at, updated_at)
-SELECT id, username, password_hash, role, created_at, updated_at FROM headplane_users_legacy`).Error; err != nil {
+
+		err = tx.Exec(`INSERT INTO headplane_users (id, username, password_hash, role, created_at, updated_at)
+	SELECT id, username, password_hash, role, created_at, updated_at FROM headplane_users_legacy`).Error
+		if err != nil {
 			return fmt.Errorf("copying headplane users: %w", err)
 		}
 	} else {
-		if err := tx.Exec(`DROP INDEX IF EXISTS ` + headplaneSettingsUserIDIndex).Error; err != nil {
+		err = tx.Exec(`DROP INDEX IF EXISTS ` + headplaneSettingsUserIDIndex).Error
+		if err != nil {
 			return fmt.Errorf("dropping headplane settings index: %w", err)
 		}
-		if err := createHeadplaneSettingsTable(tx); err != nil {
+
+		err = createHeadplaneSettingsTable(tx)
+		if err != nil {
 			return err
 		}
-		if err := tx.Exec(`INSERT INTO headplane_settings
+
+		err = tx.Exec(`INSERT INTO headplane_settings
 (id, user_id, api_key_encrypted, api_key_nonce, api_key_salt, theme, profile_name, updated_at)
 SELECT id, user_id, api_key_encrypted, api_key_nonce, api_key_salt, theme, profile_name, updated_at
-FROM headplane_settings_legacy`).Error; err != nil {
+FROM headplane_settings_legacy`).Error
+		if err != nil {
 			return fmt.Errorf("copying headplane settings: %w", err)
 		}
 	}
 
-	if err := tx.Exec(`DROP TABLE ` + legacyTable).Error; err != nil {
+	err = tx.Exec(`DROP TABLE ` + legacyTable).Error
+	if err != nil {
 		return fmt.Errorf("dropping legacy %s table: %w", table, err)
 	}
 
@@ -220,12 +248,14 @@ func createHeadplaneUsersTable(tx *gorm.DB) error {
 		ddl = headplaneUsersDDLPostgres
 	}
 
-	if err := tx.Exec(ddl).Error; err != nil {
+	err := tx.Exec(ddl).Error
+	if err != nil {
 		return fmt.Errorf("creating headplane users table: %w", err)
 	}
 
 	for _, stmt := range headplaneUserIndexes {
-		if err := tx.Exec(stmt).Error; err != nil {
+		err = tx.Exec(stmt).Error
+		if err != nil {
 			return fmt.Errorf("creating headplane users index: %w", err)
 		}
 	}
@@ -239,12 +269,14 @@ func createHeadplaneSettingsTable(tx *gorm.DB) error {
 		ddl = headplaneSettingsDDLPostgres
 	}
 
-	if err := tx.Exec(ddl).Error; err != nil {
+	err := tx.Exec(ddl).Error
+	if err != nil {
 		return fmt.Errorf("creating headplane settings table: %w", err)
 	}
 
 	for _, stmt := range headplaneSettingsIndexes {
-		if err := tx.Exec(stmt).Error; err != nil {
+		err = tx.Exec(stmt).Error
+		if err != nil {
 			return fmt.Errorf("creating headplane settings index: %w", err)
 		}
 	}

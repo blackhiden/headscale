@@ -93,11 +93,13 @@ func CreateHeadplaneUser(tx *gorm.DB, username, password, role string) (*Headpla
 		Role:     role,
 	}
 
-	if err := user.SetPassword(password); err != nil {
+	err = user.SetPassword(password)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := tx.Create(user).Error; err != nil {
+	err = tx.Create(user).Error
+	if err != nil {
 		return nil, err
 	}
 
@@ -169,7 +171,8 @@ func UpdateHeadplaneUserPassword(tx *gorm.DB, id uint, newPassword string) error
 		return err
 	}
 
-	if err := user.SetPassword(newPassword); err != nil {
+	err = user.SetPassword(newPassword)
+	if err != nil {
 		return err
 	}
 
@@ -216,7 +219,8 @@ func UpdateHeadplaneUser(tx *gorm.DB, id uint, username, role string) (*Headplan
 		return user, nil
 	}
 
-	if err := tx.Model(user).Updates(updates).Error; err != nil {
+	err = tx.Model(user).Updates(updates).Error
+	if err != nil {
 		return nil, err
 	}
 

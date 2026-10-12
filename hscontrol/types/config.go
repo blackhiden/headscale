@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

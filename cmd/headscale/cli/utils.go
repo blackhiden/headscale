@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
 	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
 	"github.com/blackhiden/headscale/hscontrol"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/prometheus/common/model"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog/log"

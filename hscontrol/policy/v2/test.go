@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-json-experiment/json"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/go-json-experiment/json"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 )

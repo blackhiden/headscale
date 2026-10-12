@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/danielgtaylor/huma/v2"
 )
 
 // emptyIfNil ensures a slice serializes as [] rather than null, which the

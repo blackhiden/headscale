@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

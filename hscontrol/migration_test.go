@@ -18,4 +18,3 @@ func TestPlaceholder(t *testing.T) {
 	// This file can be removed in a future cleanup.
 	t.Skip("Phase 13c: Headplane local-auth migration tests retired")
 }
-

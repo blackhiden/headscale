@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/blackhiden/headscale/hscontrol/scope"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/go-chi/chi/v5"
 )
 
 // accessTokenTTL is the fixed lifetime of a minted access token, matching

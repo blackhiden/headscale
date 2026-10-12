@@ -11,11 +11,11 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/blackhiden/headscale/hscontrol/capver"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	"github.com/blackhiden/headscale/hscontrol/capver"
-	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/http2"
