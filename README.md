@@ -130,6 +130,12 @@ The **docs** are formatted with [`mdformat`](https://mdformat.readthedocs.io).
 
 The **rest** (Markdown, YAML, etc) is formatted with [`prettier`](https://prettier.io).
 
+For every Markdown (`.md`) change, run the Nix formatting check before committing:
+
+```shell
+sudo nix --extra-experimental-features 'nix-command flakes' build -L .#checks.x86_64-linux.formatting
+```
+
 Check out the `.golangci.yaml` and `Makefile` to see the specific configuration.
 
 ### Install development tools

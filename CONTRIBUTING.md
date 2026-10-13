@@ -33,6 +33,13 @@ Headscale is open to code contributions for bug fixes without discussion.
 
 If you find mistakes in the documentation, please submit a fix to the documentation.
 
+Every change to a Markdown (`.md`) file must pass the Nix formatting check before
+submission:
+
+```shell
+sudo nix --extra-experimental-features 'nix-command flakes' build -L .#checks.x86_64-linux.formatting
+```
+
 ## Fork-specific features
 
 This repository is the `arsydoni4326-alt` fork of Headscale. It tracks upstream
