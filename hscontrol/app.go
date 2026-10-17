@@ -500,6 +500,9 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r.Get("/register/{auth_id}", h.authProvider.RegisterHandler)
 	r.Get("/auth/{auth_id}", h.authProvider.AuthHandler)
 
+	// API endpoint for fetching QR registration payload (open endpoint)
+	r.Get("/api/v1/registration/qr/{auth_id}", h.RegistrationQRPayloadHandler)
+
 	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
 		r.Get("/oidc/callback", provider.OIDCCallbackHandler)
 		r.Get("/register/confirm/{auth_id}", provider.RegisterConfirmGetHandler)
