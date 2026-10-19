@@ -19,7 +19,7 @@
 #     headscale serve
 
 # Build stage
-FROM golang:1.27.0-trixie AS builder
+FROM golang:1.27.2-trixie AS builder
 
 # Version metadata is injected via -ldflags into the hscontrol/types package.
 # Pass these build args from the build command (see .github/workflows/deploy.yaml):
