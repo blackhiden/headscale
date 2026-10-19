@@ -66,7 +66,7 @@ similar lines of code is better than a premature abstraction.
 ## Quick Start
 
 ```bash
-# Enter the nix dev shell (Go 1.27.0, buf, golangci-lint, prek)
+# Enter the nix dev shell (Go 1.27.2, buf, golangci-lint, prek)
 nix develop
 
 # Full development workflow: fmt + lint + test + build
@@ -93,7 +93,7 @@ go run ./tools/bump plan     # what is stale, changes nothing
 go run ./tools/bump verify   # do the pins still agree
 ```
 
-Go 1.27.0 minimum (per `go.mod:3`). `nix develop` pins the exact toolchain
+Go 1.27.2 minimum (per `go.mod:3`). `nix develop` pins the exact toolchain
 used in CI.
 
 ## Pre-Commit with prek
@@ -284,6 +284,12 @@ Three rules it encodes. A hand-written bump has to follow them too:
    command then downloads one, so `go build` succeeds locally. The nix builders
    set `GOTOOLCHAIN=local` and fail. `bump verify` reports the drift; the tool
    never edits the directive itself.
+
+The tool does not encode one more rule: the DNS providers (`github.com/libdns/*`)
+and `github.com/caddyserver/certmagic` must agree on the `github.com/libdns/libdns`
+major version. One provider instance serves both node certificates and certmagic,
+so they move together; a provider on another libdns major cannot be added until
+certmagic moves.
 
 `Dockerfile.tailscale-HEAD` and `Dockerfile.derper` compile a tailscale tree
 cloned from an unpinned branch, so their builder image is a floor, not a

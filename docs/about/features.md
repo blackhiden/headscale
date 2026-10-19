@@ -41,5 +41,5 @@ provides on overview of Headscale's feature and compatibility with the Tailscale
     - [x] Update user profile from identity provider
     - [x] [OIDC groups in ACLs](../ref/policy.md#oidc-groups)
 - [ ] [Funnel](https://tailscale.com/docs/features/tailscale-funnel) ([#1040](https://github.com/blackhiden/headscale/issues/1040))
-- [ ] [Serve](https://tailscale.com/docs/features/tailscale-serve) ([#1234](https://github.com/blackhiden/headscale/issues/1921))
+- [x] [Serve](https://tailscale.com/docs/features/tailscale-serve)
 - [ ] [Network flow logs](https://tailscale.com/docs/features/logging/network-flow-logs) ([#1687](https://github.com/blackhiden/headscale/issues/1687))
