@@ -162,6 +162,46 @@ Non-interactive script for safe worktree creation.
 - Collision detection before any changes
 - All branches from exact same base commit
 
+## Submodule Handling
+
+When a task involves the `headplane/` submodule (a separate git repository), the
+worktree strategy must account for the submodule's independent git history:
+
+### Main repo worktrees
+
+Worktrees of the main repo (`headscale/`) will have the submodule checked out at
+the pinned commit. Initialize the submodule in each worktree:
+
+```bash
+cd /path/to/main-repo-worktree
+git submodule update --init --recursive
+```
+
+### Submodule worktrees
+
+For tasks that modify the submodule itself, create a worktree **inside the
+submodule's own git repository**:
+
+```bash
+cd /path/to/main-repo/headplane
+git worktree add -b feature/<name> ../../headplane-<name> <base-commit>
+```
+
+The submodule worktree lives one directory above the main repo, alongside the
+main repo worktrees. This keeps the submodule's feature branch isolated from
+the main repo's feature branches.
+
+### Submodule commit pointer
+
+When a submodule feature branch is merged, the main repo must be updated to
+point to the new submodule commit:
+
+```bash
+cd /path/to/main-repo
+git add headplane
+git commit -m "chore: update headplane submodule to <commit>"
+```
+
 ## Best Practices
 
 1. **Single base commit** — All worktrees from exactly the same commit
@@ -172,6 +212,8 @@ Non-interactive script for safe worktree creation.
 6. **Commit frequently** — Small, focused commits
 7. **Never skip validation** — Build + test + lint before merge
 8. **Keep worktrees short-lived** — Merge and clean up promptly
+9. **Handle submodules explicitly** — Submodule worktrees are separate git repos
+10. **Update submodule pointers** — After merging submodule changes, update the main repo pointer
 
 ## See Also
 
