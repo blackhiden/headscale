@@ -1,0 +1,66 @@
+# Headplane configuration
+#
+# This file is mounted into the headplane container at /etc/headplane/config.yaml.
+# It tells Headplane where to find the Headscale config file and API.
+
+server:
+  host: "0.0.0.0"
+  port: 3000
+
+  # The base URL for Headplane. Change this to match your deployment.
+  base_url: "http://localhost:3000"
+
+  # The secret used to encode and decode web sessions (must be 32 characters)
+  # CHANGE THIS to a random 32-character string!
+  cookie_secret: "dev_secret_32_chars_1234567890ab"
+
+  # Whether cookies should be marked as Secure
+  # * Should be false if running without HTTPS
+  # * Should be true if running behind a reverse proxy with HTTPS
+  cookie_secure: false
+
+  # The path to persist Headplane specific data.
+  data_path: "/var/cache/headplane"
+
+  # The maximum age of the session cookie in seconds
+  cookie_max_age: 86400 # 1 day in seconds
+
+headscale:
+  # The URL to your Headscale instance
+  # (All API requests are routed through this URL)
+  # (THIS IS NOT the gRPC endpoint, but the HTTP endpoint)
+  url: "http://headscale:8080"
+
+  # Path to the Headscale configuration file
+  # This is optional, but HIGHLY recommended for the best experience
+  # If this is read only, Headplane will show your configuration settings
+  # in the Web UI, but they cannot be changed.
+  config_path: "/etc/headscale/config.yaml"
+
+  # The API key used by Headplane for server-side operations.
+  # This is required for local password authentication, OIDC authentication,
+  # proxy authentication, and the Headplane agent.
+  # Generate one with: docker compose exec headscale headscale apikeys create
+  # Then set it here and restart headplane.
+  api_key: ""
+
+# Integration configurations for Headplane to interact with Headscale
+integration:
+  # The Headplane agent periodically syncs node information (version, OS, etc.)
+  # from your Tailnet.
+  agent:
+    enabled: false
+
+  # Only one of these should be enabled at a time or you will get errors
+  docker:
+    enabled: false
+    container_label: "me.tale.headplane.target=headscale"
+    socket: "unix:///var/run/docker.sock"
+
+  kubernetes:
+    enabled: false
+    validate_manifest: true
+    pod_name: "headscale"
+
+  proc:
+    enabled: false

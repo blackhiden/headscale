@@ -1,0 +1,59 @@
+# Docker Compose for headscale + headplane
+#
+# Usage:
+#   docker compose up -d
+#
+# This starts headscale on port 8080 (HTTP) and 9090 (metrics),
+# and headplane on port 3000 (HTTP).
+#
+# Required setup before first run:
+#   1. Create an API key for Headplane: docker compose exec headscale headscale apikeys create
+#   2. Copy the generated key and set it in headplane/config.yaml as headscale.api_key
+#   3. Restart headplane: docker compose restart headplane
+
+networks:
+  headnet:
+    name: "headnet"
+    driver: "bridge"
+
+services:
+  headscale:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: "headscale"
+    restart: "unless-stopped"
+    command: "serve"
+    networks:
+      - "headnet"
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - "./config.yaml:/etc/headscale/config.yaml:ro"
+      - "headscale-data:/var/lib/headscale"
+    environment:
+      TZ: "America/New_York"
+
+  headplane:
+    build:
+      context: ./headplane
+      dockerfile: Dockerfile
+    container_name: "headplane"
+    restart: "unless-stopped"
+    networks:
+      - "headnet"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - "./headplane-config.yaml:/etc/headplane/config.yaml:ro"
+      - "./config.yaml:/etc/headscale/config.yaml:ro"
+      - "headplane-data:/var/cache/headplane"
+    environment:
+      TZ: "America/New_York"
+    depends_on:
+      - "headscale"
+
+volumes:
+  headscale-data:
+  headplane-data:
