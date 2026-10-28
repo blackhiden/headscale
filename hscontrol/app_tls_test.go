@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/juanfont/headscale/hscontrol/dns/dnstest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/dns/dnstest"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/letsencrypt/pebble/v2/ca"
 	"github.com/letsencrypt/pebble/v2/db"
 	"github.com/letsencrypt/pebble/v2/va"
