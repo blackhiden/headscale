@@ -194,6 +194,27 @@ make build
 
 The Makefile will warn you if any required tools are missing and suggest running `nix develop`. Run `make help` to see all available targets.
 
+## Docker Compose (Headscale + Headplane)
+
+The repository includes a `compose.yaml` that runs both Headscale and Headplane together:
+
+```bash
+# Build and start both services
+docker compose up -d
+
+# Create an API key for Headplane
+docker compose exec headscale headscale apikeys create
+
+# Set the generated key in headplane-config.yaml as headscale.api_key
+# Then restart headplane
+docker compose restart headplane
+```
+
+- Headscale listens on `127.0.0.1:8080` (HTTP) and `127.0.0.1:9090` (metrics)
+- Headplane listens on `127.0.0.1:3000` (HTTP)
+- Config files are mounted from `./config.yaml` and `./headplane-config.yaml`
+- Data persists in Docker named volumes
+
 ## Contributors
 
 <a href="https://github.com/blackhiden/headscale/graphs/contributors">

@@ -183,6 +183,7 @@ nav:
       - Audit Log: usage/audit-log.md
       - DERP Status: usage/derp-status.md
       - Topology: usage/topology.md
+      - Admin Technical Info: usage/admin-technical-info.md
       - Export / Import: usage/export-import.md
       - Connect a node:
           - Android: usage/connect/android.md
@@ -205,3 +206,6 @@ nav:
           - Reverse proxy: ref/integration/reverse-proxy.md
           - Web UI: ref/integration/web-ui.md
           - Tools: ref/integration/tools.md
+  - API:
+      - Server Info: api/server-info.md
+      - QR Payload: api/qr-payload.md

@@ -56,6 +56,9 @@ harden what exists today before expanding into new territory.
   retain CLI approval and provide QR approval through Headplane's
   **Machines → Scan QR** flow. Headscale remains authoritative for auth-ID
   expiry and single use.
+- Phase 18 below is **planned**: an admin technical info section for
+  `/admin/admin` in Headplane, showing server and system details for both
+  Headscale and Headplane.
 - Phase 11 below is **proposed** and must not be implemented without
   explicit approval.
 - Phase 12 is **partially implemented**: the backend approval API is done; the
@@ -1903,6 +1906,230 @@ Recommendation: Use JSON payload for extensibility and clearer structure.
 
 - Headscale: `v0.37.0-arsydoni4326-alt` or later
 - Headplane: `v0.9.0-arsydoni4326-alt` or later
+
+---
+
+## Phase 18 — Admin Technical Info Section (Headplane `/admin/admin`) [Planned]
+
+**Status:** Planned  
+**Priority:** Medium  
+**Impact:** New admin UI section showing server and system technical details for both Headscale and Headplane
+
+### Objective
+
+Add a new section to the Headplane admin page (`/admin/admin`) that displays
+technical specifications of the Headscale control server and the Headplane
+server. The section shows data such as CPU, RAM, storage, tailnet network,
+public IP, deployment mode (native vs Docker), Docker version (when running in
+Docker), and other relevant server/system details.
+
+### Problem addressed
+
+Administrators currently have no single place in the Headplane UI to view the
+technical details of the servers running Headscale and Headplane. This
+information is useful for troubleshooting, capacity planning, and understanding
+the deployment environment. It is currently only available via CLI commands,
+Docker inspection, or OS-level tools.
+
+### Requirements
+
+**Confirmed requirements:**
+
+- Add a new section to `/admin/admin` in Headplane showing technical
+  specifications for both the Headscale server and the Headplane server.
+- Display data including (but not limited to): CPU, RAM, storage, tailnet
+  network, public IP, deployment mode (native vs Docker), and Docker version
+  (when applicable).
+- The section must be accessible only to authenticated administrators.
+- The section must work for both native and Docker deployments.
+- No sensitive information (API keys, passwords, tokens, private keys) may be
+  exposed.
+
+**Implementation decisions:**
+
+- **Headplane server info**: Gathered from the Node.js runtime (`node:os`
+  module) and the existing Headplane config/integration modules. Exposed via a
+  new admin-only API endpoint on the Headplane backend.
+- **Headscale server info**: Gathered from the Go runtime and OS. Exposed via a
+  new or extended Headscale API endpoint (e.g. `/api/v1/server-info`), which
+  Headplane proxies through its backend.
+- **Docker detection**: Reuse the existing `DockerIntegration` module in
+  `headplane/app/server/config/integration/docker.ts` to detect Docker
+  availability and version. For Headscale, detect Docker via the Go runtime
+  environment (e.g. presence of `/proc/1/cgroup` entries, Docker socket, or
+  container environment variables).
+- **UI**: Add a new card/section to the existing `/admin/admin` page using the
+  existing `Card` component. Display info in a structured, readable format with
+  clear labels. Handle loading, error, and partial-data states gracefully.
+- **Public IP**: Detect via outbound HTTP request to a public IP echo service
+  (e.g. `https://api.ipify.org` or similar), or fall back to the configured
+  `server_url` / `public_url` hostname. The public IP lookup must be
+  non-blocking and must not fail the page if the service is unreachable.
+
+**Open questions:**
+
+- Which Headscale server info fields are considered safe to expose via the API?
+  Recommended: Go version, OS, CPU count, RAM total, storage total, Docker
+  status/version, public IP, tailnet network info. Fields that could aid
+  attackers (e.g. exact kernel version, detailed hardware model) should be
+  excluded or masked.
+- Should the UI aggregate both Headplane and Headscale info into one section,
+  or split them into separate cards? Recommended: two separate cards within the
+  same section, one for each server.
+- How should the UI handle missing or unavailable info? Recommended: show
+  "Unavailable" with a notice, rather than failing the entire section.
+
+### Scope
+
+#### Backend (Headscale)
+
+- [ ] **Server info API endpoint**: Add a new `GET /api/v1/server-info` endpoint
+  (or extend an existing endpoint) that returns non-sensitive technical info
+  about the Headscale server:
+  - Go version, OS, architecture
+  - CPU count, RAM total, storage total
+  - Deployment mode (native vs Docker)
+  - Docker version (when running in Docker)
+  - Public IP (when determinable)
+  - Tailnet network info (IP range, MagicDNS domain, DERP region count)
+  - Headscale version, commit, build time
+- [ ] **Docker detection**: Detect whether Headscale is running in a Docker
+  container (e.g. via `/proc/1/cgroup`, Docker socket presence, or environment
+  variables). When running in Docker, report the Docker version.
+- [ ] **System info gathering**: Use Go's `runtime` package and OS-level APIs
+  (`/proc/meminfo`, `/proc/cpuinfo`, `syscall.Statfs`, etc.) to gather CPU, RAM,
+  and storage information. Handle non-Linux platforms gracefully.
+- [ ] **Public IP detection**: Attempt to determine the server's public IP via
+  outbound HTTP request to a public IP echo service. Fall back to the
+  configured `server_url` hostname if the lookup fails.
+- [ ] **Tailnet info**: Report the configured tailnet IP range, MagicDNS
+  domain, and DERP region count from the existing `State` and config.
+
+#### Backend (Headplane)
+
+- [ ] **Server info API endpoint**: Add a new admin-only API endpoint on the
+  Headplane backend (e.g. `GET /api/admin/server-info`) that returns technical
+  info about the Headplane server:
+  - Node.js version, OS, architecture
+  - CPU count, RAM total, storage total
+  - Deployment mode (native vs Docker)
+  - Docker version (when running in Docker)
+  - Public IP (when determinable)
+  - Headplane version, commit, build time
+- [ ] **Headscale info proxy**: Proxy the Headscale server-info endpoint through
+  the Headplane backend, merging Headplane and Headscale info into a single
+  response payload for the frontend.
+- [ ] **Docker detection**: Reuse the existing `DockerIntegration` module to
+  detect Docker availability and version for the Headplane server.
+
+#### Frontend (Headplane)
+
+- [ ] **Admin info section UI**: Add a new section to `/admin/admin` displaying
+  the technical info for both servers. Use the existing `Card` component and
+  follow the existing admin page layout conventions.
+- [ ] **Loading and error states**: Handle loading, error, and partial-data
+  states. Show "Unavailable" for missing fields rather than failing the section.
+- [ ] **Responsive design**: Ensure the section is readable on desktop, tablet,
+  and mobile screen sizes.
+
+### Implementation Tasks
+
+| Task ID | Title | Status | Objective | Files affected | Implementation details | Dependencies | Acceptance criteria | Tests | Verification | Risks |
+|---------|-------|--------|-----------|---------------|-----------------------|--------------|--------------------|-------|--------------|-------|
+| FEAT-001 | Backend: Headscale server-info API | Pending | Expose non-sensitive server info (CPU, RAM, storage, OS, Go version, Docker status, public IP, tailnet info) via a new API endpoint. | `hscontrol/api/v1/serverinfo.go` (new), `hscontrol/api/v1/api.go`, `hscontrol/types/version.go`, `hscontrol/state/state.go` | Add `GET /api/v1/server-info` Huma operation. Gather info from Go runtime, `/proc` files, Docker detection, and `State` config. Return JSON with fields: `version`, `go`, `os`, `cpu`, `memory`, `storage`, `docker`, `public_ip`, `tailnet`. | None | Endpoint returns JSON with required fields; does not expose secrets; works on Linux and non-Linux. | Unit tests for handler; integration test for endpoint. | `make test`, `go test ./...` | Info disclosure, performance impact of `/proc` reads. |
+| FEAT-002 | Backend: Headplane server-info API | Pending | Expose Headplane server info (CPU, RAM, storage, OS, Node.js version, Docker status, public IP) via a new admin-only API endpoint. | `headplane/app/server/api/admin/server-info.ts` (new), `headplane/app/server/config/`, `headplane/app/server/context.ts` | Add `GET /api/admin/server-info` endpoint. Use Node.js `os` module, existing `DockerIntegration`, and config to gather info. Require admin authentication. | None | Endpoint returns JSON with required fields; requires admin auth; does not expose secrets. | Unit tests for handler; integration test for endpoint. | `npx vitest run tests/unit` | Info disclosure, performance impact. |
+| FEAT-003 | Backend: Headplane → Headscale info proxy | Pending | Fetch Headscale server info from Headscale API and expose via Headplane's admin API for frontend consumption. | `headplane/app/server/api/admin/server-info.ts`, `headplane/app/server/headscale/api/index.ts` | Call Headscale `/api/v1/server-info` from Headplane backend, merge with Headplane info, expose as single payload. Handle Headscale being unreachable gracefully. | FEAT-001, FEAT-002 | API returns merged JSON with both Headplane and Headscale info. | Integration test for proxy endpoint. | `npx vitest run tests/integration` | Network failures, version mismatches. |
+| FEAT-004 | Frontend: Admin info section UI | Pending | Add a new section to `/admin/admin` displaying the technical info for both servers. | `headplane/app/routes/admin/route.tsx`, `headplane/app/components/card.tsx`, new component file | Fetch info from new admin API, display in structured cards. Handle loading, error, and partial data states. | FEAT-003 | UI displays all available info, handles errors gracefully. | Component/unit tests, UI snapshot tests. | `npx vitest run tests/component` | UI clutter, info overload, missing data. |
+| FEAT-005 | Documentation: Admin info section | Pending | Document the new feature and its API contracts. | `docs/`, `README.md`, `headplane/docs/` | Add admin guide section, update API docs, add screenshots. | FEAT-001–FEAT-004 | Docs describe feature, usage, and API. | Doc build/test. | `npx prettier --check docs/` | Outdated docs, missed edge cases. |
+| FEAT-006 | Integration & regression testing | Pending | Verify feature end-to-end, including native and Docker deployments. | `integration/`, `cmd/hi/`, test scripts | Add integration tests for native and Docker deployments, API, and UI. | All above | All tests pass, no regressions. | Integration tests. | `go run ./cmd/hi run "TestName"` | Missed edge cases, environment-specific failures. |
+
+### Dependencies
+
+- **Blocks**: None
+- **Blocked by**: None (can proceed immediately)
+- **Related**:
+  - Phase 13c (config-based authentication) — admin page already requires
+    single local-admin mode
+  - Phase 16 (Headplane UI/UX improvements) — the admin page layout is being
+    refined
+  - Existing `DockerIntegration` and `ProcIntegration` modules — reused for
+    deployment-mode detection
+
+### Success Criteria
+
+1. `/admin/admin` shows a new section with technical details for both Headscale
+   and Headplane.
+2. Info includes: CPU, RAM, storage, OS, runtime version, Docker status/version,
+   public IP, tailnet network.
+3. Works for both native and Docker deployments.
+4. No sensitive info is exposed.
+5. UI handles missing/unavailable data gracefully.
+6. All tests pass.
+7. Documentation is updated.
+
+### Testing Checklist
+
+**Backend (Headscale):**
+
+- [ ] `GET /api/v1/server-info` returns correct JSON
+- [ ] Endpoint requires API key authentication
+- [ ] Docker detection works correctly (native vs container)
+- [ ] CPU, RAM, storage info is accurate
+- [ ] Public IP detection works and falls back gracefully
+- [ ] Tailnet info is correct
+
+**Backend (Headplane):**
+
+- [ ] `GET /api/admin/server-info` returns correct JSON
+- [ ] Endpoint requires admin authentication
+- [ ] Docker detection works correctly
+- [ ] Headscale proxy works and handles unreachable Headscale gracefully
+
+**Frontend (Headplane):**
+
+- [ ] `/admin/admin` shows the new info section
+- [ ] Loading state shows while fetching
+- [ ] Error state shows when API fails
+- [ ] Partial data shows "Unavailable" for missing fields
+- [ ] Responsive on desktop, tablet, and mobile
+
+### Documentation Updates
+
+- [ ] Update `docs/` with admin info section documentation
+- [ ] Update `headplane/docs/` with API endpoint documentation
+- [ ] Update `CHANGELOG.md` with the new feature
+- [ ] Update `README.md` if applicable
+
+### Risk Assessment
+
+- **Info disclosure**: Low risk if only non-sensitive fields are exposed.
+  Review all fields before shipping.
+- **Performance**: Low risk — info gathering is lightweight and non-blocking.
+- **Compatibility**: Low risk — feature is additive and non-destructive.
+- **Deployment**: Low risk — works for both native and Docker deployments.
+
+### Estimated Effort
+
+- Backend (Headscale): 4-6 hours
+  - Server-info API endpoint: 2-3 hours
+  - Docker detection: 1 hour
+  - System info gathering: 1-2 hours
+  - Testing: 1 hour
+- Backend (Headplane): 3-4 hours
+  - Server-info API endpoint: 1-2 hours
+  - Headscale proxy: 1 hour
+  - Testing: 1 hour
+- Frontend (Headplane): 3-4 hours
+  - Admin info section UI: 2-3 hours
+  - Loading/error states: 1 hour
+  - Testing: 1 hour
+- Documentation: 1-2 hours
+- Total: **11-16 hours**
+
+### Release Target
+
+- Headscale: `v0.38.0-arsydoni4326-alt` or later
+- Headplane: `v0.10.0-arsydoni4326-alt` or later
 
 ---
 
