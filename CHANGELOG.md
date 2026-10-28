@@ -4,6 +4,13 @@
 
 ### Features
 
+- **Admin Technical Info Section:** Add a new section to the Headplane admin page (`/admin/admin`) displaying technical specifications for both the Headscale control server and the Headplane server. ([Phase 18](#phase-18--admin-technical-info-section))
+  - Backend: New `GET /api/v1/server-info` Headscale endpoint returning non-sensitive server info (CPU, RAM, storage, OS, Go version, Docker status, public IP, tailnet network)
+  - Backend: New `GET /api/admin/server-info` Headplane endpoint merging Headplane and Headscale server info
+  - Frontend: New technical info section at `/admin/admin` with two cards (Headscale and Headplane)
+  - Security: Admin-only access, no sensitive info exposed, graceful handling of missing data
+  - Documentation: User guide (`docs/usage/admin-technical-info.md`) and API reference (`docs/api/server-info.md`)
+
 - **QR Code Registration:** Add QR code-based device registration flow. Users can now register devices by scanning a QR code displayed on the registration page using Headplane's web UI. The QR code contains the registration auth-id, server URL, and expiry timestamp. The existing CLI registration method remains available. ([Phase 17](#phase-17--qr-code-registration-flow-headscale--headplane))
   - Backend: QR code generation for standard CLI-approved and OIDC registration pages using `github.com/skip2/go-qrcode`
   - Frontend: Machines → Scan QR navigation and scanner component using `html5-qrcode`
