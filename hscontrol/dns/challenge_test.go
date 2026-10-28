@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/dns/dnstest"
+	"github.com/blackhiden/headscale/hscontrol/dns/dnstest"
 	"github.com/libdns/libdns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

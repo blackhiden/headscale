@@ -4,8 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/db"
+	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 )
 
