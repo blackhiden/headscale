@@ -1,4 +1,48 @@
 # Session
+## Current Task: Merge upstream/main into dev and create Git Flow release 🔄 IN PROGRESS
+
+**Started:** 2026-11-23
+
+### Pre-merge baseline
+
+- Current branch before workflow: `main` at `87867713`.
+- `dev` tip before local sync: `815e9738`.
+- `origin/main`: `9ef033c7`.
+- `upstream/main` after `git fetch upstream --prune`: `0c304b06`.
+- Latest valid release tag: `v1.1.5` (`fb2048b7`). The malformed
+  `vv0.35.0-arsydoni4326-alt` tag is ignored; Git Flow adds the `v` prefix, so
+  the release name passed to git-flow must be `1.1.6` to produce `v1.1.6`.
+- Backup branch: `backup/pre-merge-20261123` (points to original `dev` tip).
+- Intended `headplane` gitlink: `9b8bfc2c15744e33cb9f8d9d2c998260bcff5aad`.
+  The checked-out submodule worktree remains at
+  `5ab2878a5d0e931486daa6de89b9fef3d4f411d6`; this known discrepancy is left
+  unchanged.
+
+### Decisions and discoveries
+
+- `dev` and `main` had diverged: `main` contained the merge-preservation and
+  schema documentation commits that `dev` lacked. The initial preservation
+  audit on `dev` failed only for `docs/MERGE-PRESERVATION.md` and `SCHEMA.md`.
+- To prevent feature/documentation loss, `main` was merged into `dev` first
+  with `git merge --no-ff main -m 'Merge main into dev before upstream merge'`.
+  No content conflicts occurred.
+- That merge selected `main`'s Headplane gitlink; `FP-016` requires restoring
+  `dev`'s intended gitlink before proceeding.
+- No application code has been changed for this task.
+
+### Pending work
+
+- Restore the intended Headplane gitlink and re-run the preservation audit.
+- Merge `upstream/main` into `dev`, resolving conflicts per
+  `docs/MERGE-PRESERVATION.md`.
+- Run build, preservation audit, and relevant tests.
+- Start and finish Git Flow release `1.1.6`, producing tag `v1.1.6`.
+- Update `CHANGELOG.md`, `docs/MERGE-PRESERVATION.md` decision log, and this
+  session record with final results.
+
+---
+
+
 
 ## Current Task: Harden Merge-Preservation Document Format ✅ COMPLETE
 
