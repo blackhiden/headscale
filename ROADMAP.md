@@ -23,6 +23,8 @@ must be preserved. This includes, but is not limited to:
   `__COMMIT_HASH__` Vite global.
 - The fork repository targets (`github.com/blackhiden/headscale` and
   `github.com/arsydoni4326-alt/headplane`).
+- The detailed Doni Arsy contribution inventory in
+  [`docs/MERGE-PRESERVATION.md`](./docs/MERGE-PRESERVATION.md).
 
 Every roadmap item below is **additive and non-destructive**. No item may remove,
 rename, or break an existing feature without explicit review and a documented

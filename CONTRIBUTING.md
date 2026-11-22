@@ -63,7 +63,9 @@ contributing, please be aware of these additions:
   on the connected Headscale version.
 
 For a full description of fork-specific features, see
-[docs/about/fork.md](./docs/about/fork.md).
+[docs/about/fork.md](./docs/about/fork.md). For the complete inventory of code
+authored by Doni Arsy and the upstream-merge checklist, see
+[docs/MERGE-PRESERVATION.md](./docs/MERGE-PRESERVATION.md).
 
 ## Feature-preservation rule
 
