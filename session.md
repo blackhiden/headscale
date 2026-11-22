@@ -1,6 +1,98 @@
 # Session
 
-## Current Task: Fix 404 on Headplane `/api/admin/server-info` ✅ COMPLETE
+## Current Task: Harden Merge-Preservation Document Format ✅ COMPLETE
+
+**Completed:** 2026-11-22
+
+### Objective
+
+Convert `docs/MERGE-PRESERVATION.md` from a narrative inventory into a
+feature-loss-proof merge contract that gives explicit conflict rules, restore
+commands, and verification steps for every fork feature.
+
+### Delivered
+
+- Added stable `FP-001`–`FP-016` IDs and a feature manifest table.
+- Rewrote the inventory as self-contained preservation cards with author,
+  last-known-good commits, protected paths, required tokens, behavior contract,
+  conflict rule, restore command, and verification command.
+- Added a one-command preservation audit that checks paths, tokens, migration
+  IDs, and submodule integration points.
+- Added a merge protocol, red-flag triage table, and append-only merge decision
+  log.
+- Documented CI gate coverage gaps and known limitations.
+- Updated `CHANGELOG.md` to describe the new contract format.
+
+### Validation
+
+- Extracted and executed the audit block from the document — PASS.
+- `git diff --check` — PASS.
+- `mdformat` and `prettier` are not installed locally; the exact Nix formatting
+  gate was not run.
+- Documentation-only change; no Go build or test run was required.
+
+---
+
+## Previous Task: Document Doni Arsy Code for Merge Preservation ✅ COMPLETE
+
+**Completed:** 2026-11-22
+
+### Objective
+
+Scan the fork remote (`origin`) for all commits authored by Doni Arsy and write
+a preservation-oriented summary to `docs/MERGE-PRESERVATION.md`.
+
+### Scan Results
+
+- 297 Doni-authored commits reachable from `origin/*`; 172 non-merge and 124
+  merge commits.
+- `origin/main` at scan time: `9ef033c7`; local HEAD: `3c788b7a`.
+- The `headplane` submodule has zero Doni-authored commits; his parent-repo
+  contribution is gitlink selection/integration.
+- Pure merge commits, Cline checkpoint/index commits, and release-only commits
+  were excluded from the feature inventory but retained in history.
+- `hscontrol/api/v1/serverinfo.go` and `hscontrol/qr_api.go` were authored by
+  Denny Lastpaste, not Doni; they are documented as adjacent fork features.
+
+### Delivered
+
+- Replaced the empty `docs/MERGE-PRESERVATION.md` placeholder with a full
+  inventory covering fork identity, update checker, DERP endpoint, webhooks,
+  machine approval, Headplane local admin/settings, OIDC groups, Phase 10/11
+  features, QR registration, observability, UI/a11y, docs/process, small fixes,
+  and deliberate removals.
+- Added a representative commit map, upstream-merge checklist, recovery
+  template, verification commands, and known limitations.
+- Added the missing required root `SCHEMA.md`.
+- Linked the preservation document from `CONTRIBUTING.md`, `ROADMAP.md`,
+  `mkdocs.yml`, and `CHANGELOG.md`.
+
+### Decisions and Assumptions
+
+- "All code written by Doni Arsy" means commits whose author is Doni Arsy in
+  the fork remote, not code merely merged by him.
+- Submodule features are described as integrated via gitlinks because the
+  submodule contains no Doni-authored commits in this clone.
+- The current submodule pointer mismatch (`HEAD` gitlink `9b8bfc2c...` versus
+  checked-out `5ab2878...`) was recorded as a known limitation, not changed.
+
+### Validation
+
+- `git log --remotes=origin --author='Doni Arsy' --no-merges --oneline` — 172
+  commits enumerated.
+- `git diff --name-status upstream/main...origin/main` — reviewed fork drift.
+- `git -C headplane log --all --author='Doni Arsy'` — zero commits.
+- `git diff --check` — PASS.
+- `mdformat` and `prettier` are not installed in this workspace, so the exact
+  Nix formatting gate was not run locally.
+- `mkdocs build --strict` was attempted but failed because the environment
+  lacks the `material.extensions.emoji` Python module; this is an environment
+  limitation, not a document syntax error.
+- Documentation-only change; no Go build or test run was required.
+
+---
+
+## Previous Task: Fix 404 on Headplane `/api/admin/server-info` ✅ COMPLETE
 
 **Completed:** 2026-10-28
 

@@ -2,6 +2,12 @@
 
 ## Next
 
+### Documentation
+
+- Reworked `docs/MERGE-PRESERVATION.md` into a feature-loss-proof merge
+  contract with stable `FP-*` IDs, per-feature preservation cards, a
+  one-command audit, red-flag triage, and a merge decision log.
+
 ### Features
 
 - **Admin Technical Info Section:** Add a new section to the Headplane admin page (`/admin/admin`) displaying technical specifications for both the Headscale control server and the Headplane server. ([Phase 18](#phase-18--admin-technical-info-section))

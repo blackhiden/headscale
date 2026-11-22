@@ -164,6 +164,7 @@ nav:
       - Getting help: about/help.md
       - Releases: about/releases.md
       - The fork: about/fork.md
+      - Merge preservation: MERGE-PRESERVATION.md
       - Contributing: about/contributing.md
       - Testing and CI: about/testing.md
       - Sponsor: about/sponsor.md
