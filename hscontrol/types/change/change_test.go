@@ -1,6 +1,7 @@
 package change
 
 import (
+	"encoding/json"
 	"net/netip"
 	"reflect"
 	"testing"
@@ -406,7 +407,7 @@ func TestChange_IsBroadcastPolicyChange(t *testing.T) {
 		want bool
 	}{
 		{name: "policy change", c: PolicyChange(), want: true},
-		{name: "self-update recompute", c: originUpdate, want: false},
+		{name: "self-update recompute", c: originUpdate, want: true},
 		{name: "targeted recompute", c: targeted, want: false},
 		{name: "online patch", c: NodeOnline(1), want: false},
 		{name: "full update", c: FullUpdate(), want: false},
@@ -421,9 +422,9 @@ func TestChange_IsBroadcastPolicyChange(t *testing.T) {
 }
 
 func TestDedupePolicyChanges(t *testing.T) {
-	// originRecompute is a runtime recompute carrying node-specific payload
-	// (OriginNode), so it is not the canonical broadcast PolicyChange and must
-	// never be coalesced away.
+	// originRecompute is a runtime recompute stamped with the node that caused
+	// it, as a tag write returns it. The mapper renders it like any other
+	// recompute, so it must coalesce like any other.
 	originRecompute := PolicyChange()
 	originRecompute.OriginNode = 7
 
@@ -450,10 +451,10 @@ func TestDedupePolicyChanges(t *testing.T) {
 		{
 			name: "peer patches survive between collapsed policy changes",
 			changes: []Change{
-				NodeOnline(1), PolicyChange(), NodeOnline(2), PolicyChange(), NodeOffline(3),
+				NodeOnline(1), PolicyChange(), NodeOnline(2), PolicyChange(), NodeOffline(3, time.Time{}),
 			},
 			want: []Change{
-				NodeOnline(1), PolicyChange(), NodeOnline(2), NodeOffline(3),
+				NodeOnline(1), PolicyChange(), NodeOnline(2), NodeOffline(3, time.Time{}),
 			},
 		},
 		{
@@ -462,14 +463,14 @@ func TestDedupePolicyChanges(t *testing.T) {
 			want:    []Change{PolicyChange(), NodeAdded(5)},
 		},
 		{
-			name:    "recompute carrying OriginNode is kept alongside the canonical one",
+			name:    "recompute carrying OriginNode collapses into the canonical one",
 			changes: []Change{PolicyChange(), originRecompute, PolicyChange()},
-			want:    []Change{PolicyChange(), originRecompute},
+			want:    []Change{PolicyChange()},
 		},
 		{
-			name:    "non-canonical recomputes are not collapsed",
+			name:    "recomputes carrying OriginNode collapse to one",
 			changes: []Change{originRecompute, originRecompute},
-			want:    []Change{originRecompute, originRecompute},
+			want:    []Change{originRecompute},
 		},
 		{
 			name:    "changes without any recompute are unchanged",
@@ -482,6 +483,149 @@ func TestDedupePolicyChanges(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := DedupePolicyChanges(tt.changes)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCoalescePeerDeltas(t *testing.T) {
+	const self types.NodeID = 1
+
+	merged := func(peers []types.NodeID, patches ...*tailcfg.PeerChange) Change {
+		return Change{Reason: "coalesced peer changes", PeersChanged: peers, PeerPatches: patches}
+	}
+	patch := func(c Change) *tailcfg.PeerChange { return c.PeerPatches[0] }
+
+	ping := PingNode(self, &tailcfg.PingRequest{URL: "https://example.com/ping"})
+
+	tests := []struct {
+		name    string
+		changes []Change
+		want    []Change
+	}{
+		{
+			name:    "single delta is unchanged",
+			changes: []Change{NodeAdded(2)},
+			want:    []Change{NodeAdded(2)},
+		},
+		{
+			name:    "join storm folds into one change",
+			changes: []Change{NodeAdded(3), NodeOnline(3), NodeAdded(2), NodeOnline(2)},
+			want:    []Change{merged([]types.NodeID{2, 3})},
+		},
+		{
+			name:    "patches for peers sent whole are dropped, others kept in order",
+			changes: []Change{NodeOnline(4), NodeAdded(2), NodeOffline(4, time.Time{}), NodeOnline(2)},
+			want:    []Change{merged([]types.NodeID{2}, patch(NodeOnline(4)), patch(NodeOffline(4, time.Time{})))},
+		},
+		{
+			name: "runs do not cross other changes",
+			changes: []Change{
+				NodeAdded(2), NodeOnline(2), PolicyChange(), NodeAdded(3), PeersRemoved(4), NodeOnline(5), ping, NodeOnline(6),
+			},
+			want: []Change{
+				merged([]types.NodeID{2}), PolicyChange(), NodeAdded(3), PeersRemoved(4), NodeOnline(5), ping, NodeOnline(6),
+			},
+		},
+		{
+			name: "deletions fold into one removal ahead of the tick",
+			changes: []Change{
+				NodeAdded(2), NodeRemoved(5, self)[1], NodeOnline(3), PolicyChange(), NodeRemoved(4, self)[1], NodeAdded(6),
+			},
+			want: []Change{
+				{Reason: "node removed", PeersRemoved: []types.NodeID{4, 5}, DeletedNodes: []types.NodeID{4, 5}},
+				merged([]types.NodeID{2}, patch(NodeOnline(3))), PolicyChange(), NodeAdded(6),
+			},
+		},
+		{
+			name:    "the node's own change is a self update, not a peer delta",
+			changes: []Change{NodeAdded(2), NodeAdded(self), NodeAdded(3)},
+			want:    []Change{NodeAdded(2), NodeAdded(self), NodeAdded(3)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, CoalescePeerDeltas(self, tt.changes))
+		})
+	}
+}
+
+// TestCoalescePeerDeltasClassifiesEveryField classifies every [Change] field
+// by whether a change setting it may fold into a run of peer deltas. A new
+// field fails here until it is classified.
+func TestCoalescePeerDeltasClassifiesEveryField(t *testing.T) {
+	const self = types.NodeID(1)
+
+	folds := map[string]bool{
+		"Reason":                         true,  // logging only
+		"TargetNode":                     true,  // a node's pending only holds its own
+		"OriginNode":                     false, // set to self: a self update
+		"IncludeSelf":                    false,
+		"IncludeDERPMap":                 false,
+		"IncludeDNS":                     false,
+		"IncludeDomain":                  false,
+		"IncludePolicy":                  false,
+		"PeersChanged":                   true,
+		"PeersRemoved":                   false, // must stay ordered against re-adds
+		"PeerPatches":                    true,
+		"SendAllPeers":                   false,
+		"DeletedNodes":                   false,
+		"RequiresRuntimePeerComputation": false,
+		"PingRequest":                    false,
+	}
+
+	typ := reflect.TypeFor[Change]()
+	require.Len(t, folds, typ.NumField(), "classify every Change field")
+
+	for field := range typ.Fields() {
+		t.Run(field.Name, func(t *testing.T) {
+			want, ok := folds[field.Name]
+			require.True(t, ok, "field %s is not classified", field.Name)
+
+			c := Change{PeersChanged: []types.NodeID{2}}
+			setNonZero(t, reflect.ValueOf(&c).Elem().FieldByIndex(field.Index), self)
+
+			assert.Equal(t, want, c.isPeerDelta(self))
+		})
+	}
+}
+
+// TestCoalescePeerDeltasHoistsOnlyDeletions classifies every [Change] field
+// by whether a deletion setting it may still be hoisted ahead of the tick. A
+// new field fails here until it is classified.
+func TestCoalescePeerDeltasHoistsOnlyDeletions(t *testing.T) {
+	const self = types.NodeID(1)
+
+	hoists := map[string]bool{
+		"Reason":                         true,
+		"TargetNode":                     true,
+		"OriginNode":                     false,
+		"IncludeSelf":                    false,
+		"IncludeDERPMap":                 false,
+		"IncludeDNS":                     false,
+		"IncludeDomain":                  false,
+		"IncludePolicy":                  false,
+		"PeersChanged":                   false,
+		"PeersRemoved":                   true,
+		"PeerPatches":                    false,
+		"SendAllPeers":                   false,
+		"DeletedNodes":                   true,
+		"RequiresRuntimePeerComputation": false,
+		"PingRequest":                    false,
+	}
+
+	typ := reflect.TypeFor[Change]()
+	require.Len(t, hoists, typ.NumField(), "classify every Change field")
+
+	for field := range typ.Fields() {
+		t.Run(field.Name, func(t *testing.T) {
+			want, ok := hoists[field.Name]
+			require.True(t, ok, "field %s is not classified", field.Name)
+
+			c := NodeRemoved(2, self)[1]
+			setNonZero(t, reflect.ValueOf(&c).Elem().FieldByIndex(field.Index), self)
+
+			assert.Equal(t, want, c.isDeletion())
 		})
 	}
 }
@@ -566,10 +710,21 @@ func TestPeersRemoved(t *testing.T) {
 }
 
 func TestNodeRemoved(t *testing.T) {
-	r := NodeRemoved(42)
-	assert.Equal(t, "node removed", r.Reason)
-	assert.Equal(t, []types.NodeID{42}, r.PeersRemoved)
-	assert.Equal(t, []types.NodeID{42}, r.DeletedNodes)
+	rs := NodeRemoved(42, 7, 9)
+	require.Len(t, rs, 3)
+	assert.Equal(t, "node removed", rs[0].Reason)
+	assert.Equal(t, types.NodeID(42), rs[0].TargetNode,
+		"the teardown reaches no other node")
+	assert.Empty(t, rs[0].PeersRemoved)
+	assert.Equal(t, []types.NodeID{42}, rs[0].DeletedNodes)
+
+	for i, peer := range []types.NodeID{7, 9} {
+		assert.Equal(t, peer, rs[i+1].TargetNode)
+		assert.Equal(t, []types.NodeID{42}, rs[i+1].PeersRemoved)
+		assert.Equal(t, []types.NodeID{42}, rs[i+1].DeletedNodes,
+			"a peer's removal folds with the tick's other deletions")
+		assert.True(t, rs[i+1].isDeletion())
+	}
 }
 
 func TestPeerPatched(t *testing.T) {
@@ -785,13 +940,16 @@ func TestNodeOnlineOfflineForSubnetRouter(t *testing.T) {
 	view := router.View()
 	require.True(t, view.IsSubnetRouter(), "test node must be a subnet router")
 
+	seen := time.Date(2026, 1, 2, 3, 4, 5, 123456789, time.UTC)
+
 	tests := []struct {
 		name       string
 		got        Change
 		wantOnline bool
+		wantSeen   *time.Time
 	}{
 		{name: "online", got: NodeOnline(view.ID()), wantOnline: true},
-		{name: "offline", got: NodeOffline(view.ID()), wantOnline: false},
+		{name: "offline", got: NodeOffline(view.ID(), seen), wantOnline: false, wantSeen: &seen},
 	}
 
 	for _, tt := range tests {
@@ -810,6 +968,7 @@ func TestNodeOnlineOfflineForSubnetRouter(t *testing.T) {
 
 			require.NotNil(t, patch.Online)
 			assert.Equal(t, tt.wantOnline, *patch.Online)
+			assert.Equal(t, tt.wantSeen, patch.LastSeen)
 		})
 	}
 }
@@ -843,4 +1002,20 @@ func TestNodeKeyRotatedEmitsPatchNotWholeNode(t *testing.T) {
 	require.NotNil(t, patch.KeyExpiry, "patch must carry KeyExpiry to (un)expire the peer")
 	assert.Equal(t, expiry, *patch.KeyExpiry)
 	assert.Equal(t, []netip.AddrPort(node.Endpoints), patch.Endpoints, "patch must carry endpoints")
+}
+
+// TestNodeKeyRotatedSendsExpiryInUTC proves the patch carries the expiry in
+// UTC, as [types.NodeView.TailNode] does. PostgreSQL loads it in the server's
+// zone, where an expiry late in 9999 is already in the year 10000, which
+// json.Marshal refuses.
+func TestNodeKeyRotatedSendsExpiryInUTC(t *testing.T) {
+	latest := time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
+	loaded := latest.In(time.FixedZone("", 60*60))
+
+	c := NodeKeyRotated((&types.Node{ID: 7, Expiry: &loaded}).View())
+	require.Len(t, c.PeerPatches, 1)
+
+	_, err := json.Marshal(c.PeerPatches[0])
+	require.NoError(t, err)
+	assert.True(t, latest.Equal(*c.PeerPatches[0].KeyExpiry))
 }

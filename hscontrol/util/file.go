@@ -1,16 +1,17 @@
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/tailscale/hujson"
 	"gopkg.in/yaml.v3"
 )
@@ -35,25 +36,45 @@ var ErrInvalidFileMode = errors.New("not an octal file mode between 0 and 0777")
 var ErrUnknownFileFormat = errors.New("unknown file format, want .json, .hujson, .yaml or .yml")
 
 // UnmarshalByExt decodes data into a T in the format name's extension picks:
-// .json, .hujson (JSON with comments and trailing commas), or .yaml/.yml.
-// The extension decides, not the content: YAML parses JSON syntax, so sniffing
-// cannot tell the two apart. YAML keys are the lowercased Go field names.
+// .json or .hujson, both read as HuJSON (JSON with comments and trailing
+// commas), or .yaml/.yml. The extension decides, not the content: YAML parses
+// JSON syntax, so sniffing cannot tell the two apart. YAML keys are the
+// lowercased Go field names.
 func UnmarshalByExt[T any](name string, data []byte) (T, error) {
+	return unmarshalByExt[T](name, data, false)
+}
+
+// UnmarshalByExtStrict is [UnmarshalByExt] that fails on a key T has no
+// field for, so a misspelt key is an error rather than silently dropped.
+func UnmarshalByExtStrict[T any](name string, data []byte) (T, error) {
+	return unmarshalByExt[T](name, data, true)
+}
+
+func unmarshalByExt[T any](name string, data []byte, strict bool) (T, error) {
 	var (
 		v   T
 		err error
 	)
 
 	switch ext := strings.ToLower(filepath.Ext(name)); ext {
-	case ".json":
-		err = json.Unmarshal(data, &v)
-	case ".hujson":
+	case ".json", ".hujson":
 		data, err = hujson.Standardize(data)
 		if err == nil {
-			err = json.Unmarshal(data, &v)
+			dec := json.NewDecoder(bytes.NewReader(data))
+			if strict {
+				dec.DisallowUnknownFields()
+			}
+
+			err = dec.Decode(&v)
 		}
 	case ".yaml", ".yml":
-		err = yaml.Unmarshal(data, &v)
+		dec := yaml.NewDecoder(bytes.NewReader(data))
+		dec.KnownFields(strict)
+
+		err = dec.Decode(&v)
+		if errors.Is(err, io.EOF) {
+			err = nil // an empty document, as yaml.Unmarshal reads it
+		}
 	default:
 		return v, fmt.Errorf("%s: %w", name, ErrUnknownFileFormat)
 	}
@@ -77,14 +98,11 @@ func ReadFileByExt[T any](path string) (T, error) {
 	return UnmarshalByExt[T](path, data)
 }
 
-func AbsolutePathFromConfigPath(path string) string {
-	// If a relative path is provided, prefix it with the directory where
-	// the config file was found.
-	if (path != "") && !strings.HasPrefix(path, string(os.PathSeparator)) {
-		dir, _ := filepath.Split(viper.ConfigFileUsed())
-		if dir != "" {
-			path = filepath.Join(dir, path)
-		}
+// AbsolutePath resolves a relative path from the configuration against
+// configDir, the directory relative paths are read from.
+func AbsolutePath(configDir, path string) string {
+	if path != "" && configDir != "" && !filepath.IsAbs(path) {
+		return filepath.Join(configDir, path)
 	}
 
 	return path

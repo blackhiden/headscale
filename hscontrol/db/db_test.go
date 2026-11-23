@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blackhiden/headscale/hscontrol/config"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,68 @@ import (
 //
 // TODO(kradalby): remove in 0.31 with the credentials migration.
 const legacyPlaintextKey = "plaintextlegacykey0000000000000000000000000000"
+
+func TestSQLiteSameQueryInAndOutsideTransaction(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+server_url: https://example.com
+prefixes:
+  v4: 100.64.0.0/10
+noise:
+  private_key_path: noise_private.key
+dns:
+  magic_dns: false
+  override_local_dns: false
+database:
+  type: sqlite3
+  sqlite:
+    path: headscale.db
+`), 0o600))
+	l, err := config.Load(configPath, true, os.Environ())
+	require.NoError(t, err)
+	require.NoError(t, config.Validate(l.Config))
+	hsdb, err := NewHeadscaleDatabase(l.Config)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, hsdb.Close()) })
+
+	user, err := hsdb.CreateUser(types.User{Name: "test-user"})
+	require.NoError(t, err)
+	sqlDB, err := hsdb.DB.DB()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	hsdb.DB = hsdb.DB.WithContext(ctx)
+	poolResult := make(chan error, 1)
+
+	err = hsdb.Read(func(rx *gorm.DB) error {
+		waitCount := sqlDB.Stats().WaitCount
+
+		go func() {
+			_, err := hsdb.GetUserByID(types.UserID(user.ID))
+			poolResult <- err
+		}()
+
+		require.Eventually(t, func() bool {
+			return sqlDB.Stats().WaitCount > waitCount
+		}, time.Second, time.Millisecond)
+
+		_, err := GetUserByID(rx, types.UserID(user.ID))
+
+		return err
+	})
+	require.NoError(t, err)
+
+	select {
+	case err := <-poolResult:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal(
+			"pool query did not finish after the transaction released its connection",
+		)
+	}
+}
 
 // TestSQLiteMigrationAndDataValidation tests specific SQLite migration scenarios
 // and validates data integrity after migration. All migrations that require data validation
@@ -47,6 +110,11 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, nodes, 5)
+
+				// Approvals from before the upgrade carry no auto-approval mark.
+				for _, n := range nodes {
+					assert.Empty(t, n.AutoApprovedRoutes, "node %d", n.ID)
+				}
 
 				// Pre-auth key ids are preserved, so every node keeps its key.
 				for _, n := range nodes {
@@ -218,6 +286,12 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 				assert.False(t, node5.IsTagged(), "node5 (tags='[]') should be untagged")
 				require.NotNil(t, node5.Expiry, "node5 (user-owned) expiry must be preserved")
 				assert.Equal(t, 2099, node5.Expiry.UTC().Year(), "node5 future expiry preserved")
+
+				// 202611171200-node-key-expiry-disabled: the switch is on for
+				// tagged nodes only.
+				for _, n := range nodes {
+					assert.Equal(t, n.IsTagged(), n.KeyExpiryDisabled, "%s key expiry switch", n.Hostname)
+				}
 			},
 		},
 	}
@@ -253,15 +327,10 @@ func createSQLiteFromSQLFile(sqlFilePath, dbPath string) error {
 	return err
 }
 
-// requireConstraintFailed checks if the error is a constraint failure with
-// either SQLite and PostgreSQL error messages.
+// requireConstraintFailed checks that a unique index refused the write.
 func requireConstraintFailed(t *testing.T, err error) {
 	t.Helper()
-	require.Error(t, err)
-
-	if !strings.Contains(err.Error(), "UNIQUE constraint failed:") && !strings.Contains(err.Error(), "violates unique constraint") {
-		require.Failf(t, "expected error to contain a constraint failure, got: %s", err.Error())
-	}
+	require.ErrorIs(t, err, gorm.ErrDuplicatedKey)
 }
 
 func TestConstraints(t *testing.T) {
@@ -631,22 +700,93 @@ func TestSQLiteMigrationToCredentialsIsAtomic(t *testing.T) {
 	assert.True(t, pak.Reusable)
 }
 
-// TestSQLiteRejectsPre029Database ensures a real pre-0.29 database is refused
-// rather than silently skipping the migrations that were removed.
-func TestSQLiteRejectsPre029Database(t *testing.T) {
+// TestSQLiteMigrationAddsCreatedByToken upgrades a database whose credentials
+// table predates the created_by_token column: existing keys read as not made
+// by a token, and the schema matches schema.sql again.
+func TestSQLiteMigrationAddsCreatedByToken(t *testing.T) {
 	dbPath := t.TempDir() + "/headscale_test.db"
-
-	err := createSQLiteFromSQLFile("testdata/sqlite_too_old/headscale_0.26.1_dump.sql", dbPath)
-	require.NoError(t, err)
-
-	_, err = NewHeadscaleDatabase(&types.Config{
+	cfg := &types.Config{
 		Database: types.DatabaseConfig{
 			Type:   "sqlite3",
 			Sqlite: types.SqliteConfig{Path: dbPath},
 		},
 		Policy: types.PolicyConfig{Mode: types.PolicyModeDB},
-	})
-	require.ErrorIs(t, err, errDatabaseTooOld)
+	}
+
+	hsdb, err := NewHeadscaleDatabase(cfg)
+	require.NoError(t, err)
+
+	pak, err := hsdb.CreatePreAuthKey(nil, true, false, nil, []string{"tag:ci"})
+	require.NoError(t, err)
+	require.NoError(t, hsdb.Close())
+
+	raw, err := sql.Open("sqlite", dbPath)
+	require.NoError(t, err)
+
+	defer raw.Close()
+
+	for _, stmt := range []string{
+		`ALTER TABLE credentials DROP COLUMN created_by_token`,
+		`DELETE FROM migrations WHERE id = '202610221200-credential-created-by-token'`,
+	} {
+		_, err = raw.ExecContext(context.Background(), stmt)
+		require.NoError(t, err, stmt)
+	}
+
+	hsdb, err = NewHeadscaleDatabase(cfg)
+	require.NoError(t, err)
+
+	got, err := hsdb.GetPreAuthKeyByID(pak.ID)
+	require.NoError(t, err)
+	assert.False(t, got.CreatedByToken)
+
+	made, err := hsdb.CreateTokenPreAuthKey(nil, true, false, nil, []string{"tag:ci"})
+	require.NoError(t, err)
+	got, err = hsdb.GetPreAuthKeyByID(made.ID)
+	require.NoError(t, err)
+	assert.True(t, got.CreatedByToken)
+}
+
+// TestSQLiteRejectsPre029Database ensures real pre-0.29 databases are refused
+// before anything is written, rather than silently skipping the migrations
+// that were removed.
+func TestSQLiteRejectsPre029Database(t *testing.T) {
+	dumps, err := os.ReadDir("testdata/sqlite_too_old")
+	require.NoError(t, err)
+
+	for _, dump := range dumps {
+		t.Run(dump.Name(), func(t *testing.T) {
+			dbPath := t.TempDir() + "/headscale_test.db"
+
+			err := createSQLiteFromSQLFile(filepath.Join("testdata/sqlite_too_old", dump.Name()), dbPath)
+			require.NoError(t, err)
+
+			schema := func() string {
+				raw, err := sql.Open("sqlite", dbPath)
+				require.NoError(t, err)
+
+				defer raw.Close()
+
+				var s string
+				require.NoError(t, raw.QueryRowContext(context.Background(),
+					"SELECT group_concat(sql, ';') FROM (SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name)",
+				).Scan(&s))
+
+				return s
+			}
+			before := schema()
+
+			_, err = NewHeadscaleDatabase(&types.Config{
+				Database: types.DatabaseConfig{
+					Type:   "sqlite3",
+					Sqlite: types.SqliteConfig{Path: dbPath},
+				},
+				Policy: types.PolicyConfig{Mode: types.PolicyModeDB},
+			})
+			require.ErrorIs(t, err, errDatabaseTooOld)
+			assert.Equal(t, before, schema())
+		})
+	}
 }
 
 // TestSQLiteAllTestdataMigrations tests migration compatibility across all SQLite schemas
@@ -923,6 +1063,30 @@ func TestRevokedKeysBackingNodesSurviveCollection(t *testing.T) {
 	assert.ElementsMatch(t, []types.NodeID{3, 5}, ids)
 }
 
+// TestNodeEphemeralMigrationRerunKeepsFlags simulates a start that committed
+// the node ephemeral migration but died before gormigrate recorded it, after
+// which node 3 was made permanent: the next start must neither fail on the
+// existing column nor backfill node 3 again.
+func TestNodeEphemeralMigrationRerunKeepsFlags(t *testing.T) {
+	dbPath := t.TempDir() + "/headscale_test.db"
+
+	require.NoError(t, createSQLiteFromSQLFile("testdata/sqlite/headscale_0.29.3_dump.sql", dbPath))
+
+	hsdb, err := NewHeadscaleDatabase(sqliteTestConfig(dbPath))
+	require.NoError(t, err)
+	require.NoError(t, hsdb.DB.Exec(`UPDATE nodes SET ephemeral = false WHERE id = 3`).Error)
+	require.NoError(t, hsdb.DB.Exec(`DELETE FROM migrations WHERE id = '202610211300-node-ephemeral'`).Error)
+	require.NoError(t, hsdb.Close())
+
+	hsdb, err = NewHeadscaleDatabase(sqliteTestConfig(dbPath))
+	require.NoError(t, err)
+
+	ephemeral, err := hsdb.ListEphemeralNodes()
+	require.NoError(t, err)
+	require.Len(t, ephemeral, 1)
+	assert.Equal(t, types.NodeID(5), ephemeral[0].ID)
+}
+
 // TestInterruptedInitSchemaRecovers simulates a first start that created the
 // schema but died before gormigrate recorded the migrations, and asserts the
 // next start completes instead of failing on the existing credentials table.
@@ -954,4 +1118,138 @@ func TestInterruptedInitSchemaRecovers(t *testing.T) {
 		_, _, err := hsdb.CreateAPIKey(nil)
 		require.NoError(t, err)
 	})
+}
+
+func TestOpenDBReturnsOpenError(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  func(t *testing.T) types.DatabaseConfig
+	}{
+		{
+			name: "sqlite-path-is-a-directory",
+			cfg: func(t *testing.T) types.DatabaseConfig {
+				t.Helper()
+
+				return types.DatabaseConfig{
+					Type:   types.DatabaseSqlite,
+					Sqlite: types.SqliteConfig{Path: t.TempDir()},
+				}
+			},
+		},
+		{
+			name: "postgres-unreachable-host",
+			cfg: func(t *testing.T) types.DatabaseConfig {
+				t.Helper()
+
+				return types.DatabaseConfig{
+					Type: types.DatabasePostgres,
+					Postgres: types.PostgresConfig{
+						Host: "127.0.0.1",
+						Port: 1,
+						Name: "headscale",
+						User: "headscale",
+						Ssl:  "false",
+					},
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				db  *gorm.DB
+				err error
+			)
+
+			require.NotPanics(t, func() {
+				cfg := tt.cfg(t)
+				db, err = openDB(cfg, cfg.Sqlite.Path)
+			})
+			require.Error(t, err)
+			assert.Nil(t, db)
+		})
+	}
+}
+
+// TestSQLiteWriteAheadLog switches one database between modes, because SQLite
+// stores the journal mode in the file and turning WAL off has to undo it.
+func TestSQLiteWriteAheadLog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "headscale.db")
+
+	open := func(wal bool) (string, int) {
+		t.Helper()
+
+		cfg := sqliteTestConfig(path)
+		cfg.Database.Sqlite.WriteAheadLog = wal
+
+		hsdb, err := NewHeadscaleDatabase(cfg)
+		require.NoError(t, err)
+
+		var (
+			mode        string
+			synchronous int
+		)
+
+		require.NoError(t, hsdb.DB.Raw("PRAGMA journal_mode").Scan(&mode).Error)
+		require.NoError(t, hsdb.DB.Raw("PRAGMA synchronous").Scan(&synchronous).Error)
+		require.NoError(t, hsdb.Close())
+
+		return mode, synchronous
+	}
+
+	const normal, full = 1, 2
+
+	mode, synchronous := open(true)
+	assert.Equal(t, "wal", mode)
+	assert.Equal(t, normal, synchronous)
+
+	mode, synchronous = open(false)
+	assert.Equal(t, "delete", mode)
+	assert.Equal(t, full, synchronous)
+
+	mode, _ = open(true)
+	assert.Equal(t, "wal", mode)
+}
+
+func TestLastControlAddressMigration(t *testing.T) {
+	dbPath := t.TempDir() + "/headscale.db"
+	cfg := &types.Config{
+		Database: types.DatabaseConfig{
+			Type: types.DatabaseSqlite,
+			Sqlite: types.SqliteConfig{
+				Path: dbPath,
+			},
+		},
+		Policy: types.PolicyConfig{Mode: types.PolicyModeDB},
+	}
+
+	database, err := NewHeadscaleDatabase(cfg)
+	require.NoError(t, err, "a fresh database must match schema.sql")
+	require.True(t, database.DB.Migrator().HasColumn(&types.Node{}, "last_control_address"))
+
+	user := database.CreateUserForTest("migration-user")
+	node := database.CreateRegisteredNodeForTest(user, "migration-node")
+	require.Nil(t, node.LastControlAddress)
+
+	result := database.DB.Exec(
+		"DELETE FROM migrations WHERE id = ?",
+		"202611041200-node-last-control-address",
+	)
+	require.NoError(t, result.Error)
+	require.Equal(t, int64(1), result.RowsAffected)
+	require.NoError(t,
+		database.DB.Exec("ALTER TABLE nodes DROP COLUMN last_control_address").Error)
+	require.False(t, database.DB.Migrator().HasColumn(&types.Node{}, "last_control_address"))
+	require.NoError(t, database.Close())
+
+	upgraded, err := NewHeadscaleDatabase(cfg)
+	require.NoError(t, err, "a database without last_control_address must upgrade")
+	t.Cleanup(func() { _ = upgraded.Close() })
+
+	require.True(t, upgraded.DB.Migrator().HasColumn(&types.Node{}, "last_control_address"))
+	reloaded, err := upgraded.GetNodeByID(node.ID)
+	require.NoError(t, err)
+	assert.Nil(t, reloaded.LastControlAddress,
+		"existing nodes must receive NULL rather than an invented address")
 }

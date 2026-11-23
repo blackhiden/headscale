@@ -7,13 +7,38 @@ import (
 
 	"github.com/blackhiden/headscale/hscontrol/util"
 	"go4.org/netipx"
-	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 )
 
 type Match struct {
 	srcs  *netipx.IPSet
 	dests *netipx.IPSet
+
+	srcRanges  []netipx.IPRange
+	destRanges []netipx.IPRange
+
+	// Kept apart because only port destinations carry traffic to an exit
+	// node; a capability to the internet changes who the exit node lists.
+	internet    bool
+	capInternet bool
+}
+
+// newMatch unions the port and capability destinations into one set.
+func newMatch(srcs, ports, caps *netipx.IPSet) Match {
+	var b netipx.IPSetBuilder
+	b.AddSet(ports)
+	b.AddSet(caps)
+
+	dests, _ := b.IPSet()
+
+	return Match{
+		srcs:        srcs,
+		dests:       dests,
+		srcRanges:   srcs.Ranges(),
+		destRanges:  dests.Ranges(),
+		internet:    util.HasInternetDestination(ports),
+		capInternet: util.HasInternetDestination(caps),
+	}
 }
 
 func (m *Match) DebugString() string {
@@ -52,25 +77,35 @@ func MatchesFromFilterRules(rules []tailcfg.FilterRule) []Match {
 // [policy.ReduceNodes], hiding the cap target
 // from the source unless a companion IP-level rule also exists.
 func MatchFromFilterRule(rule tailcfg.FilterRule) Match {
-	dests := new(netipx.IPSetBuilder)
+	return MatchFromFilterRuleSrcs(rule, buildIPSet(rule.SrcIPs))
+}
+
+// MatchFromFilterRuleSrcs is [MatchFromFilterRule] for a rule whose SrcIPs
+// are already parsed as srcs, see [ParseSrcs]: rules sharing one source
+// list, such as a via grant's on every router, parse it once.
+func MatchFromFilterRuleSrcs(rule tailcfg.FilterRule, srcs *netipx.IPSet) Match {
+	var ports, caps netipx.IPSetBuilder
 
 	for _, dp := range rule.DstPorts {
 		set, _ := util.ParseIPSet(dp.IP, nil)
-		dests.AddSet(set)
+		ports.AddSet(set)
 	}
 
 	for _, cg := range rule.CapGrant {
 		for _, pref := range cg.Dsts {
-			dests.AddPrefix(pref)
+			caps.AddPrefix(pref)
 		}
 	}
 
-	destsSet, _ := dests.IPSet()
+	portsSet, _ := ports.IPSet()
+	capsSet, _ := caps.IPSet()
 
-	return Match{
-		srcs:  buildIPSet(rule.SrcIPs),
-		dests: destsSet,
-	}
+	return newMatch(srcs, portsSet, capsSet)
+}
+
+// ParseSrcs parses SrcIPs as [MatchFromFilterRule] does.
+func ParseSrcs(srcIPs []string) *netipx.IPSet {
+	return buildIPSet(srcIPs)
 }
 
 // buildIPSet parses each string via [util.ParseIPSet] and unions the
@@ -99,26 +134,58 @@ func (m *Match) DestsContainsIP(ips ...netip.Addr) bool {
 }
 
 func (m *Match) SrcsOverlapsPrefixes(prefixes ...netip.Prefix) bool {
-	return slices.ContainsFunc(prefixes, m.srcs.OverlapsPrefix)
+	return slices.ContainsFunc(prefixes, func(prefix netip.Prefix) bool {
+		return overlaps(m.srcRanges, netipx.RangeOfPrefix(prefix))
+	})
 }
 
 func (m *Match) DestsOverlapsPrefixes(prefixes ...netip.Prefix) bool {
-	return slices.ContainsFunc(prefixes, m.dests.OverlapsPrefix)
+	return slices.ContainsFunc(prefixes, func(prefix netip.Prefix) bool {
+		return overlaps(m.destRanges, netipx.RangeOfPrefix(prefix))
+	})
 }
 
-// DestsIsTheInternet reports whether the destination covers "the
-// internet" — the set represented by autogroup:internet, special-cased
-// for exit nodes. Returns true if either family's /0 is contained
-// (0.0.0.0/0 or ::/0), or if dests is a superset of [util.TheInternet]. A
-// single-family /0 counts because operators may write it directly and
-// it still denotes the whole internet for that family.
-func (m *Match) DestsIsTheInternet() bool {
-	if m.dests.ContainsPrefix(tsaddr.AllIPv4()) ||
-		m.dests.ContainsPrefix(tsaddr.AllIPv6()) {
-		return true
+// SrcsOverlapsRanges reports whether the sources overlap sorted, disjoint ranges.
+func (m *Match) SrcsOverlapsRanges(ranges []netipx.IPRange) bool {
+	return rangesOverlap(m.srcRanges, ranges)
+}
+
+// DestsOverlapsRanges reports whether the destinations overlap sorted, disjoint ranges.
+func (m *Match) DestsOverlapsRanges(ranges []netipx.IPRange) bool {
+	return rangesOverlap(m.destRanges, ranges)
+}
+
+func rangesOverlap(a, b []netipx.IPRange) bool {
+	if len(a) > len(b) {
+		a, b = b, a
 	}
 
-	// Superset-of-[util.TheInternet] check handles merged filter rules
-	// where the internet prefixes are combined with other dests.
-	return util.IPSetSubsetOf(util.TheInternet(), m.dests)
+	return slices.ContainsFunc(a, func(r netipx.IPRange) bool {
+		return overlaps(b, r)
+	})
+}
+
+func overlaps(ranges []netipx.IPRange, r netipx.IPRange) bool {
+	if !r.IsValid() {
+		return false
+	}
+
+	i, _ := slices.BinarySearchFunc(ranges, r.From(),
+		func(x netipx.IPRange, a netip.Addr) int {
+			return x.To().Compare(a)
+		})
+
+	return i < len(ranges) && ranges[i].Overlaps(r)
+}
+
+// DestsIsTheInternet reports whether any port destination is in
+// [util.TheInternet]. It lets clients select exit nodes for that traffic.
+func (m *Match) DestsIsTheInternet() bool {
+	return m.internet
+}
+
+// CapDestsIsTheInternet reports whether any capability destination is in
+// [util.TheInternet].
+func (m *Match) CapDestsIsTheInternet() bool {
+	return m.capInternet
 }

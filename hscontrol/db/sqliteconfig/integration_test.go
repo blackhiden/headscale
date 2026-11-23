@@ -3,10 +3,12 @@ package sqliteconfig
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
 
@@ -277,4 +279,121 @@ func TestJournalModeValidation(t *testing.T) {
 // contains checks if a string contains a substring (helper function).
 func contains(str, substr string) bool {
 	return strings.Contains(str, substr)
+}
+
+// TestToURLOpensExactPath guards against URI metacharacters in the path: SQLite
+// ends a file: URI path at '?' or '#' and decodes '%', so an unescaped path
+// opens a different file than the one configured.
+func TestToURLOpensExactPath(t *testing.T) {
+	for _, name := range []string{"q?x", "h#00", "pct%41", "pct%zz", "sp ace"} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), name)
+			require.NoError(t, os.Mkdir(dir, 0o700))
+
+			dbPath := filepath.Join(dir, name+".db")
+
+			url, err := Default(dbPath).ToURL()
+			require.NoError(t, err)
+
+			db, err := sql.Open("sqlite", url)
+			require.NoError(t, err)
+
+			defer db.Close()
+
+			_, err = db.ExecContext(t.Context(), "CREATE TABLE t (id INTEGER)")
+			require.NoError(t, err)
+
+			_, err = os.Stat(dbPath)
+			require.NoError(t, err, "database not created at configured path")
+
+			var mode string
+			require.NoError(t, db.QueryRowContext(t.Context(), "PRAGMA journal_mode").Scan(&mode))
+			require.Equal(t, "wal", mode)
+
+			// The read-only form tailsql uses must open the same file.
+			roURL, err := (&Config{Path: dbPath, WALAutocheckpoint: -1, ReadOnly: true}).ToURL()
+			require.NoError(t, err)
+
+			ro, err := sql.Open("sqlite", roURL)
+			require.NoError(t, err)
+
+			defer ro.Close()
+
+			var n int
+			require.NoError(t, ro.QueryRowContext(t.Context(), "SELECT count(*) FROM t").Scan(&n))
+
+			_, err = ro.ExecContext(t.Context(), "INSERT INTO t VALUES (1)")
+			require.ErrorContains(t, err, "readonly")
+		})
+	}
+}
+
+// TestReadOnlyRejectsWrites proves a ReadOnly connection cannot change the
+// database, even when a statement lifts query_only. ATTACH and VACUUM INTO
+// still create other files; see [ReadOnly].
+func TestReadOnlyRejectsWrites(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "ro.db")
+
+	rwURL, err := Default(dbPath).ToURL()
+	if err != nil {
+		t.Fatalf("rw url: %v", err)
+	}
+
+	rw, err := sql.Open("sqlite", rwURL)
+	if err != nil {
+		t.Fatalf("open rw: %v", err)
+	}
+	defer rw.Close()
+
+	_, err = rw.ExecContext(ctx, "CREATE TABLE t (v INTEGER); INSERT INTO t VALUES (1)")
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	roURL, err := ReadOnly(dbPath).ToURL()
+	if err != nil {
+		t.Fatalf("ro url: %v", err)
+	}
+
+	ro, err := sql.Open("sqlite", roURL)
+	if err != nil {
+		t.Fatalf("open ro: %v", err)
+	}
+	defer ro.Close()
+
+	// One connection, so a PRAGMA in one statement carries to the next.
+	conn, err := ro.Conn(ctx)
+	if err != nil {
+		t.Fatalf("conn: %v", err)
+	}
+	defer conn.Close()
+
+	writes := []string{
+		"INSERT INTO t VALUES (2)",
+		"UPDATE t SET v = 3",
+		"DELETE FROM t",
+		"DROP TABLE t",
+		"CREATE TABLE x (a)",
+		"PRAGMA query_only = 0; DELETE FROM t",
+		"DELETE FROM t",
+	}
+	for _, q := range writes {
+		_, err := conn.ExecContext(ctx, q)
+		if err == nil {
+			t.Errorf("%q succeeded on a read-only connection", q)
+		}
+	}
+
+	var n int
+
+	err = conn.QueryRowContext(ctx, "SELECT count(*) FROM t WHERE v = 1").Scan(&n)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	if n != 1 {
+		t.Errorf("table changed: %d rows with v=1, want 1", n)
+	}
 }

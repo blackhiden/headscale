@@ -26,6 +26,11 @@ var (
 	ErrAccessTokenClientRevoked = errors.New("oauth access token issuing client revoked or deleted")
 )
 
+// maxAccessTokensPerClient bounds the access tokens kept for one OAuth client.
+// Minting needs only the client secret, whatever its scopes, so each mint ends
+// the client's tokens beyond the newest this many.
+const maxAccessTokensPerClient = 1000
+
 // validateScopes rejects any value outside the vocabulary in [scope.Known]. An
 // unknown scope satisfies no requirement, so storing one would silently mint a
 // client with fewer permissions than asked for. Every offending scope is
@@ -157,10 +162,11 @@ func (hsdb *HSDatabase) ListOAuthClients() ([]types.OAuthClient, error) {
 	return clients, nil
 }
 
-// RevokeOAuthClient deletes a client and all access tokens it issued. An unknown
-// client id returns [ErrOAuthClientNotFound], so a repeated DELETE is a clean
-// 404. Unlike pre-auth keys (which soft-revoke for node-registration history), an
-// OAuth client has no such history and is removed outright, matching Tailscale.
+// RevokeOAuthClient soft-revokes a client, as Tailscale's DELETE does: the row
+// stays retrievable with its invalid flag set, and the access tokens it issued
+// are deleted. Revoking a revoked client keeps its first revoke time and
+// succeeds; an unknown client id returns [ErrOAuthClientNotFound]. The
+// background collector hard-deletes it after the retention window.
 func (hsdb *HSDatabase) RevokeOAuthClient(clientID string) error {
 	return hsdb.Write(func(tx *gorm.DB) error {
 		err := tx.Where("kind = ? AND client_id = ?", types.CredentialOAuthToken, clientID).
@@ -169,8 +175,9 @@ func (hsdb *HSDatabase) RevokeOAuthClient(clientID string) error {
 			return fmt.Errorf("deleting oauth access tokens: %w", err)
 		}
 
-		res := tx.Where("kind = ? AND identifier = ?", types.CredentialOAuthClient, clientID).
-			Delete(&types.Credential{})
+		res := tx.Model(&types.Credential{}).
+			Where("kind = ? AND identifier = ?", types.CredentialOAuthClient, clientID).
+			Update("revoked", gorm.Expr("COALESCE(revoked, ?)", time.Now()))
 		if res.Error != nil {
 			return res.Error
 		}
@@ -183,6 +190,22 @@ func (hsdb *HSDatabase) RevokeOAuthClient(clientID string) error {
 	})
 }
 
+// DestroyRevokedOAuthClientsBefore hard-deletes every client revoked before
+// cutoff, returning how many were removed.
+func (hsdb *HSDatabase) DestroyRevokedOAuthClientsBefore(cutoff time.Time) (int64, error) {
+	var count int64
+
+	err := hsdb.Write(func(tx *gorm.DB) error {
+		res := tx.Where("kind = ? AND revoked IS NOT NULL AND revoked < ?", types.CredentialOAuthClient, cutoff).
+			Delete(&types.Credential{})
+		count = res.RowsAffected
+
+		return res.Error
+	})
+
+	return count, err
+}
+
 // MintAccessToken stores a new [types.OAuthAccessToken] for clientID with the
 // given (already narrowed) scopes/tags and expiration, returning the plaintext
 // token (shown ONCE).
@@ -192,6 +215,12 @@ func (hsdb *HSDatabase) MintAccessToken(
 	expiration *time.Time,
 ) (string, *types.OAuthAccessToken, error) {
 	tokenStr, prefix, hash := generateSecret(types.AccessTokenPrefix)
+
+	scopes = set.SetOf(scopes).Slice()
+	slices.Sort(scopes)
+
+	tags = set.SetOf(tags).Slice()
+	slices.Sort(tags)
 
 	now := time.Now().UTC()
 	cred := types.Credential{
@@ -223,7 +252,19 @@ func (hsdb *HSDatabase) MintAccessToken(
 			return ErrOAuthClientRevoked
 		}
 
-		return tx.Save(&cred).Error
+		err = tx.Save(&cred).Error
+		if err != nil {
+			return err
+		}
+
+		// Under the limit the subquery is NULL and nothing is deleted.
+		newestSurplus := tx.Model(&types.Credential{}).Select("id").
+			Where("kind = ? AND client_id = ?", types.CredentialOAuthToken, clientID).
+			Order("id DESC").Limit(1).Offset(maxAccessTokensPerClient)
+
+		return tx.Where("kind = ? AND client_id = ? AND id <= (?)",
+			types.CredentialOAuthToken, clientID, newestSurplus).
+			Delete(&types.Credential{}).Error
 	})
 	if err != nil {
 		return "", nil, fmt.Errorf("saving oauth access token: %w", err)
@@ -240,7 +281,7 @@ func (hsdb *HSDatabase) AuthenticateAccessToken(tokenStr string) (*types.OAuthAc
 		return nil, ErrAccessTokenFailedToParse
 	}
 
-	_, rest, found := strings.Cut(tokenStr, types.AccessTokenPrefix)
+	rest, found := strings.CutPrefix(tokenStr, types.AccessTokenPrefix)
 	if !found {
 		return nil, ErrAccessTokenFailedToParse
 	}

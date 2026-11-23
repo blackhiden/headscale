@@ -2,6 +2,7 @@ package templates
 
 import (
 	"cmp"
+	"strings"
 
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
@@ -15,6 +16,7 @@ import (
 // detail (hostname, OS, machine-key fingerprint) for the user to
 // recognise whether the device they are about to claim is in fact
 // theirs.
+// The form and user fields are also used for SSH check confirmations.
 type RegisterConfirmInfo struct {
 	// FormAction is the absolute or relative URL the confirm form
 	// POSTs to. Typically /register/confirm/{auth_id}.
@@ -28,8 +30,7 @@ type RegisterConfirmInfo struct {
 	// the cookie set by the OIDC callback before the POST is honoured.
 	CSRFToken string
 
-	// User is the OIDC-authenticated identity the device will be
-	// registered to if the user confirms.
+	// User is the OIDC-authenticated identity approving the request.
 	User string
 
 	// Hostname is the hostname the registering tailscaled instance
@@ -48,6 +49,12 @@ type RegisterConfirmInfo struct {
 	// image for Headplane mobile scanning. Empty string if QR generation
 	// failed; the template omits the QR section when empty.
 	QRCodeDataURL string
+
+	// ExistingNode is the stored node name, empty for a new device.
+	ExistingNode string
+
+	// Tags are the ownership tags requested by the registering client.
+	Tags []string
 }
 
 // RegisterConfirm renders an interstitial page that asks the
@@ -57,16 +64,23 @@ type RegisterConfirmInfo struct {
 // silently complete a phishing-style registration when the victim's
 // IdP allows silent SSO.
 func RegisterConfirm(info RegisterConfirmInfo) *elem.Element {
-	deviceList := deviceTable(
-		[]deviceRow{
-			{"Hostname", elem.Text(info.Hostname)},
-			{"OS", elem.Text(cmp.Or(info.OS, "(unknown)"))},
-			{"Machine key", Code(elem.Text(info.MachineKey))},
-			{"Registered to", elem.Text(info.User)},
-		},
-	)
+	rows := []deviceRow{
+		{"Hostname", elem.Text(info.Hostname)},
+		{"OS", elem.Text(cmp.Or(info.OS, "(unknown)"))},
+		{"Machine key", Code(elem.Text(info.MachineKey))},
+		{"Existing node", elem.Text(cmp.Or(info.ExistingNode, "None, this is a new device"))},
+	}
+	if len(info.Tags) > 0 {
+		rows = append(rows,
+			deviceRow{"Registered to", elem.Text(strings.Join(info.Tags, ", "))},
+			deviceRow{"Approved by", elem.Text(info.User)},
+		)
+	} else {
+		rows = append(rows, deviceRow{"Registered to", elem.Text(info.User)})
+	}
 
-	// Build content nodes: device table, optional QR section, then form
+	deviceList := deviceTable(rows)
+
 	content := []elem.Node{
 		H2(elem.Text("Confirm node registration")),
 		P(elem.Text(
@@ -76,13 +90,52 @@ func RegisterConfirm(info RegisterConfirmInfo) *elem.Element {
 		deviceList,
 	}
 
-	// Add QR code section if available
 	if info.QRCodeDataURL != "" {
 		content = append(content, qrSection(info.QRCodeDataURL))
 	}
 
-	// Add confirmation form
-	form := elem.Form(
+	content = append(content,
+		confirmForm(info, "Confirm registration"),
+		P(elem.Text(
+			"If you do not recognise this device, close this window. "+
+				"The registration request will expire automatically.",
+		)),
+	)
+
+	return page("Headscale - Confirm node registration", content...)
+}
+
+// SSHCheckConfirm asks the owner to approve the source and destination node pair.
+func SSHCheckConfirm(
+	info RegisterConfirmInfo,
+	source, destination string,
+) *elem.Element {
+	return page(
+		"Headscale - Confirm SSH session",
+		H2(elem.Text("Confirm SSH session")),
+		P(elem.Text(
+			"An SSH session is waiting for your approval. "+
+				"Review the source and destination nodes before continuing.",
+		)),
+		deviceTable([]deviceRow{
+			{"From", elem.Text(source)},
+			{"To", elem.Text(destination)},
+			{"Approved by", elem.Text(info.User)},
+		}),
+		P(elem.Text(
+			"Approval also allows new SSH sessions between these two nodes "+
+				"without asking again until the check period ends.",
+		)),
+		confirmForm(info, "Approve SSH session"),
+		P(elem.Text(
+			"If you do not recognise this request, close this window. "+
+				"The request will expire automatically.",
+		)),
+	)
+}
+
+func confirmForm(info RegisterConfirmInfo, buttonText string) *elem.Element {
+	return elem.Form(
 		attrs.Props{
 			attrs.Method: "POST",
 			attrs.Action: info.FormAction,
@@ -94,18 +147,9 @@ func RegisterConfirm(info RegisterConfirmInfo) *elem.Element {
 		}),
 		elem.Button(
 			attrs.Props{attrs.Type: "submit"},
-			elem.Text("Confirm registration"),
+			elem.Text(buttonText),
 		),
 	)
-	content = append(content, form)
-
-	// Add footer text
-	content = append(content, P(elem.Text(
-		"If you do not recognise this device, close this window. "+
-			"The registration request will expire automatically.",
-	)))
-
-	return page("Headscale - Confirm node registration", content...)
 }
 
 type deviceRow struct {
@@ -123,7 +167,7 @@ func deviceTable(rows []deviceRow) *elem.Element {
 					styles.Padding:      "0.5rem 1rem 0.5rem 0",
 					styles.FontWeight:   "600",
 					styles.WhiteSpace:   "nowrap",
-					styles.Color:        cssDefaultForegroundLight,
+					styles.Color:        "var(--md-default-fg-color--light)",
 					styles.BorderBottom: cssBorderHS,
 				}.ToInline(),
 			}, elem.Text(row.label)),
@@ -146,8 +190,6 @@ func deviceTable(rows []deviceRow) *elem.Element {
 	}, tableRows...)
 }
 
-// qrSection creates a section displaying a QR code for Headplane mobile scanning.
-// The QR code is embedded as a base64 data URL and styled to be responsive.
 func qrSection(dataURL string) *elem.Element {
 	return elem.Div(
 		attrs.Props{

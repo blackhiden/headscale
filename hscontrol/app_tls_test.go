@@ -2,20 +2,29 @@ package hscontrol
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"log"
+	"math/big"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/caddyserver/certmagic"
 	"github.com/blackhiden/headscale/hscontrol/dns/dnstest"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/caddyserver/certmagic"
 	"github.com/letsencrypt/pebble/v2/ca"
 	"github.com/letsencrypt/pebble/v2/db"
 	"github.com/letsencrypt/pebble/v2/va"
@@ -191,36 +200,37 @@ func TestDNS01SolverWait(t *testing.T) {
 // TestACMETLSSettings obtains headscale's own certificate from Pebble with
 // each challenge type, serving it the way [Headscale.Serve] does.
 func TestACMETLSSettings(t *testing.T) {
-	for _, challenge := range []string{
+	for _, challenge := range []types.ACMEChallenge{
 		types.DNS01ChallengeType,
 		types.HTTP01ChallengeType,
 		types.TLSALPN01ChallengeType,
 	} {
-		t.Run(challenge, func(t *testing.T) {
+		t.Run(string(challenge), func(t *testing.T) {
 			httpPort, tlsPort := freePort(t), freePort(t)
 			acme := startTestACME(t, httpPort, tlsPort)
 
 			h := &Headscale{cfg: &types.Config{
 				ServerURL: "https://" + acmeTestHost,
-				Addr:      net.JoinHostPort("127.0.0.1", strconv.Itoa(tlsPort)),
+				Addr:      types.ListenAddr(net.JoinHostPort("127.0.0.1", strconv.Itoa(tlsPort))),
 				TLS: types.TLSConfig{ACME: types.ACMEConfig{
 					Hostname:      acmeTestHost,
 					ChallengeType: challenge,
-					HTTPListen:    net.JoinHostPort("127.0.0.1", strconv.Itoa(httpPort)),
-					URL:           acme.directory,
+					HTTPListen:    types.ListenAddr(net.JoinHostPort("127.0.0.1", strconv.Itoa(httpPort))),
+					URL:           types.HTTPURL(acme.directory),
 					CacheDir:      t.TempDir(),
 				}},
-				DNSChallenge: types.DNSChallengeConfig{
+				DNSConfig: types.DNSConfig{Challenge: types.DNSChallengeConfig{
 					Provider:  acme.provider,
 					Resolvers: []string{acme.resolver},
-				},
+				}},
 			}}
 
 			bundle, err := h.getTLSSettings(t.Context())
 			require.NoError(t, err)
 			t.Cleanup(bundle.Stop)
+			assert.Nil(t, bundle.Reload, "certmagic renews the certificate itself")
 
-			ln, err := tls.Listen("tcp", h.cfg.Addr, bundle.Config)
+			ln, err := tls.Listen("tcp", string(h.cfg.Addr), bundle.Config)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = ln.Close() })
 
@@ -252,7 +262,7 @@ func TestACMETLSSettings(t *testing.T) {
 
 				d.Config = &tls.Config{ServerName: acmeTestHost, RootCAs: acme.roots, MinVersion: tls.VersionTLS12}
 
-				conn, err := d.DialContext(t.Context(), "tcp", h.cfg.Addr)
+				conn, err := d.DialContext(t.Context(), "tcp", string(h.cfg.Addr))
 				if assert.NoError(c, err) {
 					_ = conn.Close()
 				}
@@ -266,4 +276,217 @@ func TestACMETLSSettings(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestACMERetryStaysOnConfiguredCA pins that a failed issuance is retried
+// against tls.acme.url and nothing else. The default tls.acme.url is
+// certmagic's default CA, Let's Encrypt production, for which certmagic
+// retries against Let's Encrypt staging and registers an account there
+// (#3589). Pebble stands in for production, so the test waits for
+// certmagic's first retry interval.
+func TestACMERetryStaysOnConfiguredCA(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits for certmagic's first retry interval")
+	}
+
+	acme := startTestACME(t, freePort(t), freePort(t))
+
+	var stagingHits atomic.Int32
+
+	staging := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		stagingHits.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(staging.Close)
+
+	prevCA, prevTestCA := certmagic.DefaultACME.CA, certmagic.DefaultACME.TestCA
+	certmagic.DefaultACME.CA, certmagic.DefaultACME.TestCA = acme.directory, staging.URL
+
+	t.Cleanup(func() { certmagic.DefaultACME.CA, certmagic.DefaultACME.TestCA = prevCA, prevTestCA })
+
+	// The CA resolves TXT from acme.provider, so records published here are
+	// never seen and every validation fails, like a mistyped DNS delegation.
+	published := &dnstest.Provider{}
+
+	h := &Headscale{cfg: &types.Config{
+		ServerURL: "https://" + acmeTestHost,
+		Addr:      types.ListenAddr(net.JoinHostPort("127.0.0.1", strconv.Itoa(freePort(t)))),
+		TLS: types.TLSConfig{ACME: types.ACMEConfig{
+			Hostname:      acmeTestHost,
+			ChallengeType: types.DNS01ChallengeType,
+			URL:           types.HTTPURL(acme.directory),
+			CacheDir:      t.TempDir(),
+		}},
+		DNSConfig: types.DNSConfig{Challenge: types.DNSChallengeConfig{
+			Provider:  published,
+			Resolvers: []string{acme.resolver},
+		}},
+	}}
+
+	bundle, err := h.getTLSSettings(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(bundle.Stop)
+
+	require.NoError(t, bundle.Manage(t.Context()))
+
+	attempts := func() int {
+		n := 0
+
+		for _, c := range published.Calls() {
+			if c.Method == "append" {
+				n++
+			}
+		}
+
+		return n
+	}
+
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.True(c, attempts() >= 2 || stagingHits.Load() > 0)
+	}, 2*time.Minute, time.Second, "certmagic should retry the failed issuance")
+
+	assert.Zero(t, stagingHits.Load(), "retry must not leave tls.acme.url")
+	assert.GreaterOrEqual(t, attempts(), 2, "retry must reach tls.acme.url")
+}
+
+// testKeypair returns a new certificate as DER, and as PEM with its key.
+func testKeypair(t *testing.T, notBefore, notAfter time.Time) ([]byte, []byte, []byte) {
+	t.Helper()
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: notBefore, NotAfter: notAfter}
+
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	require.NoError(t, err)
+
+	keyDER, err := x509.MarshalPKCS8PrivateKey(priv)
+	require.NoError(t, err)
+
+	return der,
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+}
+
+// servedCertificate returns the certificate a new connection gets.
+func servedCertificate(t *testing.T, cfg *tls.Config, serverName string) []byte {
+	t.Helper()
+
+	clientEnd, serverEnd := net.Pipe()
+
+	defer clientEnd.Close()
+	defer serverEnd.Close()
+
+	go func() { _ = tls.Server(serverEnd, cfg).HandshakeContext(t.Context()) }()
+
+	client := tls.Client(clientEnd, &tls.Config{ServerName: serverName, InsecureSkipVerify: true}) //nolint:gosec // reads the served certificate, trusts nothing
+	require.NoError(t, client.HandshakeContext(t.Context()))
+
+	return client.ConnectionState().PeerCertificates[0].Raw
+}
+
+func TestStaticTLSReload(t *testing.T) {
+	dir := t.TempDir()
+	certPath, keyPath := filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")
+
+	write := func(t *testing.T, certPEM, keyPEM []byte) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(certPath, certPEM, 0o600))
+		require.NoError(t, os.WriteFile(keyPath, keyPEM, 0o600))
+	}
+
+	now := time.Now()
+	derA, certA, keyA := testKeypair(t, now.Add(-time.Hour), now.Add(time.Hour))
+	derB, certB, keyB := testKeypair(t, now.Add(-time.Hour), now.Add(time.Hour))
+	_, certExpired, keyExpired := testKeypair(t, now.Add(-2*time.Hour), now.Add(-time.Hour))
+	_, certFuture, keyFuture := testKeypair(t, now.Add(time.Hour), now.Add(2*time.Hour))
+
+	write(t, certA, keyA)
+
+	h := &Headscale{cfg: &types.Config{TLS: types.TLSConfig{CertPath: certPath, KeyPath: keyPath}}}
+
+	bundle, err := h.getTLSSettings(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, bundle.Reload)
+
+	// A client without SNI is the one case where crypto/tls prefers a static
+	// Certificates entry over GetCertificate.
+	assertServed := func(t *testing.T, want []byte) {
+		t.Helper()
+
+		for _, serverName := range []string{"", "headscale.example.com"} {
+			assert.Equal(t, want, servedCertificate(t, bundle.Config, serverName), "SNI %q", serverName)
+		}
+	}
+
+	assertServed(t, derA)
+
+	write(t, certB, keyB)
+	require.NoError(t, bundle.Reload())
+	assertServed(t, derB)
+
+	for name, pair := range map[string][2][]byte{
+		"garbage":       {[]byte("garbage"), []byte("garbage")},
+		"mismatched":    {certA, keyB},
+		"expired":       {certExpired, keyExpired},
+		"not yet valid": {certFuture, keyFuture},
+	} {
+		t.Run(name, func(t *testing.T) {
+			write(t, pair[0], pair[1])
+			require.ErrorContains(t, bundle.Reload(), certPath, "the operator must see which file failed")
+			assertServed(t, derB)
+		})
+	}
+
+	// Meaningful under -race, which the gorace check runs on this package.
+	write(t, certA, keyA)
+
+	var wg sync.WaitGroup
+
+	wg.Go(func() {
+		for range 20 {
+			assert.NoError(t, bundle.Reload())
+		}
+	})
+
+	for range 20 {
+		servedCertificate(t, bundle.Config, "")
+	}
+
+	wg.Wait()
+}
+
+// Expiry only blocks a reload: refusing to start would also take down the
+// CLI socket, the tool an operator needs to recover.
+func TestStaticTLSExpiredAtStartup(t *testing.T) {
+	dir := t.TempDir()
+	certPath, keyPath := filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")
+
+	now := time.Now()
+	der, certPEM, keyPEM := testKeypair(t, now.Add(-2*time.Hour), now.Add(-time.Hour))
+	require.NoError(t, os.WriteFile(certPath, certPEM, 0o600))
+	require.NoError(t, os.WriteFile(keyPath, keyPEM, 0o600))
+
+	h := &Headscale{cfg: &types.Config{TLS: types.TLSConfig{CertPath: certPath, KeyPath: keyPath}}}
+
+	bundle, err := h.getTLSSettings(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, der, servedCertificate(t, bundle.Config, ""))
+}
+
+func TestStaticTLSLoadErrorNamesConfigKeys(t *testing.T) {
+	h := &Headscale{cfg: &types.Config{TLS: types.TLSConfig{CertPath: "/nonexistent/cert", KeyPath: "/nonexistent/key"}}}
+
+	_, err := h.getTLSSettings(t.Context())
+	require.ErrorContains(t, err, "tls.cert_path")
+	require.ErrorContains(t, err, "tls.key_path")
+}
+
+func TestPlainHTTPHasNoTLSReload(t *testing.T) {
+	h := &Headscale{cfg: &types.Config{ServerURL: "http://headscale.example.com"}}
+
+	bundle, err := h.getTLSSettings(t.Context())
+	require.NoError(t, err)
+	assert.Nil(t, bundle.Reload)
 }

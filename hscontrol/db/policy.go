@@ -5,24 +5,32 @@ import (
 	"os"
 
 	"github.com/blackhiden/headscale/hscontrol/types"
-	"github.com/blackhiden/headscale/hscontrol/util"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-// SetPolicy sets the policy in the database.
+// SetPolicy replaces the policy in the database. Only the newest row is
+// ever read, so older ones are removed rather than kept as history.
 func (hsdb *HSDatabase) SetPolicy(policy string) (*types.Policy, error) {
-	// Create a new policy.
-	p := types.Policy{
-		Data: policy,
-	}
+	return Write(hsdb.DB, func(tx *gorm.DB) (*types.Policy, error) {
+		p := types.Policy{
+			Data: policy,
+		}
 
-	err := hsdb.DB.Clauses(clause.Returning{}).Create(&p).Error
-	if err != nil {
-		return nil, err
-	}
+		err := tx.Clauses(clause.Returning{}).Create(&p).Error
+		if err != nil {
+			return nil, err
+		}
 
-	return &p, nil
+		// Unscoped: a soft delete would keep the data. Deleting by id
+		// never removes a newer row from a concurrent writer.
+		err = tx.Unscoped().Where("id < ?", p.ID).Delete(&types.Policy{}).Error
+		if err != nil {
+			return nil, err
+		}
+
+		return &p, nil
+	})
 }
 
 // GetPolicy returns the latest policy in the database.
@@ -67,7 +75,7 @@ func PolicyBytes(tx *gorm.DB, cfg *types.Config) ([]byte, error) {
 			return nil, nil
 		}
 
-		absPath := util.AbsolutePathFromConfigPath(path)
+		absPath := cfg.AbsPath(path)
 
 		return os.ReadFile(absPath)
 

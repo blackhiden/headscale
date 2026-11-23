@@ -8,19 +8,18 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
 	"github.com/blackhiden/headscale/hscontrol/state"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
-	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/types/dnstype"
 	"tailscale.com/types/views"
 )
@@ -70,7 +69,7 @@ func generateUserProfiles(
 	node types.NodeView,
 	peers views.Slice[types.NodeView],
 ) []tailcfg.UserProfile {
-	userMap := make(map[uint]*types.UserView)
+	userMap := make(map[uint]types.UserView)
 
 	user := node.Owner()
 	if !user.Valid() {
@@ -81,7 +80,7 @@ func generateUserProfiles(
 		return nil
 	}
 
-	userMap[user.Model().ID] = &user
+	userMap[user.Model().ID] = user
 
 	for _, peer := range peers.All() {
 		peerUser := peer.Owner()
@@ -89,7 +88,7 @@ func generateUserProfiles(
 			continue
 		}
 
-		userMap[peerUser.Model().ID] = &peerUser
+		userMap[peerUser.Model().ID] = peerUser
 	}
 
 	var profiles []tailcfg.UserProfile
@@ -101,30 +100,12 @@ func generateUserProfiles(
 	return profiles
 }
 
-// nextDNSAttrPrefix is the form Tailscale uses for per-node NextDNS profile
-// selection: an "attr" entry of "nextdns:<profile-id>" overrides the resolver
-// path, and "nextdns:no-device-info" suppresses the metadata-appending step.
-// See https://tailscale.com/docs/integrations/nextdns.
-const (
-	nextDNSAttrPrefix             = "nextdns:"
-	nextDNSAttrNoInfo nodecap.Cap = "nextdns:no-device-info"
-)
-
-// nextDNSProfileRE bounds the characters accepted in a `nextdns:<profile>`
-// suffix. NextDNS profile IDs are short alphanumeric strings; restricting
-// to that charset prevents a policy author from injecting `?`, `/`, `@`,
-// or `..` into the resolver URL via a crafted cap name.
-var nextDNSProfileRE = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
-
 func generateDNSConfig(
 	cfg *types.Config,
 	node types.NodeView,
 	capMap tailcfg.NodeCapMap,
 ) *tailcfg.DNSConfig {
 	dnsConfig := cfg.CloneTailcfgDNSConfig()
-	if dnsConfig == nil {
-		return nil
-	}
 
 	profile := nextDNSProfileFromCapMap(capMap)
 	if profile != "" {
@@ -137,7 +118,7 @@ func generateDNSConfig(
 		}
 	}
 
-	if _, suppressMetadata := capMap[nextDNSAttrNoInfo]; !suppressMetadata {
+	if _, suppressMetadata := capMap[policyv2.NextDNSAttrNoInfo]; !suppressMetadata {
 		addNextDNSMetadata(dnsConfig.Resolvers, node)
 		addNextDNSMetadata(dnsConfig.FallbackResolvers, node)
 
@@ -149,6 +130,16 @@ func generateDNSConfig(
 
 	if domain, ok := node.CertDomain(cfg); ok {
 		dnsConfig.CertDomains = []string{domain}
+	}
+
+	// An exit node refuses to proxy these names. Without this, where its OS
+	// resolver reaches MagicDNS, a client allowed only to use the exit node can
+	// read its view of the tailnet through it. Two gaps are deliberate. Without
+	// MagicDNS, base_domain can be a public domain whose names clients ask the
+	// exit node for, so node names stay readable. Reverse lookups stay open, as
+	// on Tailscale SaaS.
+	if dnsConfig.Proxied && cfg.DNSConfig.BaseDomain != "" {
+		dnsConfig.ExitNodeFilteredSet = []string{"." + strings.ToLower(cfg.DNSConfig.BaseDomain)}
 	}
 
 	return dnsConfig
@@ -165,7 +156,7 @@ func generateDNSConfig(
 // order in Go is randomised, so taking the literal first match would
 // cause the chosen profile to flip between reloads when a node has
 // multiple `nextdns:` caps. The profile string is also validated
-// against [nextDNSProfileRE] so a crafted cap cannot inject path or
+// against [policyv2.NextDNSProfileRE] so a crafted cap cannot inject path or
 // query characters into the resolver URL.
 func nextDNSProfileFromCapMap(capMap tailcfg.NodeCapMap) string {
 	if len(capMap) == 0 {
@@ -174,21 +165,19 @@ func nextDNSProfileFromCapMap(capMap tailcfg.NodeCapMap) string {
 
 	candidates := make([]string, 0, len(capMap))
 
-	for cap := range capMap {
-		if cap == nextDNSAttrNoInfo {
+	for attr := range capMap {
+		if attr == policyv2.NextDNSAttrNoInfo {
 			continue
 		}
 
-		profile, ok := strings.CutPrefix(string(cap), nextDNSAttrPrefix)
+		profile, ok := strings.CutPrefix(string(attr), policyv2.NextDNSAttrPrefix)
 		if !ok || profile == "" {
 			continue
 		}
 
-		if !nextDNSProfileRE.MatchString(profile) {
-			log.Warn().
-				Str("cap", string(cap)).
-				Msg("nextdns profile rejected: must match [A-Za-z0-9._-]{1,64}")
-
+		// Skipped in silence: the policy warns once when it loads, and this
+		// check guards the URL splice.
+		if !policyv2.NextDNSProfileRE.MatchString(profile) {
 			continue
 		}
 
@@ -244,6 +233,7 @@ func addNextDNSMetadata(resolvers []*dnstype.Resolver, node types.NodeView) {
 		}
 
 		q := u.Query()
+		q.Set("device_id", string(node.ID().StableID()))
 		q.Set("device_name", node.Hostname())
 
 		// Guard Hostinfo().Valid() before dereferencing OS(): a node loaded
@@ -401,9 +391,13 @@ func (m *mapper) buildFromChange(
 		builder.WithPeers(peers)
 	} else {
 		if len(resp.PeersChanged) > 0 {
-			peers := m.state.ListPeers(nodeID, resp.PeersChanged...)
-			builder.WithUserProfiles(peers)
-			builder.WithPeerChanges(peers)
+			// Visibility may leave none of the changed peers for this
+			// recipient; the profiles would then carry only its own
+			// user, which it already holds.
+			if peers := m.state.ListPeers(nodeID, resp.PeersChanged...); peers.Len() > 0 {
+				builder.WithUserProfiles(peers)
+				builder.WithPeerChanges(peers)
+			}
 		}
 
 		if len(resp.PeersRemoved) > 0 {

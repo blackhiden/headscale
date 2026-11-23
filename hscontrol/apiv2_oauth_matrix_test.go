@@ -52,12 +52,18 @@ func apiReq(t *testing.T, method, target, bearer string, body any) (int, []byte)
 }
 
 // scopeDenied reports whether a response is a scope-enforcement denial. The scope
-// gate runs in the middleware before the handler, so a denial is exactly a 403
-// carrying this message; any other status (200, or a 400/404 from the handler on
-// minimal input) means the request passed the scope gate.
+// gate runs in the middleware before the handler and answers as Tailscale: 403
+// when the token holds the read half of a write scope, otherwise 404 "not
+// found". Any other answer means the request passed the scope gate.
 func scopeDenied(status int, body []byte) bool {
-	return status == http.StatusForbidden &&
-		strings.Contains(string(body), "missing the required scope")
+	switch status {
+	case http.StatusForbidden:
+		return strings.Contains(string(body), "calling actor does not have enough permissions")
+	case http.StatusNotFound:
+		return strings.Contains(string(body), `"message":"not found"`)
+	}
+
+	return false
 }
 
 // mintScopedToken creates an OAuth client holding exactly scope s (tagged tag:ci so
@@ -114,14 +120,18 @@ func TestAPIv2OAuthMatrix_Enforcement(t *testing.T) {
 
 	ops := []matrixOp{
 		{"getDevice", http.MethodGet, "/api/v2/device/1", scope.DevicesCoreRead, nil, false},
+		{"getDevicePostureAttributes", http.MethodGet, "/api/v2/device/1/attributes", scope.DevicesPostureAttributesRead, nil, false},
 		{"listDevices", http.MethodGet, "/api/v2/tailnet/-/devices", scope.DevicesCoreRead, nil, false},
 		{"deleteDevice", http.MethodDelete, "/api/v2/device/1", scope.DevicesCore, nil, false},
 		{"authorizeDevice", http.MethodPost, "/api/v2/device/1/authorized", scope.DevicesCore, map[string]any{}, false},
+		{"expireDevice", http.MethodPost, "/api/v2/device/1/expire", scope.DevicesCore, map[string]any{}, false},
 		{"setDeviceName", http.MethodPost, "/api/v2/device/1/name", scope.DevicesCore, map[string]any{}, false},
 		{"setDeviceTags", http.MethodPost, "/api/v2/device/1/tags", scope.DevicesCore, map[string]any{}, false},
 		{"setDeviceKey", http.MethodPost, "/api/v2/device/1/key", scope.DevicesCore, map[string]any{}, false},
+		{"updateDeviceClient", http.MethodPost, "/api/v2/device/1/update-client", scope.DevicesCore, nil, false},
 		{"setDeviceRoutes", http.MethodPost, "/api/v2/device/1/routes", scope.DevicesRoutes, map[string]any{}, false},
 		{"getDeviceRoutes", http.MethodGet, "/api/v2/device/1/routes", scope.DevicesRoutesRead, nil, false},
+		{"getDeviceUpdateStatus", http.MethodGet, "/api/v2/device/1/update-status", scope.DevicesCoreRead, nil, false},
 		{"getACL", http.MethodGet, "/api/v2/tailnet/-/acl", scope.PolicyFileRead, nil, false},
 		{"setACL", http.MethodPost, "/api/v2/tailnet/-/acl", scope.PolicyFile, map[string]any{}, false},
 		{"getSettings", http.MethodGet, "/api/v2/tailnet/-/settings", scope.FeatureSettingsRead, nil, false},
@@ -142,9 +152,8 @@ func TestAPIv2OAuthMatrix_Enforcement(t *testing.T) {
 
 			wantDenied := !scope.Grants([]scope.Scope{s}, op.need)
 
-			// A multiplexed keys op denies via uniform not-found (no existence
-			// oracle), so denial is "resource not returned"; every other op
-			// denies with the middleware's scope-403.
+			// A multiplexed keys op denies in its handler, so denial is
+			// "resource not returned"; every other op denies in the middleware.
 			denied := scopeDenied(status, body)
 			if op.multiplexed {
 				denied = status != http.StatusOK
@@ -153,6 +162,15 @@ func TestAPIv2OAuthMatrix_Enforcement(t *testing.T) {
 			assert.Equalf(t, wantDenied, denied,
 				"op %s with scope %q (needs %q): status=%d body=%s",
 				op.name, s, op.need, status, body)
+
+			if wantDenied && !op.multiplexed {
+				wantStatus := http.StatusNotFound
+				if op.need.IsWrite() && scope.Grants([]scope.Scope{s}, op.need+":read") {
+					wantStatus = http.StatusForbidden
+				}
+
+				assert.Equalf(t, wantStatus, status, "op %s with scope %q: body=%s", op.name, s, body)
+			}
 		}
 	}
 }
@@ -181,9 +199,30 @@ func TestAPIv2OAuthMatrix_ScopeNarrowing(t *testing.T) {
 	}
 }
 
+// TestAPIv2OAuthMatrix_CreateKeyScopeBeforeBody: createKey declares no static
+// scope, so a token that may create neither kind of key must be refused before
+// huma reads and validates the body.
+func TestAPIv2OAuthMatrix_CreateKeyScopeBeforeBody(t *testing.T) {
+	_, baseURL, admin := newOAuthTestServer(t)
+	invalid := map[string]any{"tags": []int{0}}
+
+	for _, s := range scope.Known() {
+		held := []scope.Scope{s}
+		mayCreate := scope.Grants(held, scope.AuthKeys) || scope.Grants(held, scope.OAuthKeys)
+
+		status, body := apiReq(t, http.MethodPost, baseURL+"/api/v2/tailnet/-/keys",
+			mintScopedToken(t, baseURL, admin, s), invalid)
+		if mayCreate {
+			assert.Equalf(t, http.StatusUnprocessableEntity, status, "%s: %s", s, body)
+		} else {
+			assert.Truef(t, scopeDenied(status, body), "%s: %d %s", s, status, body)
+		}
+	}
+}
+
 // TestAPIv2OAuthMatrix_TagNarrowing proves P1 for tags at mint time: a client may
 // only mint a token for tags within its grant (closing the /oauth/token tags-param
-// path). A client with the "all" scope may request any tag.
+// path). Only an untagged client with the "all" scope may request any tag.
 func TestAPIv2OAuthMatrix_TagNarrowing(t *testing.T) {
 	_, baseURL, admin := newOAuthTestServer(t)
 
@@ -202,10 +241,15 @@ func TestAPIv2OAuthMatrix_TagNarrowing(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, st, mm)
 	assert.Equal(t, "invalid_target", mm["error"])
 
-	// An all-scope client may request any tag.
+	// A tagged all-scope client stays inside its tags; an untagged one may
+	// request any tag.
 	_, allSecret := createClient(t, baseURL, admin, []string{"all"}, []string{"tag:a"})
 	stAll, mAll := mintTokenWithTags(t, baseURL, allSecret, "tag:anything")
-	assert.Equalf(t, http.StatusOK, stAll, "all-scope client may assign any tag: %v", mAll)
+	assert.Equalf(t, http.StatusBadRequest, stAll, "tagged all-scope client: %v", mAll)
+
+	_, anySecret := createClient(t, baseURL, admin, []string{"all"}, nil)
+	stAny, mAny := mintTokenWithTags(t, baseURL, anySecret, "tag:anything")
+	assert.Equalf(t, http.StatusOK, stAny, "untagged all-scope client may assign any tag: %v", mAny)
 }
 
 // TestAPIv2OAuthMatrix_Lifecycle proves expired and revoked credentials are denied

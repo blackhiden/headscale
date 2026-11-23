@@ -61,6 +61,7 @@ CREATE TABLE credentials(
   created_at datetime,
   expiration datetime,
   revoked datetime,
+  created_by_token numeric DEFAULT false,
 
   CONSTRAINT fk_credentials_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_credentials_hash CHECK(hash IS NOT NULL OR revoked IS NOT NULL),
@@ -79,6 +80,7 @@ CREATE TABLE nodes(
   host_info text,
   ipv4 text,
   ipv6 text,
+  last_control_address text,
   hostname text,
   given_name varchar(63),
   -- user_id is NULL for tagged nodes (owned by tags, not a user).
@@ -87,9 +89,12 @@ CREATE TABLE nodes(
   register_method text,
   tags text,
   auth_key_id integer,
+  ephemeral numeric DEFAULT false,
   last_seen datetime,
   expiry datetime,
+  key_expiry_disabled numeric DEFAULT false,
   approved_routes text,
+  auto_approved_routes text,
 
   created_at datetime,
   updated_at datetime,

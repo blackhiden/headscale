@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/blackhiden/headscale/hscontrol/capver"
 	"github.com/blackhiden/headscale/hscontrol/dns"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
@@ -160,8 +162,6 @@ func (h *Headscale) NoiseUpgradeHandler(
 	r.Use(middleware.RequestLogger(&zerologRequestLogger{}))
 	r.Use(middleware.Recoverer)
 
-	r.Handle("/metrics", metrics.Handler())
-
 	r.Route("/machine", func(r chi.Router) {
 		r.Post("/register", ns.RegistrationHandler)
 		r.Post("/map", ns.PollNetMapHandler)
@@ -199,18 +199,34 @@ func (h *Headscale) NoiseUpgradeHandler(
 		r.Route("/webclient", func(r chi.Router) {})
 
 		r.Post("/c2n", ns.NotImplementedHandler)
+
+		// c2n response endpoint: receives the HTTP response a node produced for a
+		// c2n [tailcfg.PingRequest]. Only the target node's Noise session may answer.
+		r.Post("/c2n-response", ns.C2NResponseHandler)
 	})
 
+	// Serve returns once the listener is drained; the connection outlives it.
+	_ = newNoiseHTTPServer(r, types.HTTPTimeout).
+		Serve(netutil.NewOneConnListener(noiseConn, nil))
+}
+
+// newNoiseHTTPServer builds the server for one Noise tunnel. The hijack drops
+// the outer server's deadlines and any machine key gets a tunnel, so this is
+// where a stalled request body (ReadTimeout) and a tunnel with no open stream
+// (IdleTimeout) are bounded. WriteTimeout stays unset: it would cut long polls
+// and a set-dns waiting for its record to propagate.
+func newNoiseHTTPServer(handler http.Handler, timeout time.Duration) *http.Server {
 	srv := &http.Server{
-		Handler:           r,
-		ReadHeaderTimeout: types.HTTPTimeout,
+		Handler:           handler,
+		ReadHeaderTimeout: timeout,
+		ReadTimeout:       timeout,
+		IdleTimeout:       timeout,
 		Protocols:         new(http.Protocols),
 	}
 	// Noise already encrypts, so HTTP/2 runs without TLS.
 	srv.Protocols.SetUnencryptedHTTP2(true)
 
-	// Serve returns once the listener is drained; the connection outlives it.
-	_ = srv.Serve(netutil.NewOneConnListener(noiseConn, nil))
+	return srv
 }
 
 func unsupportedClientError(version tailcfg.CapabilityVersion) error {
@@ -300,6 +316,63 @@ func overrideRemoteAddr(addr string) func(http.Handler) http.Handler {
 func (ns *noiseServer) NotImplementedHandler(writer http.ResponseWriter, req *http.Request) {
 	log.Trace().Caller().Str("path", req.URL.String()).Msg("not implemented handler hit")
 	http.Error(writer, "Not implemented yet", http.StatusNotImplemented)
+}
+
+// maxC2NResponseBytes bounds the c2n response body a node may send. The
+// responses headscale asks for are small JSON documents.
+const maxC2NResponseBytes = 64 << 10
+
+// C2NResponseHandler handles the POST a node makes with the HTTP response
+// to a c2n [tailcfg.PingRequest]. The c2n ID is unguessable, and the
+// response is only accepted over the Noise session of the node the
+// request was sent to.
+func (ns *noiseServer) C2NResponseHandler(
+	writer http.ResponseWriter,
+	req *http.Request,
+) {
+	c2nID := req.URL.Query().Get("id")
+	if c2nID == "" {
+		http.Error(writer, "missing c2n ID", http.StatusBadRequest)
+		return
+	}
+
+	nodeID, ok := ns.headscale.state.C2NTarget(c2nID)
+	if !ok {
+		http.Error(writer, "unknown or expired c2n request", http.StatusNotFound)
+		return
+	}
+
+	nv, ok := ns.headscale.state.GetNodeByID(nodeID)
+	if !ok {
+		httpError(writer, NewHTTPError(http.StatusNotFound, "node not found", nil))
+		return
+	}
+
+	err := machineKeyMismatch(nv, ns.machineKey)
+	if err != nil {
+		httpError(writer, err)
+		return
+	}
+
+	body, err := io.ReadAll(http.MaxBytesReader(writer, req.Body, maxC2NResponseBytes))
+	if err != nil {
+		status := http.StatusBadRequest
+
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			status = http.StatusRequestEntityTooLarge
+		}
+
+		httpError(writer, NewHTTPError(status, "reading c2n response", err))
+
+		return
+	}
+
+	if !ns.headscale.state.CompleteC2N(c2nID, body) {
+		http.Error(writer, "unknown or expired c2n request", http.StatusNotFound)
+		return
+	}
+
+	writer.WriteHeader(http.StatusNoContent)
 }
 
 // PingResponseHandler handles HEAD requests from clients responding to a
@@ -413,7 +486,7 @@ func (ns *noiseServer) SSHActionHandler(
 	reqLog := log.With().
 		Uint64("src_node_id", srcNodeID.Uint64()).
 		Uint64("dst_node_id", dstNodeID.Uint64()).
-		Str("local_user", req.URL.Query().Get("local_user")).
+		Str(zf.LocalUser, clipForLog(req.URL.Query().Get("local_user"))).
 		Logger()
 
 	reqLog.Trace().Caller().Msg("SSH action request")
@@ -554,10 +627,13 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 		)
 	}
 
-	ns.headscale.state.SetAuthCacheEntry(
+	err = ns.headscale.state.SetAuthCacheEntry(
 		authID,
 		types.NewSSHCheckAuthRequest(srcNodeID, dstNodeID),
 	)
+	if err != nil {
+		return nil, authAdmissionError(err)
+	}
 
 	authURL := ns.headscale.authProvider.AuthURL(authID)
 
@@ -587,8 +663,9 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 }
 
 // sshActionFollowUp handles follow-up requests where the client
-// provides an auth_id. It blocks until the auth session resolves or
-// the request context is cancelled (e.g. the client disconnects).
+// provides an auth_id. It blocks until the auth session resolves, the
+// request context is cancelled (e.g. the client disconnects), or a newer
+// follow-up parks on the session.
 func (ns *noiseServer) sshActionFollowUp(
 	ctx context.Context,
 	reqLog zerolog.Logger,
@@ -652,6 +729,8 @@ func (ns *noiseServer) sshActionFollowUp(
 
 	reqLog.Trace().Caller().Msg("SSH action follow-up")
 
+	superseded := auth.Park()
+
 	var (
 		verdict   types.AuthVerdict
 		verdictOK bool
@@ -669,8 +748,14 @@ func (ns *noiseServer) sshActionFollowUp(
 			"ssh action follow-up cancelled",
 			ctx.Err(),
 		)
+	case <-superseded:
+		// The newer request collects the verdict; this one re-delegates, as
+		// it would on a consumed verdict, without waiting for it.
+		return sessionGone("SSH check follow-up superseded; re-delegating")
 	case verdict, verdictOK = <-auth.WaitForAuth():
 	}
+
+	ns.headscale.state.DeleteAuthCacheEntry(authID)
 
 	// FinishAuth buffers one verdict, then closes the channel. A closed
 	// receive yields the zero verdict, which Accept() reports as success,
@@ -733,41 +818,56 @@ func (ns *noiseServer) PollNetMapHandler(
 
 	nv, err := ns.getAndValidateNode(mapRequest)
 	if err != nil {
-		// The node is gone, but the client does not know that. Tailscale
-		// clients treat every non-200 on the map path the same way and retry
-		// forever with loggedIn still set; only a self node whose KeyExpiry is
-		// in the past drives them to NeedsLogin. There is no MapResponse field
-		// that says "deleted", so reuse the expiry signal headscale already
-		// sends for expired nodes.
-		// See: https://github.com/blackhiden/headscale/issues/3410
-		if errors.Is(err, errNodeNotInStore) && mapRequest.Stream {
-			expired := &tailcfg.MapResponse{
-				Node: &tailcfg.Node{
-					Key: mapRequest.NodeKey,
-					// Zero means that the key does not expire. Use a fixed,
-					// ancient non-zero value so this remains expired even when
-					// the client's clock is substantially behind the server.
-					KeyExpiry: time.Unix(1, 0).UTC(),
-					Expired:   true,
-				},
-				// This frame opens the stream in place of the initial map.
-				Debug: ns.headscale.cfg.TailcfgDebug(),
-			}
-
-			err = writeMapResponse(writer, mapRequest.Compress, true, expired)
-			if err != nil {
-				log.Error().Caller().Err(err).Msg("noise map handler: failed to write expired response for deleted node")
-			}
-
-			return
-		}
-
+		// A deleted node gets a bare 404, as Tailscale's control server sends;
+		// clients since 1.106 read it as removal and go to NeedsLogin. Do not
+		// answer with a netmap: clients reset their map backoff on every netmap,
+		// so one followed by the end of the stream is retried within
+		// milliseconds, forever.
+		// See: https://github.com/blackhiden/headscale/issues/3688
 		httpError(writer, err)
 
 		return
 	}
 
-	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv.AsStruct())
+	// Keep preferred endpoints first; clients retry rejected reports unchanged.
+	count := min(len(mapRequest.Endpoints), types.MaxEndpoints)
+	mapRequest.Endpoints = slices.Clone(mapRequest.Endpoints[:count])
+
+	mapRequest.EndpointTypes = slices.Clone(mapRequest.EndpointTypes[:min(len(mapRequest.EndpointTypes), types.MaxEndpoints)])
+	for _, endpoint := range mapRequest.Endpoints {
+		if endpoint.Addr().Zone() != "" {
+			httpError(writer, NewHTTPError(http.StatusBadRequest, "endpoint must not include an IPv6 zone", nil))
+			return
+		}
+	}
+
+	if hi := mapRequest.Hostinfo; hi != nil {
+		if len(hi.RoutableIPs) > types.MaxRoutableIPs {
+			log.Warn().Uint64(zf.NodeID, uint64(nv.ID())).Int(zf.RoutableIPCount, len(hi.RoutableIPs)).
+				Msgf("client announced too many routes, keeping the first %d", types.MaxRoutableIPs)
+			hi.RoutableIPs = hi.RoutableIPs[:types.MaxRoutableIPs]
+		}
+
+		if hi.NetInfo != nil {
+			// Latency measurements are not used by the control server.
+			hi.NetInfo.DERPLatency = nil
+		}
+	}
+
+	// Reject before the session, the node or its peers keep the report.
+	err = types.ValidateHostinfo(mapRequest.Hostinfo)
+	if err != nil {
+		httpError(writer, NewHTTPError(http.StatusRequestEntityTooLarge, err.Error(), err))
+		return
+	}
+
+	// A repeated JSON key can leave a short slice backed by a larger array.
+	mapRequest.Hostinfo = mapRequest.Hostinfo.Clone()
+	mapRequest.DebugFlags = nil
+
+	ns.recordLastControlAddress(nv, req.RemoteAddr)
+
+	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv)
 	sess.log.Trace().Caller().Msg("a node sending a MapRequest with Noise protocol")
 
 	if !sess.isStreaming() {
@@ -809,7 +909,7 @@ func (ns *noiseServer) SetDNSHandler(writer http.ResponseWriter, req *http.Reque
 
 	nv, ok := ns.headscale.state.GetNodeByNodeKey(setDNS.NodeKey)
 	if !ok {
-		httpError(writer, NewHTTPError(http.StatusNotFound, "node not found", errNodeNotInStore))
+		httpError(writer, NewHTTPError(http.StatusNotFound, "node not found", nil))
 
 		return
 	}
@@ -908,6 +1008,39 @@ func (ns *noiseServer) RegistrationHandler(
 	var registerRequest tailcfg.RegisterRequest
 
 	decodeErr := json.NewDecoder(req.Body).Decode(&registerRequest)
+	if decodeErr == nil {
+		if registerRequest.Followup != "" {
+			// Keep only fields used by logout checks or a refreshed registration.
+			var auth *tailcfg.RegisterResponseAuth
+			if registerRequest.Auth != nil {
+				auth = &tailcfg.RegisterResponseAuth{}
+			}
+
+			registerRequest = tailcfg.RegisterRequest{
+				Version: registerRequest.Version, NodeKey: registerRequest.NodeKey,
+				Followup: registerRequest.Followup, Expiry: registerRequest.Expiry,
+				Auth: auth, Hostinfo: registrationDataFromRequest(registerRequest, ns.machineKey).Hostinfo,
+			}
+		}
+
+		if hi := registerRequest.Hostinfo; hi != nil {
+			if len(hi.RoutableIPs) > types.MaxRoutableIPs {
+				log.Warn().Str(zf.MachineKey, ns.machineKey.ShortString()).
+					Int(zf.RoutableIPCount, len(hi.RoutableIPs)).
+					Msgf("client announced too many routes, keeping the first %d", types.MaxRoutableIPs)
+				hi.RoutableIPs = hi.RoutableIPs[:types.MaxRoutableIPs]
+			}
+
+			if hi.NetInfo != nil {
+				hi.NetInfo.DERPLatency = nil
+			}
+		}
+	}
+
+	// Reject before a pending registration, a waiting follow-up or the node keeps it.
+	if decodeErr == nil {
+		decodeErr = types.ValidateHostinfo(registerRequest.Hostinfo)
+	}
 
 	// The floor must be enforced before handleRegister: a logout, pre-auth
 	// key use or auth-cache write it performs is not undone by a later 400.
@@ -916,14 +1049,35 @@ func (ns *noiseServer) RegistrationHandler(
 		return
 	}
 
+	statusCode := http.StatusOK
 	registerResponse := func() *tailcfg.RegisterResponse { //nolint:contextcheck
 		if decodeErr != nil {
 			return regErr(decodeErr)
 		}
 
+		// A waiting follow-up must not retain the decoder's excess slice capacity.
+		registerRequest.Hostinfo = registerRequest.Hostinfo.Clone()
+
 		resp, err := ns.headscale.handleRegister(req.Context(), registerRequest, ns.machineKey)
 		if err != nil {
+			// The client only retries, so this is the operator's one sign of a refused node.
+			e := log.Warn().Err(err).
+				Str(zf.MachineKey, ns.machineKey.ShortString()).
+				Str(zf.NodeKey, registerRequest.NodeKey.ShortString())
+			if registerRequest.Hostinfo != nil {
+				e = e.Str(zf.Hostname, registerRequest.Hostinfo.Hostname)
+			}
+
+			e.Msg("registration refused")
+
 			if httpErr, ok := errors.AsType[HTTPError](err); ok {
+				// Keep permanent errors in HTTP 200 so controlclient surfaces RegisterResponse.Error.
+				if httpErr.Code == http.StatusServiceUnavailable {
+					statusCode = http.StatusServiceUnavailable
+
+					writer.Header().Set("Retry-After", "10")
+				}
+
 				return &tailcfg.RegisterResponse{
 					Error: httpErr.Msg,
 				}
@@ -936,7 +1090,7 @@ func (ns *noiseServer) RegistrationHandler(
 	}()
 
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-	writer.WriteHeader(http.StatusOK)
+	writer.WriteHeader(statusCode)
 
 	err := json.NewEncoder(writer).Encode(registerResponse)
 	if err != nil {
@@ -950,17 +1104,14 @@ func (ns *noiseServer) RegistrationHandler(
 	}
 }
 
-// errNodeNotInStore distinguishes an unknown NodeKey from a NodeKey presented
-// by the wrong machine key. Both are answered with 404, but only the former
-// means the node is gone and its client should re-authenticate.
-var errNodeNotInStore = errors.New("node not found")
-
 // getAndValidateNode retrieves the node from the in-memory NodeStore using the
 // NodeKey and validates that it matches the MachineKey from the Noise session.
+// Its 404s end a client's session: clients read a map 404 as removal from the
+// tailnet, so a node that still exists must never be answered with one.
 func (ns *noiseServer) getAndValidateNode(mapRequest tailcfg.MapRequest) (types.NodeView, error) {
 	nv, ok := ns.headscale.state.GetNodeByNodeKey(mapRequest.NodeKey)
 	if !ok {
-		return types.NodeView{}, NewHTTPError(http.StatusNotFound, "node not found", errNodeNotInStore)
+		return types.NodeView{}, NewHTTPError(http.StatusNotFound, "node not found", nil)
 	}
 
 	// Validate that the MachineKey in the Noise session matches the one associated with the NodeKey.
@@ -969,4 +1120,19 @@ func (ns *noiseServer) getAndValidateNode(mapRequest tailcfg.MapRequest) (types.
 	}
 
 	return nv, nil
+}
+
+// recordLastControlAddress stores the outer request's resolved client address
+// once the node's keys are validated. Failing to store it must not fail the
+// poll.
+func (ns *noiseServer) recordLastControlAddress(node types.NodeView, remoteAddr string) {
+	addr, ok := parsePeerAddr(remoteAddr)
+	if !ok {
+		return
+	}
+
+	err := ns.headscale.state.SetLastControlAddress(node.ID(), addr)
+	if err != nil {
+		log.Error().Err(err).EmbedObject(node).Msg("could not persist node control connection address")
+	}
 }

@@ -5,6 +5,7 @@ package sqliteconfig
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 )
@@ -276,6 +277,7 @@ type Config struct {
 	Synchronous       Synchronous // synchronous mode (affects durability vs performance)
 	ForeignKeys       bool        // enable foreign key constraints (data integrity)
 	TxLock            TxLock      // transaction lock mode (affects write concurrency)
+	ReadOnly          bool        // open with mode=ro and query_only, for untrusted readers
 }
 
 // Default returns the production configuration optimized for Headscale's usage patterns.
@@ -296,6 +298,20 @@ func Default(path string) *Config {
 		Synchronous:       SynchronousNormal,
 		ForeignKeys:       true,
 		TxLock:            TxLockImmediate,
+	}
+}
+
+// ReadOnly returns a configuration for a connection that must never write the
+// database: mode=ro opens the file read-only, query_only rejects writes at the
+// statement level. No write pragmas are set. It does not stop ATTACH or VACUUM
+// INTO from creating other files; callers running untrusted SQL must reject
+// those statements themselves.
+func ReadOnly(path string) *Config {
+	return &Config{
+		Path:              path,
+		BusyTimeout:       DefaultBusyTimeout,
+		WALAutocheckpoint: -1,
+		ReadOnly:          true,
 	}
 }
 
@@ -354,7 +370,9 @@ func (c *Config) ToURL() (string, error) {
 	if c.Path == ":memory:" {
 		baseURL = ":memory:"
 	} else {
-		baseURL = "file:" + c.Path
+		// SQLite ends a URI path at '?' or '#' and decodes '%'; escape so the
+		// configured path names the file literally.
+		baseURL = "file:" + (&url.URL{Path: c.Path}).EscapedPath()
 	}
 
 	// Build query parameters
@@ -388,6 +406,10 @@ func (c *Config) ToURL() (string, error) {
 
 	if c.ForeignKeys {
 		queryParts = append(queryParts, "_pragma=foreign_keys=ON")
+	}
+
+	if c.ReadOnly {
+		queryParts = append(queryParts, "_pragma=query_only=1", "mode=ro")
 	}
 
 	if len(queryParts) > 0 {

@@ -1,6 +1,11 @@
 package state
 
 import (
+	"bytes"
+	"runtime"
+	"runtime/pprof"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,20 +15,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestAuthCacheBoundedLRU verifies that the registration auth cache is
-// bounded by a maximum entry count, that exceeding the maxEntries evicts the
-// oldest entry, and that the eviction callback resolves the parked
-// AuthRequest with ErrRegistrationExpired so any waiting goroutine wakes.
-func TestAuthCacheBoundedLRU(t *testing.T) {
-	const maxEntries = 4
+func newTestAuthCache(t *testing.T, maxEntries int, ttl time.Duration) *expirable.LRU[types.AuthID, *types.AuthRequest] {
+	t.Helper()
 
 	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
 		maxEntries,
 		func(_ types.AuthID, rn *types.AuthRequest) {
 			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
 		},
-		time.Hour, // long TTL — we test eviction by size, not by time
+		ttl,
 	)
+	t.Cleanup(cache.Close)
+
+	return cache
+}
+
+func requireExpiredVerdict(t *testing.T, entry *types.AuthRequest) {
+	t.Helper()
+
+	select {
+	case verdict := <-entry.WaitForAuth():
+		require.False(t, verdict.Accept(), "evicted entry must not signal Accept")
+		require.ErrorIs(t,
+			verdict.Err, ErrRegistrationExpired,
+			"evicted entry must surface ErrRegistrationExpired, got: %v",
+			verdict.Err,
+		)
+	case <-time.After(5 * time.Second):
+		t.Fatal("eviction callback did not wake the parked AuthRequest")
+	}
+}
+
+// TestAuthCacheBoundedLRU checks the underlying library's eviction callback.
+// State admission prevents this eviction behavior for pending auth requests.
+func TestAuthCacheBoundedLRU(t *testing.T) {
+	const maxEntries = 4
+
+	// Long TTL: eviction by size, not by time.
+	cache := newTestAuthCache(t, maxEntries, time.Hour)
 
 	entries := make([]*types.AuthRequest, 0, maxEntries+1)
 	ids := make([]types.AuthID, 0, maxEntries+1)
@@ -43,18 +72,7 @@ func TestAuthCacheBoundedLRU(t *testing.T) {
 	_, ok := cache.Get(ids[0])
 	assert.False(t, ok, "oldest entry must be evicted when maxEntries is exceeded")
 
-	// The eviction callback must have woken the parked AuthRequest.
-	select {
-	case verdict := <-entries[0].WaitForAuth():
-		require.False(t, verdict.Accept(), "evicted entry must not signal Accept")
-		require.ErrorIs(t,
-			verdict.Err, ErrRegistrationExpired,
-			"evicted entry must surface ErrRegistrationExpired, got: %v",
-			verdict.Err,
-		)
-	case <-time.After(time.Second):
-		t.Fatal("eviction callback did not wake the parked AuthRequest")
-	}
+	requireExpiredVerdict(t, entries[0])
 
 	// All non-evicted entries must still be retrievable.
 	for i := 1; i <= maxEntries; i++ {
@@ -63,469 +81,255 @@ func TestAuthCacheBoundedLRU(t *testing.T) {
 	}
 }
 
-func TestSetAuthCacheEntryPreservesQRExpiry(t *testing.T) {
-	s := &State{
-		authCache:           expirable.NewLRU[types.AuthID, *types.AuthRequest](1, nil, time.Hour),
-		authCacheExpiration: time.Hour,
+// TestAuthCacheTTLExpiry verifies the TTL sweeper evicts an entry that timed
+// out and that the eviction callback wakes its waiter.
+func TestAuthCacheTTLExpiry(t *testing.T) {
+	cache := newTestAuthCache(t, 4, 50*time.Millisecond)
+
+	id := types.MustAuthID()
+	entry := types.NewAuthRequest()
+	cache.Add(id, entry)
+
+	requireExpiredVerdict(t, entry)
+
+	_, ok := cache.Get(id)
+	assert.False(t, ok, "expired entry must be gone from the cache")
+}
+
+func TestAuthCacheAdmissionPreservesPending(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	cfg.Tuning.RegisterCacheMaxEntries = 1
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	id := types.MustAuthID()
+	pending := types.NewAuthRequest()
+	require.NoError(t, s.SetAuthCacheEntry(id, pending))
+
+	otherID := types.MustAuthID()
+	require.ErrorIs(t, s.SetAuthCacheEntry(otherID, types.NewAuthRequest()), ErrAuthCacheFull)
+
+	got, ok := s.GetAuthCacheEntry(id)
+	require.True(t, ok, "new work must not displace an admitted authentication")
+	require.Same(t, pending, got)
+
+	_, ok = s.GetAuthCacheEntry(otherID)
+	require.False(t, ok, "new work must be refused at capacity")
+
+	select {
+	case <-pending.WaitForAuth():
+		t.Fatal("capacity refusal must not finish an existing authentication")
+	default:
 	}
+}
+
+func TestAuthCacheAdmissionPreservesIdentity(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	id := types.MustAuthID()
+	pending := types.NewAuthRequest()
+	require.NoError(t, s.SetAuthCacheEntry(id, pending))
+	require.NoError(t, s.SetAuthCacheEntry(id, pending))
+	require.ErrorIs(t, s.SetAuthCacheEntry(id, types.NewAuthRequest()), ErrAuthCacheEntryExists)
+
+	got, ok := s.GetAuthCacheEntry(id)
+	require.True(t, ok)
+	require.Same(t, pending, got, "an existing auth ID must keep its original request and waiter")
+}
+
+func TestAuthCacheAdmissionConcurrent(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	cfg.Tuning.RegisterCacheMaxEntries = 2
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	id := types.MustAuthID()
+	pending := types.NewAuthRequest()
+	require.NoError(t, s.SetAuthCacheEntry(id, pending))
+
+	var wg sync.WaitGroup
+
+	results := make(chan error, 4)
+
+	for range 4 {
+		wg.Go(func() {
+			results <- s.SetAuthCacheEntry(types.MustAuthID(), types.NewAuthRequest())
+		})
+	}
+
+	wg.Wait()
+	close(results)
+
+	var accepted int
+
+	for err := range results {
+		if err == nil {
+			accepted++
+		} else {
+			require.ErrorIs(t, err, ErrAuthCacheFull)
+		}
+	}
+
+	require.Equal(t, 1, accepted)
+
+	got, ok := s.GetAuthCacheEntry(id)
+	require.True(t, ok, "concurrent admission must preserve existing transactions")
+	require.Same(t, pending, got)
+	require.Equal(t, 2, s.authCache.Len())
+}
+
+func TestAuthCacheAdmissionReservesSSHCapacity(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	cfg.Tuning.RegisterCacheMaxEntries = 1
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	registrationID := types.MustAuthID()
+	require.NoError(t, s.SetAuthCacheEntry(registrationID, types.NewAuthRequest()))
+
+	sshID := types.MustAuthID()
+	require.NoError(t, s.SetAuthCacheEntry(sshID, types.NewSSHCheckAuthRequest(1, 2)),
+		"registration capacity must not consume the SSH reservation")
+	require.ErrorIs(t, s.SetAuthCacheEntry(types.MustAuthID(), types.NewAuthRequest()), ErrAuthCacheFull)
+	_, ok := s.GetAuthCacheEntry(registrationID)
+	require.True(t, ok)
+	_, ok = s.GetAuthCacheEntry(sshID)
+	require.True(t, ok)
+}
+
+func TestAuthCacheAdmissionBoundsRegistrationPayload(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	id := types.MustAuthID()
+	request := types.NewRegisterAuthRequest(&types.RegistrationData{
+		Hostname: strings.Repeat("x", types.MaxRegistrationPayloadBytes),
+	})
+	require.ErrorIs(t, s.SetAuthCacheEntry(id, request), types.ErrRegistrationPayloadTooLarge)
+	_, ok := s.GetAuthCacheEntry(id)
+	require.False(t, ok)
+	require.Zero(t, s.authCache.Len())
+	require.Zero(t, s.authCacheRegularEntries.Load())
+}
+
+func TestAuthCacheAdmissionDoesNotReuseExpiredRequest(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	cfg.Tuning.RegisterCacheExpiration = 50 * time.Millisecond
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	id := types.MustAuthID()
+	request := types.NewAuthRequest()
+	require.NoError(t, s.SetAuthCacheEntry(id, request))
+	requireExpiredVerdict(t, request)
+	require.Error(t, s.SetAuthCacheEntry(id, request), "expired waiters cannot be reused as new pending requests")
+}
+
+func TestAuthCacheAdmissionReleasesCapacity(t *testing.T) {
+	for _, removal := range []string{"consumption", "expiry"} {
+		t.Run(removal, func(t *testing.T) {
+			cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+			cfg.Tuning.RegisterCacheMaxEntries = 1
+			cfg.Tuning.RegisterCacheExpiration = 50 * time.Millisecond
+			s, err := NewState(cfg)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+			id := types.MustAuthID()
+			pending := types.NewAuthRequest()
+			require.NoError(t, s.SetAuthCacheEntry(id, pending))
+
+			if removal == "consumption" {
+				pending.FinishAuth(types.AuthVerdict{})
+				s.DeleteAuthCacheEntry(id)
+			} else {
+				requireExpiredVerdict(t, pending)
+			}
+
+			require.NoError(t, s.SetAuthCacheEntry(types.MustAuthID(), types.NewAuthRequest()))
+			require.Equal(t, int64(1), s.authCacheRegularEntries.Load())
+		})
+	}
+}
+
+func goroutineID() string {
+	buf := make([]byte, 64)
+	n := runtime.Stack(buf, false)
+
+	// "goroutine 123 [running]:"
+	return strings.Fields(string(buf[:n]))[1]
+}
+
+// authCacheSweepers counts expirable LRU TTL sweeper goroutines started from
+// goroutine gid, so caches other tests are still tearing down do not count.
+func authCacheSweepers(t *testing.T, gid string) int {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	require.NoError(t, pprof.Lookup("goroutine").WriteTo(&buf, 2))
+
+	n := 0
+
+	for g := range strings.SplitSeq(buf.String(), "\n\n") {
+		if strings.Contains(g, "golang-lru/v2/expirable") &&
+			strings.Contains(g, " in goroutine "+gid+"\n") {
+			n++
+		}
+	}
+
+	return n
+}
+
+// TestStateCloseStopsAuthCacheSweeper verifies that closing a State stops
+// the auth cache's TTL sweeper goroutine instead of leaking it, and that a
+// request still pending at that point gets its expiry verdict rather than
+// waiting forever for a sweep that never comes.
+func TestStateCloseStopsAuthCacheSweeper(t *testing.T) {
+	gid := goroutineID()
+
+	s, err := NewState(persistTestConfig(t.TempDir() + "/headscale.db"))
+	require.NoError(t, err)
+	require.Equal(t, 1, authCacheSweepers(t, gid), "NewState must start a sweeper")
+
+	pending := types.NewAuthRequest()
+	require.NoError(t, s.SetAuthCacheEntry(types.MustAuthID(), pending))
+
+	require.NoError(t, s.Close())
+
+	requireExpiredVerdict(t, pending)
+	require.ErrorIs(t, s.SetAuthCacheEntry(types.MustAuthID(), types.NewAuthRequest()), ErrAuthCacheClosed)
+
+	assert.Eventually(t, func() bool {
+		return authCacheSweepers(t, gid) == 0
+	}, 5*time.Second, 10*time.Millisecond, "sweeper must stop on State.Close")
+}
+
+func TestSetAuthCacheEntryPreservesQRExpiry(t *testing.T) {
+	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	id := types.MustAuthID()
 	entry := types.NewRegisterAuthRequest(&types.RegistrationData{})
 	expiresAt := time.Now().Add(10 * time.Minute).Round(0)
 	entry.SetExpiry(expiresAt)
+	require.NoError(t, s.SetAuthCacheEntry(id, entry))
 
-	s.SetAuthCacheEntry(types.MustAuthID(), entry)
-
-	assert.Equal(t, expiresAt, entry.ExpiresAt())
-}
-
-// TestAuthCacheTTLExpiry verifies that cache entries expire after the
-// configured TTL and that the eviction callback is called.
-func TestAuthCacheTTLExpiry(t *testing.T) {
-	const shortTTL = 100 * time.Millisecond
-
-	evicted := make(chan types.AuthID, 1)
-
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		10, // large capacity, we test TTL not size
-		func(id types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-
-			evicted <- id
-		},
-		shortTTL,
-	)
-
-	id := types.MustAuthID()
-	entry := types.NewAuthRequest()
-	cache.Add(id, entry)
-
-	// Entry should be retrievable immediately
-	_, ok := cache.Get(id)
-	require.True(t, ok, "entry should exist immediately after insertion")
-
-	assert.Eventually(t, func() bool {
-		_, ok = cache.Get(id)
-
-		return !ok
-	}, time.Second, 10*time.Millisecond, "entry should be evicted after TTL expires")
-
-	// Eviction callback should have been called
-	select {
-	case evictedID := <-evicted:
-		assert.Equal(t, id, evictedID, "eviction callback should be called with the correct ID")
-	case <-time.After(time.Second):
-		t.Fatal("eviction callback was not called within timeout")
-	}
-
-	// The AuthRequest should have been resolved with an error
-	select {
-	case verdict := <-entry.WaitForAuth():
-		require.False(t, verdict.Accept(), "expired entry must not signal Accept")
-		require.ErrorIs(t, verdict.Err, ErrRegistrationExpired,
-			"expired entry must surface ErrRegistrationExpired, got: %v", verdict.Err)
-	case <-time.After(time.Second):
-		t.Fatal("expired entry did not resolve the AuthRequest")
-	}
-}
-
-// TestAuthCacheNoExpiryExtension verifies that re-adding an existing entry
-// does not extend its TTL or prevent expiry.
-func TestAuthCacheNoExpiryExtension(t *testing.T) {
-	const shortTTL = 100 * time.Millisecond
-
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		10,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		shortTTL,
-	)
-
-	id := types.MustAuthID()
-	entry1 := types.NewAuthRequest()
-	cache.Add(id, entry1)
-
-	// Try to re-add with the same ID (simulating a refresh attempt)
-	entry2 := types.NewAuthRequest()
-
-	cache.Add(id, entry2)
-
-	assert.Eventually(t, func() bool {
-		_, ok := cache.Get(id)
-
-		return !ok
-	}, time.Second, 10*time.Millisecond, "re-adding an entry should not extend its TTL")
-}
-
-// TestAuthCacheDoubleConsumption verifies that consuming an auth entry
-// (retrieving and removing it) prevents a second consumption attempt.
-func TestAuthCacheDoubleConsumption(t *testing.T) {
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		10,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		time.Hour,
-	)
-
-	id := types.MustAuthID()
-	entry := types.NewAuthRequest()
-	cache.Add(id, entry)
-
-	// First consumption succeeds
-	retrieved1, ok1 := cache.Get(id)
-	assert.True(t, ok1, "first retrieval should succeed")
-	assert.Equal(t, entry, retrieved1)
-
-	// Remove the entry (simulating consumption)
-	cache.Remove(id)
-
-	// Second consumption fails
-	retrieved2, ok2 := cache.Get(id)
-	assert.False(t, ok2, "second retrieval after removal should fail")
-	assert.Nil(t, retrieved2)
-}
-
-// TestAuthCacheConcurrentAccess verifies that concurrent access to the same
-// authID is handled correctly by the cache.
-func TestAuthCacheConcurrentAccess(t *testing.T) {
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		100,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		time.Hour,
-	)
-
-	id := types.MustAuthID()
-	entry := types.NewAuthRequest()
-	cache.Add(id, entry)
-
-	const numGoroutines = 10
-
-	successCount := make(chan bool, numGoroutines)
-
-	// Launch multiple goroutines trying to get the same entry
-	for range numGoroutines {
-		go func() {
-			retrieved, ok := cache.Get(id)
-			successCount <- ok && retrieved != nil
-		}()
-	}
-
-	// All should succeed since we're only reading
-	successes := 0
-
-	for range numGoroutines {
-		if <-successCount {
-			successes++
-		}
-	}
-
-	assert.Equal(t, numGoroutines, successes,
-		"all concurrent reads should succeed")
-}
-
-// TestAuthCacheConcurrentRemoval verifies that only one goroutine can
-// successfully consume (retrieve and remove) an auth entry.
-func TestAuthCacheConcurrentRemoval(t *testing.T) {
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		100,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		time.Hour,
-	)
-
-	id := types.MustAuthID()
-	entry := types.NewAuthRequest()
-	cache.Add(id, entry)
-
-	const numGoroutines = 10
-
-	successCount := make(chan bool, numGoroutines)
-
-	// Launch multiple goroutines trying to consume the same entry
-	for range numGoroutines {
-		go func() {
-			// Attempt to get and immediately remove
-			retrieved, ok := cache.Get(id)
-			if ok && retrieved != nil {
-				cache.Remove(id)
-
-				successCount <- true
-			} else {
-				successCount <- false
-			}
-		}()
-	}
-
-	// At least one should succeed, others may fail
-	successes := 0
-
-	for range numGoroutines {
-		if <-successCount {
-			successes++
-		}
-	}
-
-	assert.GreaterOrEqual(t, successes, 1,
-		"at least one goroutine should successfully retrieve the entry")
-
-	// Entry should be gone after all goroutines complete
-	_, ok := cache.Get(id)
-	assert.False(t, ok, "entry should be removed after concurrent access")
-}
-
-// TestAuthCacheMultipleEntries verifies that multiple independent auth
-// entries can coexist and be managed independently.
-func TestAuthCacheMultipleEntries(t *testing.T) {
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		100,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		time.Hour,
-	)
-
-	const numEntries = 10
-
-	ids := make([]types.AuthID, numEntries)
-	entries := make([]*types.AuthRequest, numEntries)
-
-	// Add multiple entries
-	for i := range numEntries {
-		ids[i] = types.MustAuthID()
-		entries[i] = types.NewAuthRequest()
-		cache.Add(ids[i], entries[i])
-	}
-
-	// All should be retrievable
-	for i := range numEntries {
-		retrieved, ok := cache.Get(ids[i])
-		assert.True(t, ok, "entry %d should be retrievable", i)
-		assert.Equal(t, entries[i], retrieved)
-	}
-
-	// Remove one entry
-	cache.Remove(ids[5])
-
-	// Removed entry should be gone
-	_, ok := cache.Get(ids[5])
-	assert.False(t, ok, "removed entry should not be retrievable")
-
-	// Other entries should still exist
-	for i := range numEntries {
-		if i == 5 {
-			continue
-		}
-
-		retrieved, ok := cache.Get(ids[i])
-		assert.True(t, ok, "entry %d should still be retrievable", i)
-		assert.Equal(t, entries[i], retrieved)
-	}
-}
-
-// TestAuthCacheEvictionDoesNotAffectOthers verifies that when an entry
-// is evicted due to size limits, it doesn't affect other entries.
-func TestAuthCacheEvictionDoesNotAffectOthers(t *testing.T) {
-	const maxEntries = 5
-
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		maxEntries,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		time.Hour,
-	)
-
-	ids := make([]types.AuthID, maxEntries+2)
-	entries := make([]*types.AuthRequest, maxEntries+2)
-
-	// Add maxEntries entries
-	for i := range maxEntries {
-		ids[i] = types.MustAuthID()
-		entries[i] = types.NewAuthRequest()
-		cache.Add(ids[i], entries[i])
-	}
-
-	// Add two more, which should evict the first two
-	for i := maxEntries; i < maxEntries+2; i++ {
-		ids[i] = types.MustAuthID()
-		entries[i] = types.NewAuthRequest()
-		cache.Add(ids[i], entries[i])
-	}
-
-	// First two should be evicted
-	_, ok := cache.Get(ids[0])
-	assert.False(t, ok, "first entry should be evicted")
-	_, ok = cache.Get(ids[1])
-	assert.False(t, ok, "second entry should be evicted")
-
-	// Remaining entries should still be present
-	for i := 2; i < maxEntries+2; i++ {
-		retrieved, ok := cache.Get(ids[i])
-		assert.True(t, ok, "entry %d should still be present", i)
-		assert.Equal(t, entries[i], retrieved)
-	}
-}
-
-// TestSetAuthCacheEntryDoesNotExtendExpiry verifies that re-inserting an
-// existing entry does not extend its expiry or allow bypassing cache expiration.
-func TestSetAuthCacheEntryDoesNotExtendExpiry(t *testing.T) {
-	s := &State{
-		authCache:           expirable.NewLRU[types.AuthID, *types.AuthRequest](10, nil, time.Hour),
-		authCacheExpiration: time.Hour,
-	}
-
-	authID := types.MustAuthID()
-	originalExpiry := time.Now().Add(10 * time.Minute)
-
-	// Insert with short expiry
-	entry1 := types.NewRegisterAuthRequest(&types.RegistrationData{})
-	entry1.SetExpiry(originalExpiry)
-	s.SetAuthCacheEntry(authID, entry1)
-
-	// Verify first insertion
-	retrieved, ok := s.GetAuthCacheEntry(authID)
+	got, ok := s.GetAuthCacheEntry(id)
 	require.True(t, ok)
-	assert.Equal(t, originalExpiry.Unix(), retrieved.ExpiresAt().Unix())
+	require.Equal(t, expiresAt, got.ExpiresAt())
 
-	// Try to re-insert with longer expiry - should be rejected
-	laterExpiry := time.Now().Add(2 * time.Hour)
-	entry2 := types.NewRegisterAuthRequest(&types.RegistrationData{})
-	entry2.SetExpiry(laterExpiry)
-	s.SetAuthCacheEntry(authID, entry2)
-
-	// Verify expiry was NOT extended
-	retrieved, ok = s.GetAuthCacheEntry(authID)
-	require.True(t, ok)
-	assert.Equal(t, originalExpiry.Unix(), retrieved.ExpiresAt().Unix(), "expiry should not be extended by re-insertion")
-}
-
-// TestAuthCacheInvalidAuthID verifies that attempting to retrieve
-// a non-existent auth ID returns false.
-func TestAuthCacheInvalidAuthID(t *testing.T) {
-	s := &State{
-		authCache:           expirable.NewLRU[types.AuthID, *types.AuthRequest](10, nil, time.Hour),
-		authCacheExpiration: time.Hour,
-	}
-
-	// Try to get non-existent entry
-	invalidID := types.MustAuthID()
-	_, ok := s.GetAuthCacheEntry(invalidID)
-	assert.False(t, ok, "non-existent auth ID should not be found")
-}
-
-// TestAuthCacheReusedAuthID verifies that the same auth ID cannot be
-// used for multiple distinct registrations by preventing re-insertion.
-func TestAuthCacheReusedAuthID(t *testing.T) {
-	s := &State{
-		authCache:           expirable.NewLRU[types.AuthID, *types.AuthRequest](10, nil, time.Hour),
-		authCacheExpiration: time.Hour,
-	}
-
-	authID := types.MustAuthID()
-
-	// First registration
-	data1 := &types.RegistrationData{
-		Hostname: "node1",
-	}
-	entry1 := types.NewRegisterAuthRequest(data1)
-	s.SetAuthCacheEntry(authID, entry1)
-
-	retrieved1, ok := s.GetAuthCacheEntry(authID)
-	require.True(t, ok)
-	assert.Equal(t, "node1", retrieved1.RegistrationData().Hostname)
-
-	// Attempt to reuse same auth ID with different data
-	data2 := &types.RegistrationData{
-		Hostname: "node2",
-	}
-	entry2 := types.NewRegisterAuthRequest(data2)
-	s.SetAuthCacheEntry(authID, entry2)
-
-	// Should still have original entry, not the new one
-	retrieved2, ok := s.GetAuthCacheEntry(authID)
-	require.True(t, ok)
-	assert.Equal(t, "node1", retrieved2.RegistrationData().Hostname, "original entry should be preserved")
-}
-
-// TestAuthCacheExpiredEntryNotRetrievable verifies that expired entries
-// are properly cleaned up by the LRU cache's TTL mechanism.
-func TestAuthCacheExpiredEntryNotRetrievable(t *testing.T) {
-	const shortTTL = 50 * time.Millisecond
-
-	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		10,
-		func(_ types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		shortTTL,
-	)
-
-	authID := types.MustAuthID()
-	entry := types.NewAuthRequest()
-	cache.Add(authID, entry)
-
-	// Should be retrievable immediately
-	_, ok := cache.Get(authID)
-	require.True(t, ok, "entry should be immediately retrievable")
-
-	assert.Eventually(t, func() bool {
-		_, ok = cache.Get(authID)
-
-		return !ok
-	}, time.Second, 10*time.Millisecond, "expired entry should not be retrievable")
-}
-
-// TestAuthCacheZeroExpiryGetsDefault verifies that entries without
-// an expiry set get the default cache expiration.
-func TestAuthCacheZeroExpiryGetsDefault(t *testing.T) {
-	defaultExpiration := 15 * time.Minute
-	s := &State{
-		authCache:           expirable.NewLRU[types.AuthID, *types.AuthRequest](10, nil, time.Hour),
-		authCacheExpiration: defaultExpiration,
-	}
-
-	authID := types.MustAuthID()
-	entry := types.NewRegisterAuthRequest(&types.RegistrationData{})
-	// Don't set expiry - should get default
-
-	beforeAdd := time.Now()
-
-	s.SetAuthCacheEntry(authID, entry)
-
-	afterAdd := time.Now()
-
-	retrieved, ok := s.GetAuthCacheEntry(authID)
-	require.True(t, ok)
-
-	expiry := retrieved.ExpiresAt()
-	expectedMin := beforeAdd.Add(defaultExpiration)
-	expectedMax := afterAdd.Add(defaultExpiration)
-
-	assert.True(t,
-		expiry.After(expectedMin.Add(-time.Second)) && expiry.Before(expectedMax.Add(time.Second)),
-		"entry without expiry should get default expiration (~15min)",
-	)
-}
-
-// TestAuthCacheCustomExpiryPreserved verifies that entries with
-// a custom expiry preserve that expiry.
-func TestAuthCacheCustomExpiryPreserved(t *testing.T) {
-	s := &State{
-		authCache:           expirable.NewLRU[types.AuthID, *types.AuthRequest](10, nil, time.Hour),
-		authCacheExpiration: time.Hour,
-	}
-
-	authID := types.MustAuthID()
-	customExpiry := time.Now().Add(5 * time.Minute)
-
-	entry := types.NewRegisterAuthRequest(&types.RegistrationData{})
-	entry.SetExpiry(customExpiry)
-	s.SetAuthCacheEntry(authID, entry)
-
-	retrieved, ok := s.GetAuthCacheEntry(authID)
-	require.True(t, ok)
-	assert.Equal(t, customExpiry.Unix(), retrieved.ExpiresAt().Unix(), "custom expiry should be preserved")
+	require.ErrorIs(t, s.SetAuthCacheEntry(id, types.NewRegisterAuthRequest(&types.RegistrationData{})), ErrAuthCacheEntryExists)
+	require.Equal(t, expiresAt, got.ExpiresAt(), "re-admission must not extend QR expiry")
 }

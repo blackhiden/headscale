@@ -11,17 +11,9 @@ import (
 // TestServerStartupAfterHeadplaneRetirement verifies that Headscale server starts
 // successfully after Phase 13c Headplane local-auth retirement.
 func TestServerStartupAfterHeadplaneRetirement(t *testing.T) {
-	cfg := &types.Config{
-		ServerURL: "http://headscale.example.com",
-		Database: types.DatabaseConfig{
-			Type:   "sqlite3",
-			Sqlite: types.SqliteConfig{Path: t.TempDir() + "/headscale_test.db"},
-		},
-		NoisePrivateKeyPath: t.TempDir() + "/noise_private.key",
-		Policy:              types.PolicyConfig{Mode: types.PolicyModeDB},
-	}
+	cfg := validConfig(t)
 
-	app, err := NewHeadscale(cfg)
+	app, err := NewHeadscale(&cfg)
 	require.NoError(t, err, "server should start without Headplane config")
 	require.NotNil(t, app, "app should not be nil")
 	require.NotNil(t, app.state, "app state should be initialized")
@@ -30,20 +22,12 @@ func TestServerStartupAfterHeadplaneRetirement(t *testing.T) {
 // TestHeadplaneConfigDeprecatedButPreserved verifies that HeadplaneConfig fields
 // are preserved but not used during the rollback window.
 func TestHeadplaneConfigDeprecatedButPreserved(t *testing.T) {
-	cfg := &types.Config{
-		ServerURL: "http://headscale.example.com",
-		Database: types.DatabaseConfig{
-			Type:   "sqlite3",
-			Sqlite: types.SqliteConfig{Path: t.TempDir() + "/headscale_test.db"},
-		},
-		NoisePrivateKeyPath: t.TempDir() + "/noise_private.key",
-		Policy:              types.PolicyConfig{Mode: types.PolicyModeDB},
-		Headplane: types.HeadplaneConfig{
-			Password: "legacy-password-ignored",
-		},
+	cfg := validConfig(t)
+	cfg.Headplane = types.HeadplaneConfig{
+		Password: "legacy-password-ignored",
 	}
 
-	app, err := NewHeadscale(cfg)
+	app, err := NewHeadscale(&cfg)
 	require.NoError(t, err, "server should start even with legacy Headplane.Password")
 	require.NotNil(t, app)
 
@@ -55,17 +39,9 @@ func TestHeadplaneConfigDeprecatedButPreserved(t *testing.T) {
 // TestLegacyTablesPreserved verifies that legacy Headplane tables are created
 // during migration but no longer actively managed.
 func TestLegacyTablesPreserved(t *testing.T) {
-	cfg := &types.Config{
-		ServerURL: "http://headscale.example.com",
-		Database: types.DatabaseConfig{
-			Type:   "sqlite3",
-			Sqlite: types.SqliteConfig{Path: t.TempDir() + "/headscale_test.db"},
-		},
-		NoisePrivateKeyPath: t.TempDir() + "/noise_private.key",
-		Policy:              types.PolicyConfig{Mode: types.PolicyModeDB},
-	}
+	cfg := validConfig(t)
 
-	app, err := NewHeadscale(cfg)
+	app, err := NewHeadscale(&cfg)
 	require.NoError(t, err)
 	require.NotNil(t, app)
 

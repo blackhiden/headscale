@@ -17,29 +17,8 @@ import (
 func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Headscale {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-
-	cfg := types.Config{
-		ServerURL:           "http://localhost:8080",
-		NoisePrivateKeyPath: tmpDir + "/noise_private.key",
-		Node: types.NodeConfig{
-			Expiry: nodeExpiry,
-		},
-		Database: types.DatabaseConfig{
-			Type: "sqlite3",
-			Sqlite: types.SqliteConfig{
-				Path: tmpDir + "/headscale_test.db",
-			},
-		},
-		OIDC: types.OIDCConfig{},
-		Policy: types.PolicyConfig{
-			Mode: types.PolicyModeDB,
-		},
-		Tuning: types.Tuning{
-			BatchChangeDelay: 100 * time.Millisecond,
-			BatcherWorkers:   1,
-		},
-	}
+	cfg := validConfig(t)
+	cfg.Node.Expiry = nodeExpiry
 
 	app, err := NewHeadscale(&cfg)
 	require.NoError(t, err)
@@ -556,7 +535,7 @@ func TestTaggedPreAuthKeyDisablesKeyExpiry(t *testing.T) {
 
 	// Critical assertion: Tagged nodes should have expiry disabled
 	assert.True(t, node.IsTagged(), "Node should be tagged")
-	assert.False(t, node.Expiry().Valid(), "Tagged node should have expiry disabled (nil)")
+	assert.True(t, node.KeyExpiryDisabled(), "Tagged node should have key expiry off")
 }
 
 // TestUntaggedPreAuthKeyPreservesKeyExpiry tests that nodes registered with
@@ -640,7 +619,7 @@ func TestTaggedNodeReauthPreservesDisabledExpiry(t *testing.T) {
 	node, found := app.state.GetNodeByNodeKey(nodeKey.Public())
 	require.True(t, found)
 	require.True(t, node.IsTagged())
-	require.False(t, node.Expiry().Valid(), "Initial registration should have expiry disabled")
+	require.True(t, node.KeyExpiryDisabled(), "Initial registration should have key expiry off")
 
 	// Re-authenticate with a NEW expiry request (should be ignored for tagged nodes)
 	newRequestedExpiry := time.Now().Add(48 * time.Hour)
@@ -665,8 +644,8 @@ func TestTaggedNodeReauthPreservesDisabledExpiry(t *testing.T) {
 
 	// Critical assertion: Tagged node should preserve disabled expiry on re-auth
 	assert.True(t, nodeAfterReauth.IsTagged(), "Node should still be tagged")
-	assert.False(t, nodeAfterReauth.Expiry().Valid(),
-		"Tagged node should have expiry PRESERVED as disabled after re-auth")
+	assert.True(t, nodeAfterReauth.KeyExpiryDisabled(),
+		"Tagged node should keep key expiry off after re-auth")
 }
 
 // TestTaggedNodeRestartPreservesNilExpiry tests that a tagged node whose
@@ -847,7 +826,7 @@ func TestExpiryDuringPersonalToTaggedConversion(t *testing.T) {
 		},
 		Expiry: &clientExpiry,
 	})
-	app.state.SetAuthCacheEntry(registrationID1, regEntry1)
+	require.NoError(t, app.state.SetAuthCacheEntry(registrationID1, regEntry1))
 
 	node, _, err := app.state.HandleNodeFromAuthPath(
 		registrationID1, types.UserID(user.ID), nil, "webauth",
@@ -869,7 +848,7 @@ func TestExpiryDuringPersonalToTaggedConversion(t *testing.T) {
 		},
 		Expiry: &clientExpiry, // Client still sends expiry
 	})
-	app.state.SetAuthCacheEntry(registrationID2, regEntry2)
+	require.NoError(t, app.state.SetAuthCacheEntry(registrationID2, regEntry2))
 
 	nodeAfter, _, err := app.state.HandleNodeFromAuthPath(
 		registrationID2, types.UserID(user.ID), nil, "webauth",
@@ -878,8 +857,8 @@ func TestExpiryDuringPersonalToTaggedConversion(t *testing.T) {
 	require.True(t, nodeAfter.IsTagged(), "Node should be tagged after conversion")
 
 	// CRITICAL ASSERTION: Tagged nodes should NOT have expiry
-	assert.False(t, nodeAfter.Expiry().Valid(),
-		"Tagged node should have expiry cleared to nil")
+	assert.True(t, nodeAfter.KeyExpiryDisabled(),
+		"Tagged node should have key expiry off")
 }
 
 // TestExpiryDuringTaggedToPersonalConversion tests that when a tagged node
@@ -918,7 +897,7 @@ func TestExpiryDuringTaggedToPersonalConversion(t *testing.T) {
 			RequestTags: []string{"tag:server"}, // Tagged node
 		},
 	})
-	app.state.SetAuthCacheEntry(registrationID1, regEntry1)
+	require.NoError(t, app.state.SetAuthCacheEntry(registrationID1, regEntry1))
 
 	node, _, err := app.state.HandleNodeFromAuthPath(
 		registrationID1, types.UserID(user.ID), nil, "webauth",
@@ -941,7 +920,7 @@ func TestExpiryDuringTaggedToPersonalConversion(t *testing.T) {
 		},
 		Expiry: &clientExpiry, // Client requests expiry
 	})
-	app.state.SetAuthCacheEntry(registrationID2, regEntry2)
+	require.NoError(t, app.state.SetAuthCacheEntry(registrationID2, regEntry2))
 
 	nodeAfter, _, err := app.state.HandleNodeFromAuthPath(
 		registrationID2, types.UserID(user.ID), nil, "webauth",
@@ -1109,8 +1088,8 @@ func TestTaggedAuthKeyIgnoresNodeExpiry(t *testing.T) {
 	require.True(t, found)
 
 	assert.True(t, node.IsTagged())
-	assert.False(t, node.Expiry().Valid(),
-		"tagged node should have expiry disabled (nil) even with node.expiry configured")
+	assert.True(t, node.KeyExpiryDisabled(),
+		"tagged node should have key expiry off even with node.expiry configured")
 }
 
 // TestNodeExpiryZeroDisablesDefault tests that setting node.expiry to 0
@@ -1353,11 +1332,10 @@ func tsLogoutSentinelExpiry() time.Time {
 // register/logout HTTP-handler path (handleRegister -> handleLogout ->
 // handleRegister), not by poking SetNodeExpiry directly.
 //
-// Root cause (a): `tailscale logout` sends a past expiry; handleLogout stamps
-// it on the node via SetNodeExpiry with no IsTagged guard, so a tagged node —
-// which must have key-expiry disabled — becomes Expired.
+// `tailscale logout` sends a past expiry, which expires the tagged node as on
+// Tailscale SaaS. The relogin must bring it back.
 //
-// Root cause (b): on the next `tailscale up --auth-key <fresh key>`,
+// Root cause: on the next `tailscale up --auth-key <fresh key>`,
 // HandleNodeFromPreAuthKey sees an expired node, takes the expired-node
 // validation path, consumes the fresh single-use key on the in-place
 // re-registration, yet leaves the node expired (the expiry-refresh block is
@@ -1411,14 +1389,9 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 	_, err = app.handleRegister(context.Background(), logoutReq, machineKey.Public())
 	require.NoError(t, err)
 
-	// A tagged node must NOT be expired by logout — tagged nodes never expire.
-	// This is root cause (a); it fails before the fix.
 	nodeAfterLogout, found := app.state.GetNodeByNodeKey(nodeKey.Public())
 	require.True(t, found)
-	assert.False(t, nodeAfterLogout.IsExpired(),
-		"issue #3371 root cause (a): logout must not expire a tagged node")
-	assert.False(t, nodeAfterLogout.Expiry().Valid(),
-		"issue #3371 root cause (a): tagged node must keep key-expiry disabled after logout")
+	assert.True(t, nodeAfterLogout.IsExpired(), "logout expires a tagged node")
 
 	// `tailscale up --auth-key $KEY2`: a BRAND NEW single-use key, and the client
 	// rotates its node key (as the real client does on relogin).
@@ -1518,14 +1491,9 @@ func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
 		"issue #3371: tagged node must have key-expiry disabled after reusable-key relogin")
 }
 
-// TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry pins the deepest root cause
-// (a) in isolation: `tailscale logout` on a tagged node must not stamp an
-// expiry at all. This is the assertion PR #3372 does not make — it leaves
-// handleLogout expiring tagged nodes and only unwinds the damage on the next
-// registration. Keeping this separate from the relogin tests means a
-// regression that re-introduces logout-sets-expiry is caught even if the
-// re-registration cleanup masks it.
-func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
+// TestTaggedNodeLogoutExpiresIt: `tailscale logout` expires a tagged node, as
+// on Tailscale SaaS, and the expiry reaches the database.
+func TestTaggedNodeLogoutExpiresIt(t *testing.T) {
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-logout-noexpiry")
@@ -1556,18 +1524,51 @@ func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
 	nodeAfterLogout, found := app.state.GetNodeByNodeKey(nodeKey.Public())
 	require.True(t, found)
 	assert.True(t, nodeAfterLogout.IsTagged(), "node stays tagged through logout")
-	assert.False(t, nodeAfterLogout.Expiry().Valid(),
-		"issue #3371 root cause (a): logout must not set an expiry on a tagged node")
-	assert.False(t, nodeAfterLogout.IsExpired(),
-		"issue #3371 root cause (a): tagged node must not be expired by logout")
+	assert.True(t, nodeAfterLogout.IsExpired(), "logout expires a tagged node")
 
-	// The database column must be NULL, not a clamped 'now' timestamp — a
-	// persisted expiry survives restart and re-triggers the lockout.
 	var dbNode types.Node
 	require.NoError(t,
 		app.state.DB().DB.First(&dbNode, nodeAfterLogout.ID().Uint64()).Error)
-	assert.Nil(t, dbNode.Expiry,
-		"issue #3371 root cause (a): tagged node's DB expiry must remain NULL after logout")
+	require.NotNil(t, dbNode.Expiry)
+	assert.True(t, dbNode.IsExpired(), "the logout expiry is stored")
+}
+
+// TestClientBringsExpiryForward: a client may ask for an earlier expiry, which
+// turns expiry on for a node without one, but may not push it back.
+func TestClientBringsExpiryForward(t *testing.T) {
+	app := createTestApp(t)
+
+	pak, err := app.state.CreatePreAuthKey(nil, true, false, nil, []string{"tag:tag1"})
+	require.NoError(t, err)
+
+	machineKey := key.NewMachine()
+	nodeKey := key.NewNode()
+
+	_, err = app.handleRegister(context.Background(), tailcfg.RegisterRequest{
+		Auth:     &tailcfg.RegisterResponseAuth{AuthKey: pak.Key},
+		NodeKey:  nodeKey.Public(),
+		Hostinfo: &tailcfg.Hostinfo{Hostname: "set-expire"},
+	}, machineKey.Public())
+	require.NoError(t, err)
+
+	soon := time.Now().Add(time.Hour).Truncate(time.Second)
+	resp, err := app.handleRegister(context.Background(), tailcfg.RegisterRequest{
+		NodeKey: nodeKey.Public(),
+		Expiry:  soon,
+	}, machineKey.Public())
+	require.NoError(t, err)
+	assert.False(t, resp.NodeKeyExpired)
+
+	node, found := app.state.GetNodeByNodeKey(nodeKey.Public())
+	require.True(t, found)
+	require.True(t, node.Expiry().Valid(), "the earlier expiry turns expiry on")
+	assert.True(t, soon.Equal(node.Expiry().Get()))
+
+	_, err = app.handleRegister(context.Background(), tailcfg.RegisterRequest{
+		NodeKey: nodeKey.Public(),
+		Expiry:  soon.Add(time.Hour),
+	}, machineKey.Public())
+	require.ErrorContains(t, err, "extending key is not allowed")
 }
 
 // TestIssue3371_UserOwnedNodeLogoutStillExpires is the guard rail: the fix for

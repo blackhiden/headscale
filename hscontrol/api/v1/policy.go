@@ -8,9 +8,7 @@ import (
 	"os"
 	"time"
 
-	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
-	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2"
 )
 
@@ -74,7 +72,7 @@ func registerPolicy(api huma.API, b Backend) {
 
 			return out, nil
 		case types.PolicyModeFile:
-			absPath := util.AbsolutePathFromConfigPath(b.Cfg.Policy.Path)
+			absPath := b.Cfg.AbsPath(b.Cfg.Policy.Path)
 
 			f, err := os.Open(absPath)
 			if err != nil {
@@ -116,37 +114,11 @@ func registerPolicy(api huma.API, b Backend) {
 			)
 		}
 
-		p := in.Body.Policy
-
-		// Reject policy that would fail when building a map response. SSH rule
-		// validation needs a node, so a server with no nodes can't catch every
-		// case here.
-		nodes := b.State.ListNodes()
-
-		_, err := b.State.SetPolicy([]byte(p))
-		if err != nil {
-			return nil, huma.Error400BadRequest("setting policy", err)
-		}
-
-		if nodes.Len() > 0 {
-			_, err = b.State.SSHPolicy(nodes.At(0))
-			if err != nil {
-				return nil, huma.Error400BadRequest("verifying SSH rules", err)
-			}
-		}
-
-		updated, err := b.State.SetPolicyInDB(p)
-		if err != nil {
-			return nil, huma.Error500InternalServerError("setting policy", err)
-		}
-
-		// Reload even when content is unchanged: routes manually disabled before
-		// may now qualify for auto-approval, so they must be re-evaluated.
-		cs, err := b.State.ReloadPolicy()
+		updated, cs, err := b.State.UpdatePolicy([]byte(in.Body.Policy))
 		b.Change(cs...)
 
 		if err != nil {
-			return nil, huma.Error500InternalServerError("reloading policy", err)
+			return nil, mapError("setting policy", err)
 		}
 
 		out := &setPolicyOutput{}
@@ -165,23 +137,9 @@ func registerPolicy(api huma.API, b Backend) {
 		Tags:        []string{"Policy"},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, in *checkPolicyInput) (*checkPolicyOutput, error) {
-		polB := []byte(in.Body.Policy)
-
-		users, err := b.State.ListAllUsers()
+		err := b.State.ValidatePolicy([]byte(in.Body.Policy))
 		if err != nil {
-			return nil, huma.Error500InternalServerError("loading users", err)
-		}
-
-		nodes := b.State.ListNodes()
-
-		pm, err := policyv2.NewPolicyManager(polB, users, nodes)
-		if err != nil {
-			return nil, huma.Error400BadRequest(err.Error(), err)
-		}
-
-		_, err = pm.SetPolicy(polB)
-		if err != nil {
-			return nil, huma.Error400BadRequest(err.Error(), err)
+			return nil, mapError(err.Error(), err)
 		}
 
 		return &checkPolicyOutput{}, nil

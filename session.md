@@ -1,4 +1,54 @@
 # Session
+## Current Task: Merge upstream/main into dev and create Git Flow release ✅ MERGE COMPLETE
+
+**Completed:** 2026-11-23
+
+### Result
+
+- Fetched `upstream/main` at `0c304b06` and merged it into `dev`.
+- Merge commit: `9a56c617d426b2cebb8401a1966248a7dfa950a8`.
+- Previous latest valid tag: `v1.1.5`. Next release: `1.1.6` (tag `v1.1.6`).
+- Backup branch retained: `backup/pre-merge-20261123`.
+- Headplane gitlink retained at `9b8bfc2c15744e33cb9f8d9d2c998260bcff5aad`;
+  the checked-out submodule worktree remains at `5ab2878a…` as documented.
+
+### Conflict resolution
+
+- 83 conflicts were resolved: 44 import-only, 6 clean normalized merges, and
+  33 manual/configuration resolutions.
+- Preserved fork features `FP-001`–`FP-016`, including the module path, update
+  checker, DERP/webhook/machine-approval APIs, Headplane integration, OIDC
+  groups, QR registration, server info, readiness endpoint, and docs.
+- Accepted upstream's newer config loader, auth-cache admission, tagged-PAK
+  re-registration, policy group pre-resolution, deleted-node behavior, and
+  migrations, then re-applied fork behavior where required.
+- Kept the deprecated `headplane` config key accepted for rollback
+  compatibility and restored the QR expiry default in `SetAuthCacheEntry`.
+- Accepted fork deletions of `docs-deploy.yml`, `version-bump.yml`, and
+  `nix/example-configuration.nix`; no feature was retired.
+
+### Validation
+
+- `go build ./cmd/headscale` — PASS.
+- Preservation audit — PASS.
+- `git -C headplane` check:fork — PASS.
+- `go test ./cmd/...` — PASS.
+- `go test ./hscontrol/... -skip '^(TestTailSQLAccess|TestAPIv2)$'` — all
+  packages PASS except the pre-existing upstream servertest timeout, which also
+  reproduces on clean `upstream/main`.
+- Focused QR, config, health/readiness, and tagged-PAK tests — PASS.
+- Environment-only limitations: `TestTailSQLAccess` fails on clean upstream;
+  `TestAPIv2` requires `tscli`/`tofu` from the Nix dev shell; the servertest
+  package times out on clean upstream in this environment.
+
+### Pending work
+
+- Start and finish Git Flow release `1.1.6`, producing tag `v1.1.6`.
+- Verify final `main`, `dev`, tag, and release-branch state.
+
+---
+
+
 
 ## Current Task: Harden Merge-Preservation Document Format ✅ COMPLETE
 

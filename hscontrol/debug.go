@@ -8,11 +8,13 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/arl/statsviz"
+	"github.com/blackhiden/headscale/hscontrol/config"
 	"github.com/blackhiden/headscale/hscontrol/templates"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/types/change"
@@ -77,6 +79,56 @@ func writeDebug(w http.ResponseWriter, r *http.Request, jsonVal func() any, text
 	_, _ = w.Write([]byte(textVal()))
 }
 
+func (h *Headscale) debugHostGuard(next http.Handler) http.Handler {
+	normalize := func(host string) string {
+		name, _, err := net.SplitHostPort(host)
+		if err == nil {
+			host = name
+		}
+
+		return strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
+	}
+
+	allowed := []string{"localhost", normalize(string(h.cfg.MetricsAddr))}
+
+	serverURL, err := url.Parse(h.cfg.ServerURL)
+	if err == nil {
+		allowed = append(allowed, normalize(serverURL.Hostname()))
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/metrics" {
+			next.ServeHTTP(w, r)
+
+			return
+		}
+
+		host := normalize(r.Host)
+
+		if isAllowedDebugHost(host, allowed) {
+			next.ServeHTTP(w, r)
+
+			return
+		}
+
+		http.Error(
+			w,
+			"debug host not allowed; use localhost, an IP address, "+
+				"or the server_url or metrics_listen_addr host",
+			http.StatusForbidden,
+		)
+	})
+}
+
+func isAllowedDebugHost(host string, allowed []string) bool {
+	_, err := netip.ParseAddr(host)
+	if host == "" {
+		return false
+	}
+
+	return err == nil || slices.Contains(allowed, host)
+}
+
 func (h *Headscale) debugHTTPServer() *http.Server {
 	debugMux := http.NewServeMux()
 	debug := tsweb.Debugger(debugMux)
@@ -88,7 +140,15 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 
 	// Configuration endpoint
 	debug.Handle("config", "Current configuration", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, h.state.DebugConfig())
+		out, err := config.Marshal(h.cfg, ".json")
+		if err != nil {
+			httpError(w, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(out)
 	}))
 
 	// Policy endpoint
@@ -223,8 +283,8 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	debugMux.Handle("/metrics", promhttp.Handler())
 
 	debugHTTPServer := &http.Server{
-		Addr:         h.cfg.MetricsAddr,
-		Handler:      securityHeaders(debugMux),
+		Addr:         string(h.cfg.MetricsAddr),
+		Handler:      securityHeaders(h.debugHostGuard(debugMux)),
 		ReadTimeout:  types.HTTPTimeout,
 		WriteTimeout: 0,
 	}
