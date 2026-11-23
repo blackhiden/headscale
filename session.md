@@ -1,4 +1,38 @@
 # Session
+
+## Current Task: Merge upstream/main into dev and create Git Flow release v1.1.7
+
+**Started:** 2026-11-23
+
+### Pre-merge state
+
+- Current branch: `dev` at `2b8b517bb88d3e88c73bf867956f2b3db4fddab2` before this task.
+- `main` at `41917c4589998f38f02c7a672c3b984a0d3cc276`; `main` is an ancestor of `dev`.
+- `upstream/main` before fetch: `160d8d2e9d6fb3ea94ba9101ccfe342651096a40`.
+- `dev` was behind `upstream/main` by 1 commit and ahead by 368 commits.
+- `headplane` gitlink in `HEAD`: `7d6616b9d6fbfb76846d5cc832c7ccb306695c8f`; submodule worktree is clean at the same commit.
+- Git Flow 1.12.3 is installed and configured with master `main`, develop `dev`, release prefix `release/`, and version-tag prefix `v`.
+- Latest valid release tag: `v1.1.6`. The `vv0.35.0-arsydoni4326-alt` tag is malformed and older; it is not used for version calculation.
+- Planned release: `1.1.7`, producing tag `v1.1.7` via Git Flow.
+
+### Local work preservation
+
+- Backup branch: `backup/pre-merge-20261123-upstream-160d8d2e` at the original `dev` tip.
+- Unrelated staged `Dockerfile` change (Go builder `1.27.2` → `1.27.4` plus build-essential setup) preserved in stash `f1c4acee28c11c2a18f3a41d17982b2b91472bf1` with message `pre-upstream-merge: preserve staged Dockerfile build tweak`.
+- The stash must be restored after the release is finalized; if Git does not restore the index bit, re-stage `Dockerfile` to recover the original staged state.
+
+### Progress
+
+- [x] Read project documentation and merge contract.
+- [x] Inspect Git status, branches, tags, remotes, and git-flow configuration.
+- [x] Create backup branch and preserve unrelated staged work.
+- [ ] Fetch and update `upstream/main`.
+- [ ] Merge upstream into `dev` with preservation audit.
+- [ ] Create and finish Git Flow release.
+- [ ] Restore unrelated local work and validate final state.
+
+---
+
 ## Current Task: Restore legacy config key compatibility ✅ COMPLETE
 
 **Completed:** 2026-11-23
