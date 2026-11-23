@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/blackhiden/headscale/hscontrol/config"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"

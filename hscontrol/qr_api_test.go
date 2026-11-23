@@ -16,7 +16,7 @@ func TestRegistrationQRPayloadHandler_Success(t *testing.T) {
 	t.Parallel()
 
 	app := createTestApp(t)
-	
+
 	// Create a pending registration
 	authID := types.MustAuthID()
 	regData := &types.RegistrationData{
@@ -58,7 +58,7 @@ func TestRegistrationQRPayloadHandler_NotFound(t *testing.T) {
 	t.Parallel()
 
 	app := createTestApp(t)
-	
+
 	authID := types.MustAuthID()
 
 	// Make request for non-existent auth_id
@@ -74,7 +74,7 @@ func TestRegistrationQRPayloadHandler_Expired(t *testing.T) {
 	t.Parallel()
 
 	app := createTestApp(t)
-	
+
 	// Create an expired pending registration
 	authID := types.MustAuthID()
 	regData := &types.RegistrationData{
@@ -97,7 +97,7 @@ func TestRegistrationQRPayloadHandler_InvalidAuthID(t *testing.T) {
 	t.Parallel()
 
 	app := createTestApp(t)
-	
+
 	// Make request with invalid auth_id
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/registration/qr/invalid-auth-id", nil)
 	rec := httptest.NewRecorder()
@@ -111,7 +111,7 @@ func TestRegistrationQRPayloadHandler_NotRegistrationRequest(t *testing.T) {
 	t.Parallel()
 
 	app := createTestApp(t)
-	
+
 	// Create a non-registration auth request (e.g., SSH check)
 	authID := types.MustAuthID()
 	authReq := types.NewAuthRequest() // Not a registration request

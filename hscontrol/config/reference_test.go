@@ -9,8 +9,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -27,9 +27,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	tsapi "tailscale.com/client/tailscale/v2"
 )

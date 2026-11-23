@@ -14,8 +14,6 @@ import (
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/blackhiden/headscale/hscontrol/policy/matcher"
-	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

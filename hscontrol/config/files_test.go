@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	policyv2 "github.com/blackhiden/headscale/hscontrol/policy/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/google/go-cmp/cmp"
 	"github.com/libdns/cloudflare"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/key"

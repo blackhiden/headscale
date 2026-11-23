@@ -5,9 +5,9 @@ import (
 
 	"github.com/blackhiden/headscale/hscontrol/db"
 	"github.com/blackhiden/headscale/hscontrol/state"
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
+	"github.com/danielgtaylor/huma/v2"
 	"gorm.io/gorm"
 )
 

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	gocmp "github.com/google/go-cmp/cmp"
 	hsdns "github.com/blackhiden/headscale/hscontrol/dns"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )

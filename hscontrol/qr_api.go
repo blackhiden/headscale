@@ -89,7 +89,7 @@ func (h *Headscale) RegistrationQRPayloadHandler(
 	// Serialize to JSON
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	
+
 	if err := json.NewEncoder(writer).Encode(payload); err != nil {
 		log.Error().
 			Err(err).

@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/blackhiden/headscale/hscontrol/util/zlog/zf"
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )

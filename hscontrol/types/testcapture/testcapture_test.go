@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
+	"github.com/google/go-cmp/cmp"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
 )

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )

@@ -10,9 +10,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/blackhiden/headscale/hscontrol/types"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
 	"github.com/libdns/libdns"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/blackhiden/headscale/hscontrol/config"
+	"github.com/danielgtaylor/huma/v2"
 )
 
 func init() {

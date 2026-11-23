@@ -4,8 +4,8 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/coreos/go-oidc/v3/oidc"
 )
 
 // Default is the configuration before a file or variable sets
