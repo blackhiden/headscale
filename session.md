@@ -35,8 +35,22 @@
   - `go test ./hscontrol/policy/v2 -count=1` PASS.
   - `go test ./hscontrol/state -count=1` PASS.
   - Focused `go test ./hscontrol/servertest -run '^(TestUserEmailDomainChangeRevokesLiveAccess|TestPolicyChanges)$'` PASS.
-- [ ] Create and finish Git Flow release.
-- [ ] Restore unrelated local work and validate final state.
+- [x] Create and finish Git Flow release `1.1.7`.
+- [x] Restore unrelated local work and validate final state.
+
+### Result
+
+- Previous latest valid tag: `v1.1.6`.
+- New release version: `1.1.7`; annotated tag `v1.1.7` object `2e59d0c0d684219e04e09cb770e85f56843df81b`, pointing to commit `d598680cd6d48ca1364d6b7fa1e53458d6d703c0`.
+- Upstream commit synchronized: `160d8d2e9d6fb3ea94ba9101ccfe342651096a40`.
+- Merge into `dev`: `4992e42be045ee691ef38ea166f537dddcc53d37`; `upstream/main` is now an ancestor of `dev`.
+- Release branch: `release/1.1.7`, created from `dev` and deleted after finishing.
+- `main`: `d598680cd6d48ca1364d6b7fa1e53458d6d703c0`, containing the release merge and tag.
+- `dev`: `54f95f843285c78d198c3fc5569c786060a33517`, containing the upstream merge and release back-merge.
+- `headplane` gitlink remained `7d6616b9d6fbfb76846d5cc832c7ccb306695c8f`; `git -C headplane pnpm run check:fork` PASS.
+- Final preservation audit PASS; final `go build ./cmd/headscale` PASS.
+- The staged `Dockerfile` change was restored from stash and re-staged; no unrelated local work was discarded.
+- No push, force-push, reset, clean, or tag deletion was performed. Backup branch `backup/pre-merge-20261123-upstream-160d8d2e` was retained.
 
 ---
 
