@@ -2,6 +2,14 @@
 
 ## Next
 
+### Configuration compatibility
+
+- Accept the fork's legacy config key locations as deprecated aliases so
+  existing deployments continue to load after the upstream config refactor:
+  `derp.server.auto_update_enabled`, `derp.server.update_frequency`,
+  `node.routes.probe_interval`, and `node.routes.probe_timeout`. Each legacy key
+  emits a warning naming its replacement.
+
 ### Upstream synchronization
 
 - Synchronized `upstream/main` at `0c304b06` into `dev` and preserved all fork

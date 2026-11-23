@@ -1,4 +1,38 @@
 # Session
+## Current Task: Restore legacy config key compatibility ✅ COMPLETE
+
+**Completed:** 2026-11-23
+
+### Problem
+
+After the upstream config refactor, existing fork configs failed with unknown-key
+errors for `derp.server.auto_update_enabled`, `derp.server.update_frequency`,
+`node.routes.probe_interval`, and `node.routes.probe_timeout`.
+
+### Fix
+
+- Added deprecated aliases in `hscontrol/config/keys.go` and a rewrite step in
+  `hscontrol/config/load.go`.
+- Legacy keys are rewritten to `derp.auto_update_enabled`,
+  `derp.update_frequency`, `node.routes.ha.probe_interval`, and
+  `node.routes.ha.probe_timeout`, with one warning per key.
+- If both legacy and current keys are present, the current key wins.
+- Added regression coverage in `hscontrol/config/load_test.go`.
+- Documented the aliases in `CHANGELOG.md` and `docs/troubleshooting.md`.
+
+### Validation
+
+- Focused alias test — PASS.
+- `go test ./hscontrol/config -count=1` — PASS.
+- `go build ./cmd/headscale` — PASS.
+- `headscale check config -f /tmp/legacy-config.yaml` with all four legacy keys
+  — PASS with four deprecation warnings.
+- No new release was created for this fix.
+- An unrelated uncommitted `Dockerfile` change was left untouched.
+
+---
+
+
 ## Current Task: Merge upstream/main into dev and create Git Flow release ✅ COMPLETE
 
 **Completed:** 2026-11-23

@@ -215,6 +215,87 @@ func normaliseConfigMap(m map[string]any, path string, collide func(path, a, b s
 	return out
 }
 
+// applyLegacyAliases rewrites fork config keys that upstream moved. The new
+// key wins when both are present; the old value is dropped with a warning.
+func (s *configSource) applyLegacyAliases(m map[string]any) {
+	for _, alias := range legacyAliases {
+		oldPath := strings.Split(alias.Old, ".")
+		newPath := strings.Split(alias.New, ".")
+
+		value, ok := takeConfigPath(m, oldPath)
+		if !ok {
+			continue
+		}
+
+		if hasConfigPath(m, newPath) {
+			s.warnings = append(s.warnings, fmt.Sprintf(
+				"configuration key %s is deprecated; %s is already set, ignoring %s",
+				alias.Old, alias.New, alias.Old))
+			continue
+		}
+
+		setConfigPath(m, newPath, value)
+		s.warnings = append(s.warnings, fmt.Sprintf(
+			"configuration key %s is deprecated; use %s", alias.Old, alias.New))
+	}
+}
+
+func takeConfigPath(m map[string]any, parts []string) (any, bool) {
+	if len(parts) == 0 {
+		return nil, false
+	}
+
+	current := m
+	for _, part := range parts[:len(parts)-1] {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current = next
+	}
+
+	last := parts[len(parts)-1]
+	value, ok := current[last]
+	if ok {
+		delete(current, last)
+	}
+
+	return value, ok
+}
+
+func hasConfigPath(m map[string]any, parts []string) bool {
+	if len(parts) == 0 {
+		return false
+	}
+
+	current := m
+	for _, part := range parts[:len(parts)-1] {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			return false
+		}
+		current = next
+	}
+
+	_, ok := current[parts[len(parts)-1]]
+
+	return ok
+}
+
+func setConfigPath(m map[string]any, parts []string, value any) {
+	current := m
+	for _, part := range parts[:len(parts)-1] {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			next = map[string]any{}
+			current[part] = next
+		}
+		current = next
+	}
+
+	current[parts[len(parts)-1]] = value
+}
+
 // openMapObject is v, set at path, as a map when path is an open map and v
 // a JSON object written as a string, the form a variable takes, so its keys
 // follow the map's rule as written ones do. Any other v is returned as is:
@@ -523,6 +604,8 @@ func (s *configSource) loadFile() error {
 	m = normaliseConfigMap(m, "", func(path, a, b string) {
 		errs = append(errs, caseCollision(path, a, b, " ("+s.file+")"))
 	})
+
+	s.applyLegacyAliases(m)
 
 	// Checked before expansion, which would otherwise discard shadowed keys.
 	s.checkKeys(&errs, m)
