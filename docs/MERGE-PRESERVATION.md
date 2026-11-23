@@ -573,7 +573,7 @@ Append one row for every upstream merge. Never delete old rows.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-22 | `9ef033c7` | `3c788b7a` | `FP-001`–`FP-016` | none | none | baseline | Cline |
 | 2026-11-23 | `0c304b06` | `9a56c617` | `FP-001`–`FP-016` | `.github/workflows/docs-deploy.yml`, `.github/workflows/version-bump.yml`, `nix/example-configuration.nix` | `headplane` gitlink restored to `9b8bfc2c` | PASS | Cline |
-| 2026-11-23 | `160d8d2e` | pending | `FP-001`–`FP-017` | none | none | PASS | Cline |
+| 2026-11-23 | `160d8d2e` | `4992e42b` | `FP-001`–`FP-017` | none | none | PASS | Cline |
 
 Notes for the 2026-11-23 `160d8d2e` merge:
 
@@ -588,7 +588,7 @@ Notes for the 2026-11-23 `160d8d2e` merge:
 - Validation: preservation audit PASS; `go build ./cmd/headscale` PASS;
   `go test ./hscontrol/policy/v2` PASS; `go test ./hscontrol/state` PASS;
   focused `hscontrol/servertest` PASS.
-- Follow-up work: record the final merge commit SHA after the merge is created.
+- Follow-up work: none for the merge itself.
 
 Notes for the 2026-11-23 merge:
 

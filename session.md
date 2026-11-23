@@ -27,7 +27,7 @@
 - [x] Inspect Git status, branches, tags, remotes, and git-flow configuration.
 - [x] Create backup branch and preserve unrelated staged work.
 - [x] Fetch and update `upstream/main` (unchanged at `160d8d2e`).
-- [x] Merge upstream into `dev` with preservation audit.
+- [x] Merge upstream into `dev` with preservation audit. Merge commit: `4992e42be045ee691ef38ea166f537dddcc53d37`.
   - One import-only conflict in `hscontrol/servertest/policy_test.go` was resolved
     by keeping the fork module path and adding upstream's `types` import.
   - Preservation audit passed before and after conflict resolution.
