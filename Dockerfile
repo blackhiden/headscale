@@ -19,7 +19,7 @@
 #     headscale serve
 
 # Build stage
-FROM golang:1.27.2-trixie AS builder
+FROM golang:1.27.4-trixie AS builder
 
 # Version metadata is injected via -ldflags into the hscontrol/types package.
 # Pass these build args from the build command (see .github/workflows/deploy.yaml):
@@ -35,6 +35,15 @@ ENV GOPATH /go
 WORKDIR /go/src/headscale
 
 # Download dependencies first - only invalidated when go.mod/go.sum change
+
+RUN [ ! -f /etc/localtime ] && ln -s /usr/share/zoneinfo/$TZ /etc/localtime; 	\
+    echo $TZ > /etc/timezone
+RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends build-essential
+
 COPY go.mod go.sum /go/src/headscale/
 RUN --mount=type=cache,target=/go/pkg/mod \
 	--mount=type=cache,target=/root/.cache/go-build \
