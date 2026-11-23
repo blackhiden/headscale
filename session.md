@@ -26,8 +26,15 @@
 - [x] Read project documentation and merge contract.
 - [x] Inspect Git status, branches, tags, remotes, and git-flow configuration.
 - [x] Create backup branch and preserve unrelated staged work.
-- [ ] Fetch and update `upstream/main`.
-- [ ] Merge upstream into `dev` with preservation audit.
+- [x] Fetch and update `upstream/main` (unchanged at `160d8d2e`).
+- [x] Merge upstream into `dev` with preservation audit.
+  - One import-only conflict in `hscontrol/servertest/policy_test.go` was resolved
+    by keeping the fork module path and adding upstream's `types` import.
+  - Preservation audit passed before and after conflict resolution.
+  - `go build ./cmd/headscale` PASS.
+  - `go test ./hscontrol/policy/v2 -count=1` PASS.
+  - `go test ./hscontrol/state -count=1` PASS.
+  - Focused `go test ./hscontrol/servertest -run '^(TestUserEmailDomainChangeRevokesLiveAccess|TestPolicyChanges)$'` PASS.
 - [ ] Create and finish Git Flow release.
 - [ ] Restore unrelated local work and validate final state.
 

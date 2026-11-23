@@ -573,6 +573,22 @@ Append one row for every upstream merge. Never delete old rows.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-22 | `9ef033c7` | `3c788b7a` | `FP-001`–`FP-016` | none | none | baseline | Cline |
 | 2026-11-23 | `0c304b06` | `9a56c617` | `FP-001`–`FP-016` | `.github/workflows/docs-deploy.yml`, `.github/workflows/version-bump.yml`, `nix/example-configuration.nix` | `headplane` gitlink restored to `9b8bfc2c` | PASS | Cline |
+| 2026-11-23 | `160d8d2e` | pending | `FP-001`–`FP-017` | none | none | PASS | Cline |
+
+Notes for the 2026-11-23 `160d8d2e` merge:
+
+- Upstream changes accepted: policy email-domain resolution from current users,
+  live access revocation when a user's email changes, and the associated
+  policy/state/servertest coverage.
+- Upstream changes rejected to preserve fork behavior: none. The only conflict
+  was the import block in `hscontrol/servertest/policy_test.go`; the fork module
+  path was retained and upstream's new `types` import was added.
+- Features explicitly retired: none.
+- The `headplane` gitlink remained `7d6616b9d6fbfb76846d5cc832c7ccb306695c8f`.
+- Validation: preservation audit PASS; `go build ./cmd/headscale` PASS;
+  `go test ./hscontrol/policy/v2` PASS; `go test ./hscontrol/state` PASS;
+  focused `hscontrol/servertest` PASS.
+- Follow-up work: record the final merge commit SHA after the merge is created.
 
 Notes for the 2026-11-23 merge:
 
