@@ -19,6 +19,8 @@ errors for `derp.server.auto_update_enabled`, `derp.server.update_frequency`,
 - If both legacy and current keys are present, the current key wins.
 - Added regression coverage in `hscontrol/config/load_test.go`.
 - Documented the aliases in `CHANGELOG.md` and `docs/troubleshooting.md`.
+- Recorded the aliases as `FP-017` in `docs/MERGE-PRESERVATION.md`, including
+  the manifest, preservation card, audit tokens, and decision-log note.
 
 ### Validation
 
