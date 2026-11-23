@@ -41,6 +41,7 @@ Stable IDs are used in conflict notes, commit messages, and the decision log.
 | `FP-014` | Small load-bearing fixes | Doni Arsy | Active | `Credential.Clone`, `testify/assert`, `capver`, `zerolog` |
 | `FP-015` | Deliberate removals | Doni Arsy | Negative list | `*.md` ignore, removed agent docs — do **not** restore |
 | `FP-016` | Headplane gitlink selection | Doni Arsy | Active | `headplane` gitlink, `pnpm run check:fork` |
+| `FP-017` | Legacy fork config key aliases | Denny Lastpaste | Active | `hscontrol/config/keys.go`, `applyLegacyAliases`, `derp.server.auto_update_enabled` |
 
 ## 2. Scope and attribution
 
@@ -405,6 +406,27 @@ notes and the decision log.
 - **Verify:** `git ls-tree HEAD headplane`, `git submodule status`, and
   `git -C headplane pnpm run check:fork`.
 
+### FP-017 — Legacy fork config key aliases
+
+- **Author:** Denny Lastpaste
+- **Last known good:** `7aa662f2`
+- **Protected paths:** `hscontrol/config/keys.go`, `hscontrol/config/load.go`,
+  `hscontrol/config/load_test.go`, `CHANGELOG.md`, `docs/troubleshooting.md`.
+- **Required tokens:** `legacyAliases`, `applyLegacyAliases`,
+  `derp.server.auto_update_enabled`, `derp.server.update_frequency`,
+  `node.routes.probe_interval`, `node.routes.probe_timeout`.
+- **Contract:** Existing fork configs using the pre-refactor key locations must
+  keep loading. The loader rewrites them to `derp.auto_update_enabled`,
+  `derp.update_frequency`, `node.routes.ha.probe_interval`, and
+  `node.routes.ha.probe_timeout`, emitting one deprecation warning per key. If
+  both legacy and current keys are present, the current key wins.
+- **Conflict rule:** Never accept an upstream config-loader change that removes
+  `legacyAliases` or `applyLegacyAliases` without an explicit retirement entry
+  in the decision log. Keep the four alias mappings and the regression test.
+- **Restore:** `git checkout 7aa662f2 -- hscontrol/config/keys.go hscontrol/config/load.go hscontrol/config/load_test.go`
+- **Verify:** `go test ./hscontrol/config -run '^TestConfigSource$/fork_legacy_key_aliases$' -count=1`
+  and `headscale check config -f <config-with-legacy-keys>`.
+
 ## 4. One-Command Preservation Audit
 
 Run this immediately after resolving merge conflicts and before committing the
@@ -428,6 +450,7 @@ for p in \
   hscontrol/api/v1/serverinfo.go hscontrol/handlers.go \
   hscontrol/db/migrate_headplane.go hscontrol/db/migrate_webhooks.go \
   hscontrol/db/schema.sql hscontrol/types/types_clone.go \
+  hscontrol/config/keys.go hscontrol/config/load.go \
   hscontrol/servertest/sshcheck_test.go hscontrol/noise_test.go \
   docs/MERGE-PRESERVATION.md SCHEMA.md docs/ref/extending.md \
   docs/usage/observability.md docs/usage/ui-guide.md \
@@ -453,6 +476,8 @@ need_token hscontrol/handlers.go 'ReadyHandler'
 need_token hscontrol/types/types_clone.go 'src.User.Clone()'
 need_token hscontrol/servertest/sshcheck_test.go 'testify/assert'
 need_token hscontrol/noise_test.go 'capver'
+need_token hscontrol/config/keys.go 'derp.server.auto_update_enabled'
+need_token hscontrol/config/load.go 'applyLegacyAliases'
 need_token docs/ref/extending.md 'Extension points'
 need_token docs/usage/observability.md 'headscale_updatecheck_requests_total'
 need_token docs/usage/ui-guide.md 'EmptyState'
@@ -548,6 +573,22 @@ Append one row for every upstream merge. Never delete old rows.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-22 | `9ef033c7` | `3c788b7a` | `FP-001`–`FP-016` | none | none | baseline | Cline |
 | 2026-11-23 | `0c304b06` | `9a56c617` | `FP-001`–`FP-016` | `.github/workflows/docs-deploy.yml`, `.github/workflows/version-bump.yml`, `nix/example-configuration.nix` | `headplane` gitlink restored to `9b8bfc2c` | PASS | Cline |
+| 2026-11-23 | `160d8d2e` | `4992e42b` | `FP-001`–`FP-017` | none | none | PASS | Cline |
+
+Notes for the 2026-11-23 `160d8d2e` merge:
+
+- Upstream changes accepted: policy email-domain resolution from current users,
+  live access revocation when a user's email changes, and the associated
+  policy/state/servertest coverage.
+- Upstream changes rejected to preserve fork behavior: none. The only conflict
+  was the import block in `hscontrol/servertest/policy_test.go`; the fork module
+  path was retained and upstream's new `types` import was added.
+- Features explicitly retired: none.
+- The `headplane` gitlink remained `7d6616b9d6fbfb76846d5cc832c7ccb306695c8f`.
+- Validation: preservation audit PASS; `go build ./cmd/headscale` PASS;
+  `go test ./hscontrol/policy/v2` PASS; `go test ./hscontrol/state` PASS;
+  focused `hscontrol/servertest` PASS.
+- Follow-up work: none for the merge itself.
 
 Notes for the 2026-11-23 merge:
 
@@ -562,6 +603,9 @@ Notes for the 2026-11-23 merge:
   restored.
 - Follow-up work: environment-only test limitations remain (`TestTailSQLAccess`,
   `TestAPIv2` missing `tscli`/`tofu`, and the upstream servertest timeout).
+- `FP-017` was added after release `v1.1.6` in commit `7aa662f2` when deployment
+  configs using the legacy key locations were found to be rejected by the new
+  strict config loader. No feature was retired.
 
 Copy this template for the next merge:
 
@@ -600,6 +644,7 @@ The following are **not** covered by CI and must be checked with section 4:
 - `FP-013` required documentation
 - `FP-014` single-line fixes
 - `FP-016` gitlink selection
+- `FP-017` legacy config key aliases
 
 Submodule-side features are covered by
 `git -C headplane pnpm run check:fork`, which checks local admin files, login
@@ -609,7 +654,7 @@ integration, build defines, and the QR scanner.
 
 - The `headplane` gitlink recorded in `HEAD` is
   `9b8bfc2c15744e33cb9f8d9d2c998260bcff5aad`, but the checked-out submodule
-  worktree is at `5ab2878a5d0e931486daa6de89b9fef3d4f411d6`
+  worktree is at `f9b2a3ed30c7e429f6ac4367dadf57fd05f8b7f0`
   (`git submodule status` shows a leading `+`). Do not reset the submodule
   without an explicit decision about which commit is authoritative.
 - The submodule has no Doni-authored commits; preservation there means keeping

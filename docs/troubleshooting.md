@@ -226,6 +226,34 @@ journalctl -u headscale -n 50
    headscale serve
    ```
 
+### Legacy fork config keys rejected after upgrade
+
+**Symptoms:**
+
+- Startup fails with `unknown configuration key derp.server.auto_update_enabled`
+- Similar errors for `derp.server.update_frequency`,
+  `node.routes.probe_interval`, or `node.routes.probe_timeout`
+
+**Cause:**
+
+Upstream moved these keys when the configuration schema was refactored.
+
+**Resolution:**
+
+These legacy locations are accepted as deprecated aliases and rewritten to the
+new keys with a warning. Existing configs load without edits. To remove the
+warnings, update the config to the current locations:
+
+| Legacy key | Current key |
+| --- | --- |
+| `derp.server.auto_update_enabled` | `derp.auto_update_enabled` |
+| `derp.server.update_frequency` | `derp.update_frequency` |
+| `node.routes.probe_interval` | `node.routes.ha.probe_interval` |
+| `node.routes.probe_timeout` | `node.routes.ha.probe_timeout` |
+
+If both the legacy and current key are set, the current key wins and the legacy
+value is ignored.
+
 ### YAML syntax errors
 
 **Symptoms:**

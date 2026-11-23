@@ -207,3 +207,15 @@ var removedKeys = []removedKey{
 	{Old: "oidc.client_secret_path", New: "oidc.client_secret", Value: "file:<path>", Since: "0.30"},
 	{Old: "database.postgres.password_file", New: "database.postgres.pass", Value: "file:<path>", Since: "0.30"},
 }
+
+// legacyAlias is a fork config key that upstream moved. Unlike removedKey,
+// these keys are still accepted and rewritten so existing deployments keep
+// loading without a config edit.
+type legacyAlias struct{ Old, New string }
+
+var legacyAliases = []legacyAlias{
+	{Old: "derp.server.auto_update_enabled", New: "derp.auto_update_enabled"},
+	{Old: "derp.server.update_frequency", New: "derp.update_frequency"},
+	{Old: "node.routes.probe_interval", New: "node.routes.ha.probe_interval"},
+	{Old: "node.routes.probe_timeout", New: "node.routes.ha.probe_timeout"},
+}

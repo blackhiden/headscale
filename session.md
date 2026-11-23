@@ -1,5 +1,82 @@
 # Session
-## Current Task: Merge upstream/main into dev and create Git Flow release ✅ MERGE COMPLETE
+
+## Current Task: Merge upstream/main into dev and create Git Flow release v1.1.7
+
+**Started:** 2026-11-23
+
+### Pre-merge state
+
+- Current branch: `dev` at `2b8b517bb88d3e88c73bf867956f2b3db4fddab2` before this task.
+- `main` at `41917c4589998f38f02c7a672c3b984a0d3cc276`; `main` is an ancestor of `dev`.
+- `upstream/main` before fetch: `160d8d2e9d6fb3ea94ba9101ccfe342651096a40`.
+- `dev` was behind `upstream/main` by 1 commit and ahead by 368 commits.
+- `headplane` gitlink in `HEAD`: `7d6616b9d6fbfb76846d5cc832c7ccb306695c8f`; submodule worktree is clean at the same commit.
+- Git Flow 1.12.3 is installed and configured with master `main`, develop `dev`, release prefix `release/`, and version-tag prefix `v`.
+- Latest valid release tag: `v1.1.6`. The `vv0.35.0-arsydoni4326-alt` tag is malformed and older; it is not used for version calculation.
+- Planned release: `1.1.7`, producing tag `v1.1.7` via Git Flow.
+
+### Local work preservation
+
+- Backup branch: `backup/pre-merge-20261123-upstream-160d8d2e` at the original `dev` tip.
+- Unrelated staged `Dockerfile` change (Go builder `1.27.2` → `1.27.4` plus build-essential setup) preserved in stash `f1c4acee28c11c2a18f3a41d17982b2b91472bf1` with message `pre-upstream-merge: preserve staged Dockerfile build tweak`.
+- The stash must be restored after the release is finalized; if Git does not restore the index bit, re-stage `Dockerfile` to recover the original staged state.
+
+### Progress
+
+- [x] Read project documentation and merge contract.
+- [x] Inspect Git status, branches, tags, remotes, and git-flow configuration.
+- [x] Create backup branch and preserve unrelated staged work.
+- [x] Fetch and update `upstream/main` (unchanged at `160d8d2e`).
+- [x] Merge upstream into `dev` with preservation audit. Merge commit: `4992e42be045ee691ef38ea166f537dddcc53d37`.
+  - One import-only conflict in `hscontrol/servertest/policy_test.go` was resolved
+    by keeping the fork module path and adding upstream's `types` import.
+  - Preservation audit passed before and after conflict resolution.
+  - `go build ./cmd/headscale` PASS.
+  - `go test ./hscontrol/policy/v2 -count=1` PASS.
+  - `go test ./hscontrol/state -count=1` PASS.
+  - Focused `go test ./hscontrol/servertest -run '^(TestUserEmailDomainChangeRevokesLiveAccess|TestPolicyChanges)$'` PASS.
+- [ ] Create and finish Git Flow release.
+- [ ] Restore unrelated local work and validate final state.
+
+---
+
+## Current Task: Restore legacy config key compatibility ✅ COMPLETE
+
+**Completed:** 2026-11-23
+
+### Problem
+
+After the upstream config refactor, existing fork configs failed with unknown-key
+errors for `derp.server.auto_update_enabled`, `derp.server.update_frequency`,
+`node.routes.probe_interval`, and `node.routes.probe_timeout`.
+
+### Fix
+
+- Added deprecated aliases in `hscontrol/config/keys.go` and a rewrite step in
+  `hscontrol/config/load.go`.
+- Legacy keys are rewritten to `derp.auto_update_enabled`,
+  `derp.update_frequency`, `node.routes.ha.probe_interval`, and
+  `node.routes.ha.probe_timeout`, with one warning per key.
+- If both legacy and current keys are present, the current key wins.
+- Added regression coverage in `hscontrol/config/load_test.go`.
+- Documented the aliases in `CHANGELOG.md` and `docs/troubleshooting.md`.
+- Recorded the aliases as `FP-017` in `docs/MERGE-PRESERVATION.md`, including
+  the manifest, preservation card, audit tokens, and decision-log note.
+
+### Validation
+
+- Focused alias test — PASS.
+- `go test ./hscontrol/config -count=1` — PASS.
+- `go build ./cmd/headscale` — PASS.
+- `headscale check config -f /tmp/legacy-config.yaml` with all four legacy keys
+  — PASS with four deprecation warnings.
+- No new release was created for this fix.
+- An unrelated uncommitted `Dockerfile` change was left untouched.
+
+---
+
+
+## Current Task: Merge upstream/main into dev and create Git Flow release ✅ COMPLETE
 
 **Completed:** 2026-11-23
 
@@ -41,10 +118,18 @@
   `TestAPIv2` requires `tscli`/`tofu` from the Nix dev shell; the servertest
   package times out on clean upstream in this environment.
 
-### Pending work
+### Release result
 
-- Start and finish Git Flow release `1.1.6`, producing tag `v1.1.6`.
-- Verify final `main`, `dev`, tag, and release-branch state.
+- Git Flow release branch: `release/1.1.6` (created and deleted).
+- Release tag: `v1.1.6` at `41917c4589998f38f02c7a672c3b984a0d3cc276`.
+- `main` at `41917c45` contains the release merge.
+- `dev` at `d1ba1e19` contains `upstream/main`, merge commit `9a56c617`, and
+  the release back-merge.
+- Final `go build ./cmd/headscale` — PASS.
+- No push, force-push, reset, or tag deletion was performed.
+- The `headplane` gitlink remains `9b8bfc2c…`; the checked-out submodule
+  worktree is now `f9b2a3ed…` after the release checkouts. This known
+  discrepancy was left unchanged.
 
 ---
 

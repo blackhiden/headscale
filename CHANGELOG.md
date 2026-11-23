@@ -2,7 +2,25 @@
 
 ## Next
 
+### Configuration compatibility
+
+- Accept the fork's legacy config key locations as deprecated aliases so
+  existing deployments continue to load after the upstream config refactor:
+  `derp.server.auto_update_enabled`, `derp.server.update_frequency`,
+  `node.routes.probe_interval`, and `node.routes.probe_timeout`. Each legacy key
+  emits a warning naming its replacement.
+
 ### Upstream synchronization
+
+- Synchronized `upstream/main` at `160d8d2e` into `dev`. Accepted upstream's
+  policy change that resolves email domains from current users and revokes live
+  access when a user's email changes. The single merge conflict was import-only
+  in `hscontrol/servertest/policy_test.go`; the fork module path was kept and
+  upstream's new `types` import was added.
+- The feature-preservation audit passed before and after conflict resolution.
+  `go build ./cmd/headscale`, `go test ./hscontrol/policy/v2`,
+  `go test ./hscontrol/state`, and the focused servertest for the upstream
+  policy change all passed.
 
 - Synchronized `upstream/main` at `0c304b06` into `dev` and preserved all fork
   features `FP-001`–`FP-016`. The merge commit is `9a56c617`.

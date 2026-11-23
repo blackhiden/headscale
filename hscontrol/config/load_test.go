@@ -80,6 +80,22 @@ func TestConfigSource(t *testing.T) {
 			errs: []string{"unknown configuration key dns.magic_dsn (", "config.yaml:3:3)"},
 		},
 		{
+			name: "fork legacy key aliases",
+			file: "derp:\n  server:\n    auto_update_enabled: true\n    update_frequency: 3h\nnode:\n  routes:\n    probe_interval: 10s\n    probe_timeout: 5s\n",
+			warns: []string{
+				"derp.server.auto_update_enabled is deprecated; use derp.auto_update_enabled",
+				"derp.server.update_frequency is deprecated; use derp.update_frequency",
+				"node.routes.probe_interval is deprecated; use node.routes.ha.probe_interval",
+				"node.routes.probe_timeout is deprecated; use node.routes.ha.probe_timeout",
+			},
+			check: func(t *testing.T, cfg *types.Config) {
+				assert.True(t, cfg.DERP.AutoUpdate)
+				assert.Equal(t, 3*time.Hour, cfg.DERP.UpdateFrequency)
+				assert.Equal(t, 10*time.Second, cfg.Node.Routes.HA.ProbeInterval)
+				assert.Equal(t, 5*time.Second, cfg.Node.Routes.HA.ProbeTimeout)
+			},
+		},
+		{
 			name: "removed file key",
 			file: "grpc_listen_addr: :50443\n",
 			errs: []string{"grpc_listen_addr", "removed"},
