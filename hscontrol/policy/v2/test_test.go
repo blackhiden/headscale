@@ -1,12 +1,17 @@
 package v2
 
 import (
+	"fmt"
+	"net/netip"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go4.org/netipx"
 )
 
 // policyTestUsers/policyTestNodes are reused across the test cases below to
@@ -100,6 +105,55 @@ func TestRunTests(t *testing.T) {
 			}`,
 			wantPass:    false,
 			wantErrSub:  []string{"bob@headscale.net", "tag:server:22", "expected ALLOWED"},
+			wantNoErrIs: errPolicyTestsFailed,
+		},
+		{
+			// An accept needs every node behind the dst; a deny fails
+			// as soon as one is reached.
+			name: "dst-alias-partly-reached",
+			policy: `{
+				"groups": { "group:people": ["alice@headscale.net", "bob@headscale.net"] },
+				"acls": [{
+					"action": "accept",
+					"src": ["alice@headscale.net"],
+					"dst": ["alice@headscale.net:22"]
+				}],
+				"tests": [{
+					"src": "alice@headscale.net",
+					"accept": ["group:people:22"],
+					"deny": ["group:people:22"]
+				}]
+			}`,
+			wantPass: false,
+			wantErrSub: []string{
+				"alice@headscale.net -> group:people:22: expected ALLOWED, got DENIED",
+				"alice@headscale.net -> group:people:22: expected DENIED, got ALLOWED",
+			},
+			wantNoErrIs: errPolicyTestsFailed,
+		},
+		{
+			name: "src-wildcard-not-reached",
+			policy: `{
+				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"acls": [{
+					"action": "accept",
+					"src": ["alice@headscale.net"],
+					"dst": ["tag:server:22"]
+				}],
+				"tests": [
+					{ "src": "*", "deny": ["tag:server:80"] },
+					{ "src": "100.64.0.0/30", "deny": ["tag:server:80"] },
+					{ "src": "autogroup:tagged", "deny": ["tag:server:80"] },
+					{ "src": "autogroup:member", "deny": ["tag:server:80"] }
+				]
+			}`,
+			wantPass: false,
+			wantErrSub: []string{
+				`unknown user or host: "*"`,
+				`unknown user or host: "100.64.0.0/30"`,
+				`unknown user or host: "autogroup:tagged"`,
+				`unknown user or host: "autogroup:member"`,
+			},
 			wantNoErrIs: errPolicyTestsFailed,
 		},
 		{
@@ -241,6 +295,59 @@ func TestRunTests(t *testing.T) {
 			wantNoErrIs: errPolicyTestsFailed,
 		},
 		{
+			// group:all resolves to one prefix per address; no single rule
+			// covers them all, but every one is covered by some rule.
+			name: "src-prefixes-allowed-by-different-rules",
+			policy: `{
+				"groups":    { "group:all": ["alice@headscale.net", "bob@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"acls": [
+					{ "action": "accept", "src": ["alice@headscale.net"], "dst": ["tag:server:22"] },
+					{ "action": "accept", "src": ["bob@headscale.net"],   "dst": ["tag:server:22"] }
+				],
+				"tests": [{
+					"src": "group:all",
+					"accept": ["tag:server:22"]
+				}]
+			}`,
+			wantPass: true,
+		},
+		{
+			name: "src-prefixes-allowed-on-different-ports",
+			policy: `{
+				"groups":    { "group:all": ["alice@headscale.net", "bob@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"acls": [
+					{ "action": "accept", "src": ["alice@headscale.net"], "dst": ["tag:server:22"] },
+					{ "action": "accept", "src": ["bob@headscale.net"],   "dst": ["tag:server:80"] }
+				],
+				"tests": [{
+					"src": "group:all",
+					"accept": ["tag:server:22"]
+				}]
+			}`,
+			wantErrSub:  []string{"group:all", "tag:server:22", "expected ALLOWED"},
+			wantNoErrIs: errPolicyTestsFailed,
+		},
+		{
+			// One rule, several addresses per port and several ports per
+			// address: an address is only allowed on its own ports.
+			name: "dst-address-and-port-stay-paired",
+			policy: `{
+				"acls": [{
+					"action": "accept",
+					"src": ["*"],
+					"dst": ["10.0.0.1:22", "10.0.0.3:22", "10.0.0.5:22", "10.0.0.2:80", "10.0.0.3:1000-2000"]
+				}],
+				"tests": [{
+					"src": "alice@headscale.net",
+					"accept": ["10.0.0.1:22", "10.0.0.3:22", "10.0.0.5:22", "10.0.0.2:80", "10.0.0.3:1500"],
+					"deny": ["10.0.0.2:22", "10.0.0.4:22", "10.0.0.6:22", "10.0.0.1:80", "10.0.0.1:1500", "10.0.0.3:80"]
+				}]
+			}`,
+			wantPass: true,
+		},
+		{
 			name: "no-tests-block-is-no-op",
 			policy: `{
 				"acls": [{
@@ -272,6 +379,108 @@ func TestRunTests(t *testing.T) {
 				assert.Contains(t, runErr.Error(), sub, "rendered error should mention %q", sub)
 			}
 		})
+	}
+}
+
+// TestTestAddrsOverlapsPrefix checks the lookup against the one it replaces.
+func TestTestAddrsOverlapsPrefix(t *testing.T) {
+	var b netipx.IPSetBuilder
+
+	for _, p := range []string{
+		"10.0.0.1/32", "10.0.0.3/32", "10.0.2.0/24", "100.64.0.0/10",
+		"fd7a:115c:a1e0::1/128", "fd7a:115c:a1e0:1::/64",
+	} {
+		b.AddPrefix(mp(p))
+	}
+
+	set, err := b.IPSet()
+	require.NoError(t, err)
+
+	addrs := testAddrs(set.Ranges())
+
+	for _, p := range []string{
+		"0.0.0.0/0", "::/0", "9.0.0.0/8", "10.0.0.0/32", "10.0.0.1/32", "10.0.0.2/32",
+		"10.0.0.2/31", "10.0.0.4/30", "10.0.0.0/24", "10.0.1.0/24", "10.0.2.7/32",
+		"10.0.0.0/8", "100.63.255.255/32", "100.100.100.100/32", "100.128.0.0/32",
+		"255.255.255.255/32", "::/128", "fd7a:115c:a1e0::/128", "fd7a:115c:a1e0::1/128",
+		"fd7a:115c:a1e0::/48", "fd7a:115c:a1e0:1::5/128", "fd7a:115c:a1e0:2::/64",
+	} {
+		assert.Equal(t, set.OverlapsPrefix(mp(p)), addrs.overlapsPrefix(mp(p)), p)
+	}
+
+	assert.False(t, addrs.overlapsPrefix(netip.Prefix{}))
+	assert.False(t, testAddrs(nil).overlapsPrefix(mp("0.0.0.0/0")))
+}
+
+// TestRunTestsManyAssertionsAndDestinations runs the shape that made a run
+// quadratic: every assertion matched only the last of the rule's
+// destinations, and each comparison parsed that destination again.
+func TestRunTestsManyAssertionsAndDestinations(t *testing.T) {
+	users := policyTestUsers()
+	nodes := policyTestNodes(users)
+
+	const count = 2600
+
+	dsts := make([]string, 0, count+1)
+	for i := range count {
+		dsts = append(dsts, fmt.Sprintf(`"10.%d.%d.1:1"`, i/250, i%250))
+	}
+
+	dsts = append(dsts, `"192.0.2.1:1"`)
+
+	accept := slices.Repeat([]string{`"192.0.2.1:1"`}, count)
+	deny := slices.Repeat([]string{`"192.0.2.1:2"`}, count)
+
+	policy := fmt.Sprintf(`{
+		"acls": [{"action": "accept", "src": ["*"], "dst": [%s]}],
+		"tests": [{"src": "alice@headscale.net", "accept": [%s], "deny": [%s]}]
+	}`, strings.Join(dsts, ","), strings.Join(accept, ","), strings.Join(deny, ","))
+
+	pol, err := unmarshalPolicy([]byte(policy))
+	require.NoError(t, err)
+
+	require.NoError(t, evaluateTests(pol, users, nodes.ViewSlice()))
+}
+
+// TestSetPolicyEvaluatesTestsUnlocked asserts that a policy's tests run
+// before SetPolicy takes the write lock, so map generation and node writes
+// do not wait for them: a reader holding the lock does not hold up the
+// evaluation, and a rejected policy never needs the write lock at all.
+func TestSetPolicyEvaluatesTestsUnlocked(t *testing.T) {
+	users := policyTestUsers()
+	nodes := policyTestNodes(users)
+
+	pm, err := NewPolicyManager([]byte(`{}`), users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	bad := `{
+		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"acls": [{
+			"action": "accept",
+			"src": ["alice@headscale.net"],
+			"dst": ["tag:server:22"]
+		}],
+		"tests": [{
+			"src": "bob@headscale.net",
+			"accept": ["tag:server:22"]
+		}]
+	}`
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	done := make(chan error, 1)
+
+	go func() {
+		_, err := pm.SetPolicy([]byte(bad))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, errPolicyTestsFailed)
+	case <-time.After(10 * time.Second):
+		t.Fatal("SetPolicy waited for the write lock before evaluating the tests")
 	}
 }
 
@@ -438,4 +647,196 @@ func TestPolicyTestResultsErrorsRendering(t *testing.T) {
 
 	// Lines should be newline-separated, not space-joined.
 	assert.Equal(t, 2, strings.Count(rendered, "\n")+1, "expected one line per failing assertion")
+}
+
+// TestFailureBreakdownIsBounded pins that the rendered breakdown of
+// failing tests and sshTests does not grow with label length times
+// failures: the policy author sizes both, and the breakdown is also
+// rendered at boot.
+func TestFailureBreakdownIsBounded(t *testing.T) {
+	users := sshTestUsers()
+	nodes := sshTestNodes(users)
+
+	const failures = 2000
+
+	name := strings.Repeat("a", 64<<10)
+	hosts := `"hosts": {"` + name + `": "100.64.0.1", "gone": "100.64.0.99"},`
+
+	quoted := make([]string, failures)
+	for i := range failures {
+		quoted[i] = fmt.Sprintf(`"x%d"`, i)
+	}
+
+	names := strings.Join(quoted, ",")
+
+	for _, tt := range []struct {
+		name, block string
+		sentinel    error
+	}{
+		{
+			name: "sshTests dst without node",
+			block: `"sshTests": [{"src": "` + name + `", "dst": [` +
+				strings.Repeat(`"gone",`, failures) + `], "accept": ["root"]}]`,
+			sentinel: errSSHPolicyTestsFailed,
+		},
+		{
+			name: "sshTests accept",
+			block: `"sshTests": [{"src": "` + name +
+				`", "dst": ["100.64.0.2"], "accept": [` + names + `]}]`,
+			sentinel: errSSHPolicyTestsFailed,
+		},
+		{
+			name: "sshTests check",
+			block: `"sshTests": [{"src": "` + name +
+				`", "dst": ["100.64.0.2"], "check": [` + names + `]}]`,
+			sentinel: errSSHPolicyTestsFailed,
+		},
+		{
+			name: "tests accept",
+			block: `"tests": [{"src": "` + name + `", "accept": [` +
+				strings.Repeat(`"gone:22",`, failures) + `]}]`,
+			sentinel: errPolicyTestsFailed,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			pm, err := NewPolicyManager([]byte(`{}`), users, nodes.ViewSlice())
+			require.NoError(t, err)
+
+			_, err = pm.SetPolicy([]byte(`{"acls": [], ` + hosts + tt.block + `}`))
+			require.ErrorIs(t, err, tt.sentinel)
+			require.Less(t, len(err.Error()), 100<<10)
+			require.True(t, strings.HasSuffix(err.Error(), fmt.Sprintf(
+				"... and %d more", failures-maxTestFailureLines,
+			)), "error ends with the count")
+		})
+	}
+}
+
+func TestStandIns(t *testing.T) {
+	pol, err := ParsePolicy([]byte(`{
+		"groups":    {"group:a": ["g@"]},
+		"hosts":     {"h": "100.64.0.1", "net": "100.64.0.8/30"},
+		"tagOwners": {"tag:t": ["o@"], "tag:u": ["group:a"]},
+		"autoApprovers": {
+			"routes":   {"10.0.0.0/8": ["r@"]},
+			"exitNode": ["e@example.com"]
+		},
+		"acls": [
+			{"action": "accept", "src": ["as@", "user:*@example.com"], "dst": ["ad@:22", "100.64.0.2:22", "100.64.0.0/10:80", "h:22", "net:22"]}
+		],
+		"grants":    [{"src": ["gs@"], "dst": ["gd@"], "ip": ["*"]}],
+		"nodeAttrs": [{"target": ["na@"], "attr": ["randomize-client-port"]}],
+		"ssh":       [{"action": "accept", "src": ["ss@"], "dst": ["autogroup:self"], "users": ["root"]}],
+		"tests":     [{"src": "ts@", "accept": ["td@:22", "100.64.0.3:22"], "deny": ["tn@:80"]}],
+		"sshTests":  [{"src": "xs@", "dst": ["tag:t"], "accept": ["root"]}]
+	}`))
+	require.NoError(t, err)
+
+	users, nodes := standIns(pol)
+
+	names := make([]string, 0, len(users))
+	for i, u := range users {
+		require.Equal(t, uint(i+1), u.ID)
+
+		names = append(names, u.Name)
+	}
+
+	require.Equal(t, []string{
+		"*@example.com", "ad", "as", "e@example.com", "g", "gd", "gs", "na", "o",
+		"r", "ss", "td", "tn", "ts", "xs",
+	}, names, "one user per user token and per user:*@ domain, sorted")
+	require.Equal(t, "e@example.com", users[3].Email)
+	require.Empty(t, users[1].Email)
+
+	require.Len(t, nodes, len(users)+2, "one node per user and per tag")
+
+	named := []netip.Prefix{
+		mp("100.64.0.0/32"), mp("100.64.0.1/32"), mp("100.64.0.2/32"),
+		mp("100.64.0.3/32"), mp("100.64.0.8/30"),
+	}
+	seen := map[netip.Addr]bool{}
+
+	for i, n := range nodes {
+		require.Equal(t, types.NodeID(i+1), n.ID)
+
+		if i < len(users) {
+			require.Empty(t, n.Tags)
+			require.Equal(t, users[i].ID, *n.UserID)
+			require.Equal(t, &users[i], n.User)
+		} else {
+			require.Equal(t, []string{[]string{"tag:t", "tag:u"}[i-len(users)]}, []string(n.Tags))
+			require.Nil(t, n.UserID, "tags own a tagged node")
+		}
+
+		require.True(t, mp("100.64.0.0/10").Contains(*n.IPv4))
+		require.True(t, mp("fd7a:115c:a1e0::/48").Contains(*n.IPv6))
+		require.NotEqual(t, mp("fd7a:115c:a1e0::/48").Addr(), *n.IPv6)
+
+		for _, p := range named {
+			require.False(t, p.Contains(*n.IPv4), "%s is named by the policy", n.IPv4)
+		}
+
+		require.False(t, seen[*n.IPv4] || seen[*n.IPv6], "addresses are unique")
+		seen[*n.IPv4], seen[*n.IPv6] = true, true
+	}
+
+	again, againNodes := standIns(pol)
+	require.Equal(t, users, again)
+	require.Len(t, againNodes, len(nodes))
+
+	for i := range nodes {
+		require.Equal(t, *nodes[i].IPv4, *againNodes[i].IPv4, "stable addresses")
+	}
+
+	t.Run("user:*@domain", func(t *testing.T) {
+		b := []byte(`{
+			"acls":  [{"action": "accept", "src": ["alice@"], "dst": ["user:*@example.com:22"]}],
+			"tests": [{"src": "alice@", "accept": ["user:*@example.com:22"]}]
+		}`)
+
+		pol, err := ParsePolicy(b)
+		require.NoError(t, err)
+
+		users, _ := standIns(pol)
+
+		var inDomain []string
+
+		for _, u := range users {
+			if strings.HasSuffix(u.Email, "@example.com") {
+				inDomain = append(inDomain, u.Email)
+			}
+		}
+
+		require.Len(t, inDomain, 1, "one stand-in in the domain")
+		require.NoError(t, CheckPolicy(b), "the test reaches the domain's stand-in")
+	})
+}
+
+func TestCheckPolicy(t *testing.T) {
+	const acl = `"acls": [{"action": "accept", "src": ["alice@"], "dst": ["tag:web:22"]}],
+		"tagOwners": {"tag:web": ["alice@"]}`
+
+	for _, tt := range []struct {
+		name    string
+		policy  string
+		wantErr error
+	}{
+		{"empty", ``, ErrPolicyEmpty},
+		{"no tests", `{` + acl + `}`, nil},
+		{"tests pass", `{` + acl + `, "tests": [{"src": "alice@", "accept": ["tag:web:22"], "deny": ["tag:web:80"]}]}`, nil},
+		{"tests fail", `{` + acl + `, "tests": [{"src": "bob@", "accept": ["tag:web:22"]}]}`, errPolicyTestsFailed},
+		{"sshTests pass", `{` + acl + `, "ssh": [{"action": "accept", "src": ["alice@"], "dst": ["tag:web"], "users": ["root"]}],
+			"sshTests": [{"src": "alice@", "dst": ["tag:web"], "accept": ["root"]}]}`, nil},
+		{"sshTests fail", `{` + acl + `, "sshTests": [{"src": "alice@", "dst": ["tag:web"], "accept": ["root"]}]}`, errSSHPolicyTestsFailed},
+		{"undefined group", `{"acls": [{"action": "accept", "src": ["group:x"], "dst": ["*:*"]}]}`, ErrGroupNotDefined},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckPolicy([]byte(tt.policy))
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tt.wantErr)
+			}
+		})
+	}
 }

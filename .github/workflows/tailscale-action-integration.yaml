@@ -46,9 +46,11 @@ jobs:
       matrix:
         auth: [oauth, authkey]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - id: hs
-        uses: ./.github/actions/headscale-up
+        uses: $/.github/actions/headscale-up
 
       - name: Prepare ${{ matrix.auth }} credential
         id: prep
@@ -72,7 +74,7 @@ jobs:
           fi
 
       - name: Connect via the tailscale action + ping
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        uses: tailscale/github-action@v4.4.0
         with:
           authkey: ${{ steps.prep.outputs.authkey }}
           args: ${{ steps.prep.outputs.args }}
@@ -123,12 +125,14 @@ jobs:
             extra_args: --accept-dns=false
             assert: sudo tailscale debug prefs | jq -e '.CorpDNS == false'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - id: hs
-        uses: ./.github/actions/headscale-up
+        uses: $/.github/actions/headscale-up
 
       - name: Connect with ${{ matrix.input }}
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        uses: tailscale/github-action@v4.4.0
         with:
           authkey: ${{ steps.hs.outputs.preauth }}
           args: --login-server=${{ steps.hs.outputs.url }} ${{ matrix.extra_args }}

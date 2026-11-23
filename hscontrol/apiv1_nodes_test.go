@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -111,12 +112,49 @@ func TestAPIV1NodeGet(t *testing.T) {
 		assert.Equal(t, "node-c", got.Node["name"])
 		assert.Equal(t, "REGISTER_METHOD_AUTH_KEY", got.Node["registerMethod"])
 		// EmitUnpopulated parity: slices present as [], expiry as null.
-		assert.Equal(t, []any{}, got.Node["ipAddresses"])
+		assert.Equal(t, []any{}, got.Node["approvedRoutes"])
 		assert.Equal(t, []any{}, got.Node["tags"])
 		assert.Nil(t, got.Node["expiry"])
 		assert.Contains(t, got.Node, "user")
 		assert.Contains(t, got.Node, "preAuthKey")
 		assert.Contains(t, got.Node, "createdAt")
+	})
+
+	// A login with a key of the other kind keeps the node's flag; the
+	// embedded key shows the key's own.
+	t.Run("ephemeral is the node's, not its key's", func(t *testing.T) {
+		for _, created := range []bool{true, false} {
+			h := newAPIV1Harness(t)
+			user := h.app.state.CreateUserForTest("dave")
+			machineKey := key.NewMachine()
+
+			for _, ephemeral := range []bool{created, !created} {
+				pak, err := h.app.state.CreatePreAuthKey(user.TypedID(), false, ephemeral, nil, nil)
+				require.NoError(t, err)
+
+				_, err = h.app.handleRegisterWithAuthKey(tailcfg.RegisterRequest{
+					Auth:     &tailcfg.RegisterResponseAuth{AuthKey: pak.Key},
+					NodeKey:  key.NewNode().Public(),
+					Hostinfo: &tailcfg.Hostinfo{Hostname: "node-d"},
+				}, machineKey.Public())
+				require.NoError(t, err)
+			}
+
+			res := h.callHuma(http.MethodGet, "/api/v1/node/1", nil)
+			require.Equal(t, http.StatusOK, res.status)
+
+			var got struct {
+				Node struct {
+					Ephemeral  bool `json:"ephemeral"`
+					PreAuthKey struct {
+						Ephemeral bool `json:"ephemeral"`
+					} `json:"preAuthKey"`
+				} `json:"node"`
+			}
+			require.NoError(t, json.Unmarshal(res.body, &got))
+			assert.Equal(t, created, got.Node.Ephemeral, "node created ephemeral=%v", created)
+			assert.Equal(t, !created, got.Node.PreAuthKey.Ephemeral, "node created ephemeral=%v", created)
+		}
 	})
 }
 
@@ -198,6 +236,32 @@ func TestAPIV1NodeExpire(t *testing.T) {
 		assert.Equal(t, "1", got.Node["id"])
 		// Expiry was nil before; expiring sets it to a concrete timestamp.
 		assert.NotNil(t, got.Node["expiry"])
+	})
+
+	// As before the key expiry switch existed: v1 expire logs the node out.
+	t.Run("huma expires a node with key expiry off", func(t *testing.T) {
+		h := newAPIV1Harness(t)
+		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
+
+		_, _, err := h.app.state.SetNodeKeyExpiryDisabled(1, true)
+		require.NoError(t, err)
+
+		res := h.callHuma(http.MethodPost, "/api/v1/node/1/expire", nil)
+		require.Equal(t, http.StatusOK, res.status)
+
+		node, ok := h.app.state.GetNodeByID(1)
+		require.True(t, ok)
+		assert.False(t, node.KeyExpiryDisabled())
+		assert.True(t, node.IsExpired())
+	})
+
+	t.Run("huma refuses an unencodable expiry", func(t *testing.T) {
+		h := newAPIV1Harness(t)
+		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
+
+		res := h.callHuma(http.MethodPost, "/api/v1/node/1/expire",
+			[]byte(`{"expiry":"9999-12-31T23:59:59-23:59"}`))
+		assertStatus(t, res, http.StatusBadRequest)
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
@@ -307,6 +371,35 @@ func TestAPIV1NodeSetApprovedRoutes(t *testing.T) {
 			[]byte(`{"routes":[]}`))
 		assertStatus(t, res, http.StatusBadRequest)
 	})
+
+	// The admin's v2 route calls on routers announcing the tailnet's own
+	// addresses, replayed against v1: the same routes accepted or refused.
+	// Test data source: policy/v2/testdata/routes_results/routes-t4-admin.hujson.
+	t.Run("saas compat", func(t *testing.T) {
+		c := readRoutesCapture(t, "routes-t4-admin")
+		h := newAPIV1Harness(t)
+		devices := seedCaptureRouters(t, h.app, c)
+
+		replayRouteCalls(t, c, "v1-", func(a testcapture.Action, alias string) routeCall {
+			target := "/api/v1/node/" + devices[alias]
+			if a.Method == http.MethodPost {
+				target += "/approve_routes"
+			}
+
+			res := h.callHuma(a.Method, target, a.Body)
+
+			var body struct {
+				Node struct {
+					Available []string `json:"availableRoutes"`
+					Approved  []string `json:"approvedRoutes"`
+				} `json:"node"`
+				Detail string `json:"detail"`
+			}
+			require.NoErrorf(t, json.Unmarshal(res.body, &body), "body: %s", res.body)
+
+			return routeCall{res.status, body.Node.Available, body.Node.Approved, body.Detail}
+		})
+	})
 }
 
 func TestAPIV1NodeRegister(t *testing.T) {
@@ -325,7 +418,7 @@ func TestAPIV1NodeRegister(t *testing.T) {
 				MachineKey: mk.Public(),
 				Hostname:   "registered-node",
 			}
-			app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(regData))
+			require.NoError(t, app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(regData)))
 		}
 
 		assertParityIsolated(t, seed, http.MethodPost,
@@ -413,4 +506,22 @@ func TestAPIV1NodeDebugCreate(t *testing.T) {
 		assert.Equal(t, "0001-01-01T00:00:00Z", got.Node["expiry"])
 		assert.Equal(t, "0001-01-01T00:00:00Z", got.Node["lastSeen"])
 	})
+}
+
+func TestAPIV1NodeDebugCreateAdmissionFailure(t *testing.T) {
+	app := createTestApp(t, func(cfg *types.Config) {
+		cfg.Tuning.RegisterCacheMaxEntries = 1
+	})
+	defer func() { require.NoError(t, app.state.Close()) }()
+
+	app.state.CreateUserForTest("alice")
+	require.NoError(t, app.state.SetAuthCacheEntry(types.MustAuthID(), types.NewAuthRequest()))
+
+	id := types.MustAuthID()
+	body := []byte(`{"user":"alice","key":"` + id.String() + `","name":"node","routes":[]}`)
+	res := callHandler(newHumaTestHandler(app), http.MethodPost, "/api/v1/debug/node", body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status)
+
+	_, ok := app.state.GetAuthCacheEntry(id)
+	require.False(t, ok)
 }

@@ -50,6 +50,7 @@ type Node struct {
 	RegisterMethod  string          `enum:"REGISTER_METHOD_UNSPECIFIED,REGISTER_METHOD_AUTH_KEY,REGISTER_METHOD_CLI,REGISTER_METHOD_OIDC" json:"registerMethod"`
 	GivenName       string          `json:"givenName"`
 	Online          bool            `json:"online"`
+	Ephemeral       bool            `json:"ephemeral"`
 	ApprovedRoutes  []string        `json:"approvedRoutes"                                                                                nullable:"false"`
 	AvailableRoutes []string        `json:"availableRoutes"                                                                               nullable:"false"`
 	SubnetRoutes    []string        `json:"subnetRoutes"                                                                                  nullable:"false"`
@@ -321,7 +322,8 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 			expiry = *customExpiry
 		}
 
-		node, nodeChange, err := b.State.SetNodeExpiry(nodeID, &expiry)
+		// As before key expiry could be turned off: the node expires.
+		node, nodeChange, err := b.State.ExpireNodeAt(nodeID, expiry)
 		b.Change(nodeChange)
 
 		if err != nil {
@@ -429,6 +431,11 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 				return nil, huma.Error400BadRequest("parsing route", parseErr)
 			}
 
+			maskErr := util.CheckRouteMasked(prefix)
+			if maskErr != nil {
+				return nil, huma.Error400BadRequest(prefix.String() + " " + maskErr.Error())
+			}
+
 			// One exit route implies both families, else the client won't
 			// annotate the node as an exit node.
 			if prefix == tsaddr.AllIPv4() || prefix == tsaddr.AllIPv6() {
@@ -482,19 +489,11 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 			nil,
 			util.RegisterMethodCLI,
 		)
-		if err != nil {
-			b.Change(nodeChange)
-
-			return nil, mapError("registering node", err)
-		}
-
-		routeChange, err := b.State.AutoApproveRoutes(node)
-
 		// Empty changes are ignored by the change sink.
-		b.Change(nodeChange, routeChange)
+		b.Change(nodeChange)
 
 		if err != nil {
-			return nil, huma.Error500InternalServerError("auto approving routes", err)
+			return nil, mapError("registering node", err)
 		}
 
 		out := &nodeOutput{}
@@ -563,7 +562,11 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		}
 
 		authRegReq := types.NewRegisterAuthRequest(regData)
-		b.State.SetAuthCacheEntry(registrationID, authRegReq)
+
+		err = b.State.SetAuthCacheEntry(registrationID, authRegReq)
+		if err != nil {
+			return nil, mapError("starting authentication", err)
+		}
 
 		// Synthetic echo; the real node is created later via the auth path
 		// from the cached registration data.
@@ -603,6 +606,7 @@ func nodeFromView(view types.NodeView) Node {
 		RegisterMethod:  registerMethodEnum(view.RegisterMethod()),
 		GivenName:       view.GivenName(),
 		Online:          view.IsOnline().Valid() && view.IsOnline().Get(),
+		Ephemeral:       view.IsEphemeral(),
 		ApprovedRoutes:  nonNilStrings(util.PrefixesToString(view.ApprovedRoutes().AsSlice())),
 		AvailableRoutes: nonNilStrings(util.PrefixesToString(view.AnnouncedRoutes())),
 		SubnetRoutes:    []string{},
@@ -623,8 +627,8 @@ func nodeFromView(view types.NodeView) Node {
 		n.LastSeen = &ls
 	}
 
-	if view.Expiry().Valid() {
-		exp := view.Expiry().Get()
+	// A node with key expiry off shows none, as before the switch existed.
+	if exp, ok := view.KeyExpiry(); ok {
 		n.Expiry = &exp
 	}
 

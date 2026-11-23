@@ -5,7 +5,11 @@
 package servertest
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -13,12 +17,13 @@ import (
 	"time"
 
 	hscontrol "github.com/blackhiden/headscale/hscontrol"
+	"github.com/blackhiden/headscale/hscontrol/config"
 	hsdns "github.com/blackhiden/headscale/hscontrol/dns"
 	"github.com/blackhiden/headscale/hscontrol/state"
 	"github.com/blackhiden/headscale/hscontrol/types"
+	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"tailscale.com/net/memnet"
 	"tailscale.com/tailcfg"
-	"tailscale.com/types/dnstype"
 )
 
 // TestServer is an in-process Headscale control server suitable for
@@ -34,23 +39,26 @@ type TestServer struct {
 	ln         net.Listener
 	httpServer *http.Server
 	st         *state.State
+	cfg        *types.Config
 }
 
 // ServerOption configures a [TestServer].
 type ServerOption func(*serverConfig)
 
 type serverConfig struct {
-	batchDelay       time.Duration
-	bufferedChanSize int
-	ephemeralTimeout time.Duration
-	nodeExpiry       time.Duration
-	batcherWorkers   int
-	taildropEnabled  bool
-	logTailEnabled   bool
-	realListener     bool
-	magicDNSDomain   string
-	dnsResolvers     []string
-	certProvider     hsdns.Provider
+	batchDelay            time.Duration
+	bufferedChanSize      int
+	ephemeralTimeout      time.Duration
+	nodeExpiry            time.Duration
+	batcherWorkers        int
+	nodeStoreBatchTimeout time.Duration
+	taildropEnabled       bool
+	logTailEnabled        bool
+	realListener          bool
+	magicDNSDomain        string
+	dnsResolvers          []string
+	certProvider          hsdns.Provider
+	prefixV4              netip.Prefix
 }
 
 func defaultServerConfig() *serverConfig {
@@ -60,6 +68,7 @@ func defaultServerConfig() *serverConfig {
 		batcherWorkers:   1,
 		ephemeralTimeout: 30 * time.Second,
 		taildropEnabled:  true,
+		prefixV4:         netip.MustParsePrefix("100.64.0.0/10"),
 	}
 }
 
@@ -78,6 +87,11 @@ func WithBufferedChanSize(n int) ServerOption {
 // [types.DefaultBatcherWorkers] to match production concurrency.
 func WithBatcherWorkers(n int) ServerOption {
 	return func(c *serverConfig) { c.batcherWorkers = n }
+}
+
+// WithNodeStoreBatchTimeout overrides the server's default write-batch wait.
+func WithNodeStoreBatchTimeout(d time.Duration) ServerOption {
+	return func(c *serverConfig) { c.nodeStoreBatchTimeout = d }
 }
 
 // WithEphemeralTimeout sets the ephemeral node inactivity timeout.
@@ -107,10 +121,14 @@ func WithTaildropEnabled(enabled bool) ServerOption {
 	return func(c *serverConfig) { c.taildropEnabled = enabled }
 }
 
-// WithMagicDNS enables MagicDNS under domain, so map responses carry a
-// [tailcfg.DNSConfig].
+// WithMagicDNS enables MagicDNS under domain.
 func WithMagicDNS(domain string) ServerOption {
 	return func(c *serverConfig) { c.magicDNSDomain = domain }
+}
+
+// WithPrefixV4 sets prefixes.v4, the range node IPv4 addresses come from.
+func WithPrefixV4(p netip.Prefix) ServerOption {
+	return func(c *serverConfig) { c.prefixV4 = p }
 }
 
 // WithCertificates enables node certificates (dns.certificates) with
@@ -120,8 +138,8 @@ func WithCertificates(provider hsdns.Provider) ServerOption {
 	return func(c *serverConfig) { c.certProvider = provider }
 }
 
-// WithDNSResolvers sets the global DNS resolvers, so map responses carry a
-// [tailcfg.DNSConfig].
+// WithDNSResolvers sets the global DNS resolvers, overriding the nodes'
+// local DNS.
 func WithDNSResolvers(addrs ...string) ServerOption {
 	return func(c *serverConfig) { c.dnsResolvers = addrs }
 }
@@ -145,63 +163,86 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 
 	tmpDir := tb.TempDir()
 
-	prefixV4 := netip.MustParsePrefix("100.64.0.0/10")
+	prefixV4 := sc.prefixV4
 	prefixV6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
 
-	cfg := types.Config{
-		// Placeholder; updated below once the in-memory server starts.
-		ServerURL:           "http://localhost:0",
-		NoisePrivateKeyPath: tmpDir + "/noise_private.key",
-		Node: types.NodeConfig{
-			Expiry: sc.nodeExpiry,
-			Ephemeral: types.EphemeralConfig{
-				InactivityTimeout: sc.ephemeralTimeout,
-			},
-		},
-		PrefixV4:     &prefixV4,
-		PrefixV6:     &prefixV6,
-		IPAllocation: types.IPAllocationStrategySequential,
-		Database: types.DatabaseConfig{
-			Type: "sqlite3",
-			Sqlite: types.SqliteConfig{
-				Path: tmpDir + "/headscale_test.db",
-			},
-		},
-		Policy: types.PolicyConfig{
-			Mode: types.PolicyModeDB,
-		},
-		Taildrop: types.TaildropConfig{Enabled: sc.taildropEnabled},
-		LogTail:  types.LogTailConfig{Enabled: sc.logTailEnabled},
-		Tuning: types.Tuning{
-			BatchChangeDelay:               sc.batchDelay,
-			BatcherWorkers:                 sc.batcherWorkers,
-			NodeMapSessionBufferedChanSize: sc.bufferedChanSize,
-		},
+	cfg := config.Default()
+	// Placeholder; updated below once the in-memory server starts.
+	cfg.ServerURL = "http://localhost:0"
+	cfg.Noise.PrivateKeyPath = tmpDir + "/noise_private.key"
+	cfg.Node.Expiry = sc.nodeExpiry
+	cfg.Prefixes.V4 = &prefixV4
+	cfg.Prefixes.V6 = &prefixV6
+	cfg.Database.Type = types.DatabaseSqlite
+	cfg.Database.Sqlite.Path = tmpDir + "/headscale_test.db"
+	cfg.Policy.Mode = types.PolicyModeDB
+	cfg.Taildrop.Enabled = sc.taildropEnabled
+	cfg.LogTail.Enabled = sc.logTailEnabled
+	cfg.Tuning.BatchChangeDelay = sc.batchDelay
+	cfg.Tuning.BatcherWorkers = sc.batcherWorkers
+	cfg.Tuning.NodeMapSessionBufferedChanSize = sc.bufferedChanSize
+
+	if sc.nodeStoreBatchTimeout > 0 {
+		cfg.Tuning.NodeStoreBatchTimeout = sc.nodeStoreBatchTimeout
 	}
 
-	if sc.magicDNSDomain != "" || len(sc.dnsResolvers) > 0 {
-		cfg.TailcfgDNSConfig = &tailcfg.DNSConfig{}
-	}
+	// Off unless an option sets them: tests get no DNS they did not ask
+	// for.
+	cfg.DNSConfig.MagicDNS = false
+	cfg.DNSConfig.OverrideLocalDNS = false
+	cfg.DNSConfig.BaseDomain = ""
 
 	if sc.magicDNSDomain != "" {
-		cfg.BaseDomain = sc.magicDNSDomain
-		cfg.TailcfgDNSConfig.Proxied = true
-		cfg.TailcfgDNSConfig.Domains = []string{sc.magicDNSDomain}
+		cfg.DNSConfig.MagicDNS = true
+		cfg.DNSConfig.BaseDomain = sc.magicDNSDomain
 	}
 
 	if sc.certProvider != nil {
-		cfg.DNSConfig.Certificates = types.CertificatesConfig{Enabled: true, Zone: cfg.BaseDomain}
-		cfg.DNSChallenge.Provider = sc.certProvider
+		cfg.DNSConfig.Certificates = types.CertificatesConfig{Enabled: true, Zone: cfg.DNSConfig.BaseDomain}
+		cfg.DNSConfig.Challenge.Provider = sc.certProvider
+		cfg.DNSConfig.Challenge.PropagationTimeout = 0
 	}
 
-	for _, addr := range sc.dnsResolvers {
-		cfg.TailcfgDNSConfig.Resolvers = append(cfg.TailcfgDNSConfig.Resolvers, &dnstype.Resolver{Addr: addr})
+	if len(sc.dnsResolvers) > 0 {
+		cfg.DNSConfig.OverrideLocalDNS = true
+		cfg.DNSConfig.Nameservers.Global = sc.dnsResolvers
 	}
+
+	return start(tb, cfg, sc.ephemeralTimeout, sc.realListener)
+}
+
+// NewServerFromConfig starts cfg, as loaded, as a test server. Only the
+// server URL, set to the in-memory listener, and the DERP map, set
+// in-process, differ from serving cfg; the DERP map is never fetched.
+// [hscontrol.Headscale.Serve] never runs: no configured listeners, no unix
+// socket and no scheduled tasks, so this is not `headscale serve`.
+func NewServerFromConfig(tb testing.TB, cfg types.Config) *TestServer {
+	tb.Helper()
+
+	return start(tb, cfg, cfg.Node.Ephemeral.InactivityTimeout, false)
+}
+
+// start runs cfg through [hscontrol.NewHeadscale], then sets the ephemeral
+// timeout and starts the server's subsystems and listener.
+func start(tb testing.TB, cfg types.Config, ephemeralTimeout time.Duration, realListener bool) *TestServer {
+	tb.Helper()
 
 	app, err := hscontrol.NewHeadscale(&cfg)
 	if err != nil {
 		tb.Fatalf("servertest: NewHeadscale: %v", err)
 	}
+
+	// Validate's floor is for clients that reconnect over real networks;
+	// tests shorten it once the configuration has been validated.
+	cfg.Node.Ephemeral.InactivityTimeout = ephemeralTimeout
+
+	// Registered first so clients, HTTP, and background subsystems stop first.
+	tb.Cleanup(func() {
+		err := app.GetState().Close()
+		if err != nil {
+			tb.Errorf("servertest: close state: %v", err)
+		}
+	})
 
 	// Set a minimal DERP map so MapResponse generation works.
 	app.GetState().SetDERPMap(&tailcfg.DERPMap{
@@ -233,7 +274,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		ln         net.Listener
 	)
 
-	if sc.realListener {
+	if realListener {
 		var lc net.ListenConfig
 
 		ln, err = lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
@@ -261,6 +302,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		ln:         ln,
 		httpServer: httpServer,
 		st:         app.GetState(),
+		cfg:        &cfg,
 	}
 
 	tb.Cleanup(ts.Close)
@@ -293,6 +335,13 @@ func (s *TestServer) MemNet() *memnet.Network {
 	return s.memNet
 }
 
+// SetExtraRecords replaces the extra DNS records and sends them to every
+// node, as a reload of dns.extra_records_path does.
+func (s *TestServer) SetExtraRecords(records []tailcfg.DNSRecord) {
+	s.cfg.SetExtraRecords(records)
+	s.App.Change(change.ExtraRecords())
+}
+
 // CreateUser creates a test user and returns it.
 func (s *TestServer) CreateUser(tb testing.TB, name string) *types.User {
 	tb.Helper()
@@ -303,6 +352,44 @@ func (s *TestServer) CreateUser(tb testing.TB, name string) *types.User {
 	}
 
 	return u
+}
+
+// ApproveAuth registers the pending login authID to user through the v1
+// API, as `headscale auth register` does.
+func (s *TestServer) ApproveAuth(ctx context.Context, authID, user string) error {
+	apiKey, _, err := s.st.CreateAPIKey(nil)
+	if err != nil {
+		return fmt.Errorf("servertest: ApproveAuth: %w", err)
+	}
+
+	body, err := json.Marshal(map[string]string{"authId": authID, "user": user})
+	if err != nil {
+		return fmt.Errorf("servertest: ApproveAuth: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.URL+"/api/v1/auth/register", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("servertest: ApproveAuth: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Transport: &http.Transport{DialContext: s.memNet.Dial}}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("servertest: ApproveAuth: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(resp.Body)
+
+		return fmt.Errorf("servertest: ApproveAuth: %d: %s", resp.StatusCode, bytes.TrimSpace(msg)) //nolint:err113
+	}
+
+	return nil
 }
 
 // CreateAPIKey mints an API key string (the Bearer/Basic credential). When
@@ -334,9 +421,17 @@ func (s *TestServer) CreateRegisteredNode(tb testing.TB, owner *types.User, host
 	tb.Helper()
 
 	node := s.st.CreateRegisteredNodeForTest(owner, hostname...)
-	// CreateRegisteredNodeForTest sets UserID but leaves the User association
-	// unloaded; the device response renders the owner login, so attach it.
+	// CreateRegisteredNodeForTest sets UserID and AuthKeyID but leaves the
+	// associations unloaded; the device response renders the owner login and,
+	// once tagged, the login that made its key, so attach both.
 	node.User = owner
+
+	pak, err := s.st.GetPreAuthKeyByID(*node.AuthKeyID)
+	if err != nil {
+		tb.Fatalf("servertest: GetPreAuthKeyByID: %v", err)
+	}
+
+	node.AuthKey = pak.AsCredential()
 
 	return s.st.PutNodeInStoreForTest(*node)
 }

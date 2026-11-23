@@ -23,13 +23,15 @@ logs/
 vendor/
 
 dist/
+/release-assets/
 /headscale
 config.yaml
 config*.yaml
-!config-example.yaml
+!docs/ref/config-example.yaml
 derp.yaml
 *.hujson
-!hscontrol/policy/v2/testdata/*/*.hujson
+!hscontrol/policy/v2/testdata/**/*.hujson
+!hscontrol/servertest/testdata/*/*.hujson
 *.key
 /db.sqlite
 *.sqlite3
@@ -43,8 +45,6 @@ control_logs/
 # Nix build output
 result
 .direnv/
-
-integration_test/etc/config.dump.yaml
 
 # OpenAPI spec is served live from the code and emitted on demand, not committed
 /openapi/v1/headscale.yaml

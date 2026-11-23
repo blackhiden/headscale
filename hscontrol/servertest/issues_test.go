@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,8 +15,10 @@ import (
 	"github.com/blackhiden/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"tailscale.com/ipn"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
+	"tailscale.com/tsnet"
 	"tailscale.com/types/netmap"
 )
 
@@ -240,7 +245,7 @@ func TestIssuesRoutes(t *testing.T) {
 			servertest.WithUser(user))
 
 		exit.WaitForPeers(t, 1, 10*time.Second)
-		advertiseRoutes(t, exit, obs, tsaddr.ExitRoutes())
+		advertiseRoutes(t, exit, tsaddr.ExitRoutes())
 
 		_, c, err := srv.State().SetApprovedRoutes(
 			findNodeID(t, srv, "selfexit-node"), tsaddr.ExitRoutes())
@@ -274,7 +279,7 @@ func TestIssuesRoutes(t *testing.T) {
 		require.NoError(t, err)
 		srv.App.Change(c)
 
-		advertiseRoutes(t, exit, obs, tsaddr.ExitRoutes())
+		advertiseRoutes(t, exit, tsaddr.ExitRoutes())
 
 		obs.WaitForCondition(t, "peer offers exit node", 10*time.Second,
 			peerOffersExit("preexit-node"))
@@ -282,40 +287,8 @@ func TestIssuesRoutes(t *testing.T) {
 			selfOffersExit)
 	})
 
-	// A policy reload that auto-approves an advertised exit route goes
-	// through autoApproveNodes, a third producer of the same change.
-	t.Run("exit_route_auto_approved_on_reload_reaches_self", func(t *testing.T) {
-		t.Parallel()
-
-		srv := servertest.NewServer(t)
-		user := srv.CreateUser(t, "reloadexit-user")
-
-		exit := servertest.NewClient(t, srv, "reloadexit-node",
-			servertest.WithUser(user))
-		obs := servertest.NewClient(t, srv, "reloadexit-obs",
-			servertest.WithUser(user))
-
-		exit.WaitForPeers(t, 1, 10*time.Second)
-		advertiseRoutes(t, exit, obs, tsaddr.ExitRoutes())
-
-		_, err := srv.State().SetPolicyInDB(`{
-			"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
-			"autoApprovers": {"exitNode": ["reloadexit-user@"]}
-		}`)
-		require.NoError(t, err)
-
-		changes, err := srv.State().ReloadPolicy()
-		require.NoError(t, err)
-		srv.App.Change(changes...)
-
-		obs.WaitForCondition(t, "peer offers exit node", 10*time.Second,
-			peerOffersExit("reloadexit-node"))
-		exit.WaitForCondition(t, "self offers exit node", 10*time.Second,
-			selfOffersExit)
-	})
-
 	// An auto-approver approves the route inside the advertising map
-	// request, a fourth producer of the same change.
+	// request, a third producer of the same change.
 	t.Run("exit_route_auto_approved_on_advertise_reaches_self", func(t *testing.T) {
 		t.Parallel()
 
@@ -338,7 +311,7 @@ func TestIssuesRoutes(t *testing.T) {
 			servertest.WithUser(user))
 
 		exit.WaitForPeers(t, 1, 10*time.Second)
-		advertiseRoutes(t, exit, obs, tsaddr.ExitRoutes())
+		advertiseRoutes(t, exit, tsaddr.ExitRoutes())
 
 		obs.WaitForCondition(t, "peer offers exit node", 10*time.Second,
 			peerOffersExit("advexit-node"))
@@ -355,7 +328,7 @@ func TestIssuesRoutes(t *testing.T) {
 
 		c1 := servertest.NewClient(t, srv, "histore-node1",
 			servertest.WithUser(user))
-		c2 := servertest.NewClient(t, srv, "histore-node2",
+		servertest.NewClient(t, srv, "histore-node2",
 			servertest.WithUser(user))
 
 		c1.WaitForPeers(t, 1, 10*time.Second)
@@ -371,19 +344,7 @@ func TestIssuesRoutes(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		_ = c1.Direct().SendUpdate(ctx)
-
-		c2.WaitForCondition(t, "route in peer hostinfo", 10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
-				for _, p := range nm.Peers {
-					hi := p.Hostinfo()
-					if hi.Valid() && hi.Hostname() == "histore-node1" {
-						return hi.RoutableIPs().Len() > 0
-					}
-				}
-
-				return false
-			})
+		require.NoError(t, c1.Direct().SendUpdate(ctx))
 
 		nodeID := findNodeID(t, srv, "histore-node1")
 		nv, ok := srv.State().GetNodeByID(nodeID)
@@ -817,7 +778,7 @@ func TestIssuesGracePeriod(t *testing.T) {
 
 		h.Client(1).Disconnect(t)
 
-		h.Client(0).WaitForCondition(t, "peer offline", 20*time.Second,
+		h.Client(0).WaitForCondition(t, "peer offline", 25*time.Second,
 			func(nm *netmap.NetworkMap) bool {
 				for _, p := range nm.Peers {
 					hi := p.Hostinfo()
@@ -834,9 +795,10 @@ func TestIssuesGracePeriod(t *testing.T) {
 		elapsed := time.Since(disconnectTime)
 		t.Logf("offline status arrived after %v", elapsed)
 
-		assert.Greater(t, elapsed, 8*time.Second,
+		// SaaS tells peers after about 15 seconds.
+		assert.Greater(t, elapsed, 14*time.Second,
 			"offline status arrived too quickly -- grace period may not be working")
-		assert.Less(t, elapsed, 20*time.Second,
+		assert.Less(t, elapsed, 25*time.Second,
 			"offline status took too long -- propagation delay issue")
 	})
 
@@ -861,13 +823,13 @@ func TestIssuesGracePeriod(t *testing.T) {
 		// Ensure the ephemeral node's long-poll session is fully
 		// established on the server before disconnecting. Without
 		// this, the [TestClient.Disconnect] may cancel a [controlclient.Direct.PollNetMap] that hasn't
-		// yet reached serveLongPoll, so no grace period or ephemeral
-		// GC would ever be scheduled.
+		// yet reached serveLongPoll, so no grace period would ever
+		// start.
 		ephemeral.WaitForPeers(t, 1, 10*time.Second)
 
 		ephemeral.Disconnect(t)
 
-		// Grace period (10s) + ephemeral GC timeout (3s) + propagation.
+		// Grace period (15s) + ephemeral GC timeout (3s) + propagation.
 		// Use a generous timeout for CI environments under load.
 		regular.WaitForCondition(t, "ephemeral peer removed", 60*time.Second,
 			func(nm *netmap.NetworkMap) bool {
@@ -1181,6 +1143,52 @@ func TestPeerRemovedAsDelta(t *testing.T) {
 	})
 }
 
+// TestDeletedNodeNotAnnouncedToHiddenPeers deletes a node another user's node
+// cannot see under the policy: only the deleted node's peers are told it is
+// gone.
+func TestDeletedNodeNotAnnouncedToHiddenPeers(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	_, err := srv.State().SetPolicy([]byte(`{
+		"acls": [
+			{"action": "accept", "src": ["alice@"], "dst": ["alice@:*"]},
+			{"action": "accept", "src": ["bob@"], "dst": ["bob@:*"]}
+		]
+	}`))
+	require.NoError(t, err)
+
+	alice := srv.CreateUser(t, "alice")
+	bob := srv.CreateUser(t, "bob")
+
+	laptop := servertest.NewClient(t, srv, "alice-laptop",
+		servertest.WithUser(alice), servertest.WithDeltaUpdates())
+	servertest.NewClient(t, srv, "alice-db", servertest.WithUser(alice))
+	other := servertest.NewClient(t, srv, "bob-node",
+		servertest.WithUser(bob), servertest.WithDeltaUpdates())
+
+	laptop.WaitForPeers(t, 1, 10*time.Second)
+	other.WaitForPeers(t, 0, 10*time.Second)
+
+	db := findNodeID(t, srv, "alice-db")
+	dbView, ok := srv.State().GetNodeByID(db)
+	require.True(t, ok)
+
+	changes, err := srv.State().DeleteNode(dbView)
+	require.NoError(t, err)
+	srv.App.Change(changes...)
+
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Contains(c, laptop.DeltaRemovedPeers(), db.NodeID())
+	}, 10*time.Second, 50*time.Millisecond, "a peer of the deleted node must be told it is gone")
+
+	// bob-node's stream got the same batch; give it time to deliver.
+	assert.Never(t, func() bool {
+		return slices.Contains(other.DeltaRemovedPeers(), db.NodeID())
+	}, 2*time.Second, 50*time.Millisecond,
+		"a node the policy hid the deleted node from must not be told of it")
+}
+
 func findNodeID(tb testing.TB, srv *servertest.TestServer, hostname string) types.NodeID {
 	tb.Helper()
 
@@ -1197,9 +1205,9 @@ func findNodeID(tb testing.TB, srv *servertest.TestServer, hostname string) type
 	return 0
 }
 
-// advertiseRoutes pushes routes in c's Hostinfo and waits until obs sees
-// them, so the server has stored the announcement.
-func advertiseRoutes(tb testing.TB, c, obs *servertest.TestClient, routes []netip.Prefix) {
+// advertiseRoutes pushes routes in c's Hostinfo. The server stores the
+// announcement before it answers.
+func advertiseRoutes(tb testing.TB, c *servertest.TestClient, routes []netip.Prefix) {
 	tb.Helper()
 
 	c.Direct().SetHostinfo(&tailcfg.Hostinfo{
@@ -1211,14 +1219,7 @@ func advertiseRoutes(tb testing.TB, c, obs *servertest.TestClient, routes []neti
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_ = c.Direct().SendUpdate(ctx)
-
-	obs.WaitForCondition(tb, "routes in peer hostinfo", 10*time.Second,
-		func(nm *netmap.NetworkMap) bool {
-			p, ok := peerByHostname(nm, c.Name)
-
-			return ok && p.Hostinfo().RoutableIPs().Len() == len(routes)
-		})
+	require.NoError(tb, c.Direct().SendUpdate(ctx))
 }
 
 // selfOffersExit mirrors how tailscaled computes Self.ExitNodeOption.
@@ -1242,4 +1243,109 @@ func peerByHostname(nm *netmap.NetworkMap, hostname string) (tailcfg.NodeView, b
 	}
 
 	return tailcfg.NodeView{}, false
+}
+
+func TestUserProfileFollowsRename(t *testing.T) {
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "profile-original")
+	profileID := owner.TailscaleUserProfile().ID
+	peer := srv.CreateUser(t, "profile-peer")
+	ownerClient := servertest.NewClient(t, srv, "owner", servertest.WithUser(owner))
+	peerClient := servertest.NewClient(t, srv, "peer", servertest.WithUser(peer))
+	ownerClient.WaitForPeers(t, 1, 5*time.Second)
+	peerClient.WaitForPeers(t, 1, 5*time.Second)
+
+	_, c, err := srv.State().RenameUser(types.UserID(owner.ID), "profile-renamed")
+	require.NoError(t, err)
+
+	srv.App.Change(c)
+
+	for _, client := range []*servertest.TestClient{ownerClient, peerClient} {
+		client.WaitForCondition(t, "renamed user profile", 5*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				profile, ok := nm.UserProfiles[profileID]
+				return ok && profile.LoginName() == "profile-renamed"
+			})
+	}
+
+	late := servertest.NewClient(t, srv, "late", servertest.WithUser(peer))
+	late.WaitForCondition(t, "renamed user profile on join", 5*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			profile, ok := nm.UserProfiles[profileID]
+			return ok && profile.LoginName() == "profile-renamed"
+		})
+}
+
+// TestIssue3688DeletedNodeDoesNotSpinMapRequests deletes a live tsnet node
+// and counts the map polls its client starts afterwards. The client resets its
+// map backoff on every netmap it receives, so any answer that hands a deleted
+// node a netmap and then ends the stream makes it re-poll every few
+// milliseconds while it sits in NeedsLogin.
+//
+// See: https://github.com/blackhiden/headscale/issues/3688
+func TestIssue3688DeletedNodeDoesNotSpinMapRequests(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithRealListener())
+	user := srv.CreateUser(t, "spin-user")
+	authKey := srv.CreatePreAuthKey(t, types.UserID(user.ID))
+
+	var mapPolls atomic.Int64
+
+	ts := &tsnet.Server{
+		Dir:        t.TempDir(),
+		Hostname:   "spin-node",
+		ControlURL: srv.URL,
+		AuthKey:    authKey,
+		Logf: func(format string, args ...any) {
+			if strings.Contains(fmt.Sprintf(format, args...), "PollNetMap: stream=true") {
+				mapPolls.Add(1)
+			}
+		},
+	}
+	t.Cleanup(func() { ts.Close() })
+
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+
+	_, err := ts.Up(ctx)
+	require.NoError(t, err)
+
+	lc, err := ts.LocalClient()
+	require.NoError(t, err)
+
+	nodeView, ok := srv.State().GetNodeByID(findNodeID(t, srv, "spin-node"))
+	require.True(t, ok)
+
+	changes, err := srv.State().DeleteNode(nodeView)
+	require.NoError(t, err)
+	srv.App.Change(changes...)
+
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		st, err := lc.StatusWithoutPeers(ctx)
+		assert.NoError(c, err)
+		assert.Equal(c, "NeedsLogin", st.BackendState)
+	}, 15*time.Second, 50*time.Millisecond, "a deleted node must be driven to NeedsLogin")
+
+	before := mapPolls.Load()
+
+	// A 404 is retried with a growing backoff, a handful of polls in this
+	// window; the loop this guards against polls every ~10ms.
+	assert.Never(t, func() bool { return mapPolls.Load()-before > 20 }, 3*time.Second, 50*time.Millisecond,
+		"a deleted node's client must not re-poll /machine/map in a tight loop")
+
+	// Whatever quiets the client must not hold up its re-authentication.
+	require.NoError(t, lc.Start(ctx, ipn.Options{AuthKey: authKey}))
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		st, err := lc.StatusWithoutPeers(ctx)
+		assert.NoError(c, err)
+		assert.NotEqual(c, "NeedsLogin", st.BackendState)
+
+		registered := false
+		for _, n := range srv.State().ListNodes().All() {
+			registered = registered || n.Hostname() == "spin-node"
+		}
+
+		assert.True(c, registered)
+	}, 15*time.Second, 50*time.Millisecond, "a deleted node must re-register promptly")
 }

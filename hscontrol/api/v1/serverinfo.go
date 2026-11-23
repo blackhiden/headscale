@@ -109,8 +109,8 @@ func registerServerInfo(api huma.API, b Backend) {
 			},
 			PublicIP: detectPublicIP(b),
 			Tailnet: TailnetInfo{
-				IPRangeV4:      prefixString(b.Cfg.PrefixV4),
-				IPRangeV6:      prefixString(b.Cfg.PrefixV6),
+				IPRangeV4:      prefixString(b.Cfg.Prefixes.V4),
+				IPRangeV6:      prefixString(b.Cfg.Prefixes.V6),
 				MagicDNSDomain: b.Cfg.DNSConfig.BaseDomain,
 				DERPRegions:    derpRegions,
 			},

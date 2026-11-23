@@ -12,7 +12,6 @@ package mapper
 
 import (
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -59,6 +58,7 @@ func setupLightweightBatcher(t *testing.T, nodeCount, bufferSize int) *lightweig
 		mc := newMultiChannelNodeConn(id, nil) // nil mapper is fine for channel tests
 		ch := make(chan *tailcfg.MapResponse, bufferSize)
 		entry := &connectionEntry{
+			done:    make(chan struct{}),
 			id:      fmt.Sprintf("conn-%d", i),
 			c:       ch,
 			version: tailcfg.CapabilityVersion(100),
@@ -213,15 +213,27 @@ func TestAddToBatch_ConcurrentTargeted_NoDataLoss(t *testing.T) {
 
 	require.Zero(t, panics, "no panics expected")
 
-	// All 100 changes MUST be present. The Load→append→Store race causes
-	// data loss: typically 30-50% of changes are silently dropped.
-	pending := getPendingForNode(lb.b, targetNode)
-	t.Logf("targeted changes: expected=%d, got=%d (lost=%d)",
-		goroutines, len(pending), goroutines-len(pending))
+	// All 100 patches MUST be present; pending may fold them into fewer
+	// changes. The Load→append→Store race causes data loss: typically
+	// 30-50% of changes are silently dropped.
+	got := countPatches(getPendingForNode(lb.b, targetNode))
+	t.Logf("targeted patches: expected=%d, got=%d (lost=%d)",
+		goroutines, got, goroutines-got)
 
-	assert.Len(t, pending, goroutines,
-		"addToBatch lost %d/%d targeted changes under concurrent access",
-		goroutines-len(pending), goroutines)
+	assert.Equal(t, goroutines, got,
+		"addToBatch lost %d/%d targeted patches under concurrent access",
+		goroutines-got, goroutines)
+}
+
+// countPatches counts the peer patches in changes, which pending folds into
+// fewer changes without dropping any.
+func countPatches(cs []change.Change) int {
+	n := 0
+	for _, c := range cs {
+		n += len(c.PeerPatches)
+	}
+
+	return n
 }
 
 // TestAddToBatch_ConcurrentBroadcast verifies that concurrent broadcasts
@@ -243,6 +255,127 @@ func TestAddToBatch_ConcurrentBroadcast(t *testing.T) {
 	t.Logf("nodes with pending changes: %d/%d", nodesWithPending, 50)
 	assert.Positive(t, nodesWithPending,
 		"at least some nodes should have pending changes after broadcast")
+}
+
+func TestAddToBatchDifferential(t *testing.T) {
+	baseline := setupLightweightBatcher(t, 4, 1)
+	candidate := setupLightweightBatcher(t, 4, 1)
+	t.Cleanup(baseline.cleanup)
+	t.Cleanup(candidate.cleanup)
+
+	var stopped [2]atomic.Int64
+
+	for i, lb := range []*lightweightBatcher{baseline, candidate} {
+		nc, _ := lb.b.nodes.Load(4)
+		nc.connections[0].stop = func() { stopped[i].Add(1) }
+
+		lb.b.RemoveNode(3, lb.channels[3])
+		lb.b.nodes.Store(99, nil)
+	}
+
+	endpoint := change.EndpointOrDERPUpdate(&tailcfg.PeerChange{
+		NodeID: 1, DERPRegion: 7, Online: new(true),
+	})
+	ping := change.PingNode(2, &tailcfg.PingRequest{URL: "https://example.com/one"})
+	stages := []struct {
+		name    string
+		changes []change.Change
+	}{
+		{"empty", nil},
+		{"mixed", []change.Change{
+			change.NodeOnline(2), change.SelfUpdate(1), endpoint,
+			change.SelfUpdate(88), ping, change.NodeOnline(2),
+		}},
+		{"repeated_kinds", []change.Change{
+			change.NodeOnline(2), change.NodeOffline(2, time.Time{}), change.NodeOnline(2),
+			change.PeersChanged("several peers", 3, 1),
+		}},
+		{"deletion", []change.Change{
+			change.NodeRemoved(4, 1)[1], change.SelfUpdate(4), change.PeersRemoved(3),
+		}},
+		{
+			"full_with_pings",
+			[]change.Change{
+				change.FullUpdate(),
+				change.PingNode(
+					1,
+					&tailcfg.PingRequest{URL: "https://example.com/two"},
+				),
+				change.PingNode(
+					88,
+					&tailcfg.PingRequest{URL: "https://example.com/missing"},
+				),
+				change.NodeOnline(3),
+			},
+		},
+		{"repeated_full", []change.Change{change.FullUpdate(), change.FullUpdate()}},
+		{"after_full", []change.Change{endpoint, change.SelfUpdate(1), ping}},
+	}
+
+	for _, stage := range stages {
+		t.Run(stage.name, func(t *testing.T) {
+			baselineAddToBatch(baseline.b, stage.changes...)
+			candidate.b.addToBatch(stage.changes...)
+
+			for _, id := range []types.NodeID{1, 2, 3, 4, 88, 99} {
+				want, wantExists := baseline.b.nodes.Load(id)
+				got, gotExists := candidate.b.nodes.Load(id)
+				require.Equal(t, wantExists, gotExists, "node %d", id)
+				require.Equal(t, want == nil, got == nil, "node %d", id)
+
+				if got == nil {
+					continue
+				}
+
+				assert.Equal(t, getPendingForNode(baseline.b, id),
+					getPendingForNode(candidate.b, id), "node %d", id)
+			}
+
+			assert.Equal(t, baseline.b.totalNodes.Load(), candidate.b.totalNodes.Load())
+			assert.Equal(t, stopped[0].Load(), stopped[1].Load())
+
+			if stage.name == "mixed" {
+				assert.Equal(t, []change.Change{
+					change.SelfUpdate(
+						1,
+					),
+					change.NodeOnline(2),
+					endpoint,
+					change.NodeOnline(2),
+				}, getPendingForNode(candidate.b, 1))
+				assert.Equal(t, []change.Change{
+					change.NodeOnline(2), endpoint, change.NodeOnline(2),
+				}, getPendingForNode(candidate.b, 3), "disconnected recipient retains broadcasts")
+			}
+		})
+	}
+
+	require.EqualValues(t, 1, stopped[1].Load(), "deletion must stop the session once")
+}
+
+func TestAddToBatchRecipientStorage(t *testing.T) {
+	for _, impl := range batchIngressImplementations {
+		t.Run(impl.name, func(t *testing.T) {
+			lb := setupLightweightBatcher(t, 2, 1)
+			t.Cleanup(lb.cleanup)
+
+			incoming := []change.Change{change.NodeOnline(1), change.NodeOffline(1, time.Time{})}
+			impl.add(lb.b, incoming...)
+			incoming[0] = change.FullUpdate()
+
+			first, _ := lb.b.nodes.Load(1)
+			first.pendingMu.Lock()
+			first.pending[0].Reason = "recipient-local change"
+			first.pendingMu.Unlock()
+
+			assert.Equal(
+				t,
+				[]change.Change{change.NodeOnline(1), change.NodeOffline(1, time.Time{})},
+				getPendingForNode(lb.b, 2),
+				"recipients must own their pending slices",
+			)
+		})
+	}
 }
 
 // TestAddToBatch_FullUpdateOverrides verifies that a FullUpdate replaces
@@ -377,7 +510,7 @@ func TestAddToBatch_NodeRemovalCleanup(t *testing.T) {
 	_, exists := lb.b.nodes.Load(removedNode)
 	require.True(t, exists, "node 3 should exist before removal")
 
-	lb.b.addToBatch(change.NodeRemoved(removedNode))
+	lb.b.addToBatch(change.NodeRemoved(removedNode)...)
 
 	// Node should be removed from the nodes map
 	_, exists = lb.b.nodes.Load(removedNode)
@@ -444,11 +577,9 @@ func TestProcessBatchedChanges_ConcurrentAdd_NoDataLoss(t *testing.T) {
 	wg.Go(func() {
 		for i := range iterations {
 			lb.b.addToBatch(change.Change{
-				Reason:     fmt.Sprintf("add-%d", i),
-				TargetNode: types.NodeID(1),
-				PeerPatches: []*tailcfg.PeerChange{
-					{NodeID: tailcfg.NodeID(i + 100)}, //nolint:gosec // test
-				},
+				Reason:      fmt.Sprintf("add-%d", i),
+				TargetNode:  types.NodeID(1),
+				PingRequest: &tailcfg.PingRequest{URL: fmt.Sprintf("https://ping/%d", i)},
 			})
 			addedCount.Add(1)
 		}
@@ -467,18 +598,27 @@ func TestProcessBatchedChanges_ConcurrentAdd_NoDataLoss(t *testing.T) {
 	// One final process to flush any remaining
 	lb.b.processBatchedChanges()
 
-	// Count total changes across all bundled work items in the channel.
-	// Each work item may contain multiple changes since processBatchedChanges
-	// bundles all pending changes per node into a single work item.
+	// Count the pings across all bundled work items in the channel: pending
+	// may fold or collapse state changes, but every ping must arrive.
 	queuedChanges := 0
 
 	workItems := len(lb.b.workCh)
 	for range workItems {
 		w := <-lb.b.workCh
-		queuedChanges += len(w.changes)
+		for _, ch := range w.changes {
+			if ch.PingRequest != nil {
+				queuedChanges++
+			}
+		}
 	}
-	// Also count any still-pending
-	remaining := len(getPendingForNode(lb.b, types.NodeID(1)))
+	// State can coalesce to a full update, but every ping must survive.
+	remaining := 0
+
+	for _, ch := range getPendingForNode(lb.b, types.NodeID(1)) {
+		if ch.PingRequest != nil {
+			remaining++
+		}
+	}
 
 	total := queuedChanges + remaining
 	added := int(addedCount.Load())
@@ -558,6 +698,7 @@ func TestWorkMu_PreventsInterTickRace(t *testing.T) {
 	mc := newMultiChannelNodeConn(1, nil)
 	ch := make(chan *tailcfg.MapResponse, 100)
 	entry := &connectionEntry{
+		done:    make(chan struct{}),
 		id:      "test",
 		c:       ch,
 		version: tailcfg.CapabilityVersion(100),
@@ -857,6 +998,7 @@ func TestBug3_CleanupOfflineNodes_TOCTOU(t *testing.T) {
 
 	newCh := make(chan *tailcfg.MapResponse, 10)
 	entry := &connectionEntry{
+		done:    make(chan struct{}),
 		id:      "reconnected",
 		c:       newCh,
 		version: tailcfg.CapabilityVersion(100),
@@ -900,6 +1042,7 @@ func TestBug3_CleanupOfflineNodes_TOCTOU(t *testing.T) {
 			if mc, ok := lb.b.nodes.Load(targetNode); ok {
 				reconnCh := make(chan *tailcfg.MapResponse, 10)
 				reconnEntry := &connectionEntry{
+					done:    make(chan struct{}),
 					id:      "race-reconn",
 					c:       reconnCh,
 					version: tailcfg.CapabilityVersion(100),
@@ -1006,52 +1149,30 @@ func TestBug6_StartCalledMultipleTimes_GoroutineLeak(t *testing.T) {
 	lb := setupLightweightBatcher(t, 3, 10)
 	lb.b.workers = 2
 
-	goroutinesBefore := runtime.NumGoroutine()
-
 	// Call Start() once - this should launch (workers + 1) goroutines
 	// (1 for doWork + workers for worker())
-	lb.b.Start()
-	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
-
-	goroutinesAfterFirst := runtime.NumGoroutine()
-	firstStartDelta := goroutinesAfterFirst - goroutinesBefore
-	t.Logf("goroutines: before=%d, after_first_Start=%d, delta=%d",
-		goroutinesBefore, goroutinesAfterFirst, firstStartDelta)
+	startLabelled(lb.b, t.Name())
+	require.Eventually(t, func() bool {
+		return batcherGoroutines(t.Name()) == 3
+	}, time.Second, 5*time.Millisecond, "first Start() should run doWork + 2 workers")
 
 	// Call Start() again - this SHOULD be a no-op
 	// BUG: it creates a NEW done channel (orphaning goroutines listening on the old one)
 	// and launches another doWork()+workers set
-	lb.b.Start()
+	startLabelled(lb.b, t.Name())
+	startLabelled(lb.b, t.Name())
 	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
 
-	goroutinesAfterSecond := runtime.NumGoroutine()
-	secondStartDelta := goroutinesAfterSecond - goroutinesAfterFirst
-	t.Logf("goroutines: after_second_Start=%d, delta=%d (should be 0)",
-		goroutinesAfterSecond, secondStartDelta)
+	extra := batcherGoroutines(t.Name()) - 3
 
-	// Call Start() a third time
-	lb.b.Start()
-	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
-
-	goroutinesAfterThird := runtime.NumGoroutine()
-	thirdStartDelta := goroutinesAfterThird - goroutinesAfterSecond
-	t.Logf("goroutines: after_third_Start=%d, delta=%d (should be 0)",
-		goroutinesAfterThird, thirdStartDelta)
-
-	// Close() only closes the LAST done channel, leaving earlier goroutines leaked
 	lb.b.Close()
-	time.Sleep(100 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
-
-	goroutinesAfterClose := runtime.NumGoroutine()
-	t.Logf("goroutines after Close: %d (leaked: %d)",
-		goroutinesAfterClose, goroutinesAfterClose-goroutinesBefore)
 
 	// Second Start() should NOT have created new goroutines
-	assert.Zero(t, secondStartDelta,
-		"BUG #6: second Start() call leaked %d goroutines. "+
+	assert.Zero(t, extra,
+		"BUG #6: repeated Start() calls leaked %d goroutines. "+
 			"Start() has no idempotency guard, each call spawns new goroutines. "+
 			"Fix: add sync.Once or atomic.Bool to prevent multiple Start() calls",
-		secondStartDelta)
+		extra)
 }
 
 // TestBug7_CleanupOfflineNodes_PendingChangesCleanedStructurally verifies that
@@ -1336,6 +1457,7 @@ func TestScale1000_MultiChannelBroadcast(t *testing.T) {
 			ch := make(chan *tailcfg.MapResponse, bufferSize)
 			nc.channels[j] = ch
 			entry := &connectionEntry{
+				done:    make(chan struct{}),
 				id:      fmt.Sprintf("conn-%d-%d", i, j),
 				c:       ch,
 				version: tailcfg.CapabilityVersion(100),
@@ -1431,6 +1553,7 @@ func TestScale1000_ConnectionChurn(t *testing.T) {
 				// Add new connection
 				newCh := make(chan *tailcfg.MapResponse, 20)
 				entry := &connectionEntry{
+					done:    make(chan struct{}),
 					id:      fmt.Sprintf("churn-%d-%d", i, cycle),
 					c:       newCh,
 					version: tailcfg.CapabilityVersion(100),
@@ -1516,6 +1639,7 @@ func TestScale1000_ConcurrentAddRemove(t *testing.T) {
 			// Add a new connection
 			ch := make(chan *tailcfg.MapResponse, 10)
 			entry := &connectionEntry{
+				done:    make(chan struct{}),
 				id:      fmt.Sprintf("concurrent-%d", i),
 				c:       ch,
 				version: tailcfg.CapabilityVersion(100),
@@ -1635,6 +1759,7 @@ func TestScale1000_BroadcastDuringNodeChurn(t *testing.T) {
 						mc := newMultiChannelNodeConn(id, nil)
 						ch := make(chan *tailcfg.MapResponse, 10)
 						entry := &connectionEntry{
+							done:    make(chan struct{}),
 							id:      fmt.Sprintf("rechurn-%d-%d", i, cycle),
 							c:       ch,
 							version: tailcfg.CapabilityVersion(100),
@@ -1710,6 +1835,7 @@ func TestScale1000_WorkChannelSaturation(t *testing.T) {
 		mc := newMultiChannelNodeConn(id, nil)
 		ch := make(chan *tailcfg.MapResponse, 1)
 		entry := &connectionEntry{
+			done:    make(chan struct{}),
 			id:      fmt.Sprintf("conn-%d", i),
 			c:       ch,
 			version: tailcfg.CapabilityVersion(100),

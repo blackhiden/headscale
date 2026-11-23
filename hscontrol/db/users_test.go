@@ -11,6 +11,40 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestDestroyUserKeepsTaggedNodeEphemeral(t *testing.T) {
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	user := db.CreateUserForTest("tagged-ephemeral-user")
+	pak, err := db.CreatePreAuthKey(
+		user.TypedID(),
+		true,
+		true,
+		nil,
+		[]string{"tag:server"},
+	)
+	require.NoError(t, err)
+
+	node := &types.Node{
+		Hostname:  "tagged-ephemeral-node",
+		Tags:      []string{"tag:server"},
+		AuthKeyID: &pak.ID,
+		Ephemeral: true,
+	}
+	require.NoError(t, db.DB.Create(node).Error)
+	require.NoError(t, db.DestroyUser(types.UserID(user.ID)))
+	nodes, err := db.ListNodes()
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.True(t, nodes[0].IsTagged())
+	require.True(t, nodes[0].IsEphemeral())
+
+	retained, err := db.GetPreAuthKeyByID(pak.ID)
+	require.NoError(t, err)
+	require.Nil(t, retained.Revoked, "a tagged key outlives the user that made it")
+	require.Nil(t, retained.UserID)
+}
+
 func TestCreateAndDestroyUser(t *testing.T) {
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
@@ -61,6 +95,27 @@ func TestDestroyUserErrors(t *testing.T) {
 
 				result := db.DB.First(&foundPak, "kind = ? AND id = ?", types.CredentialPreAuthKey, pak.ID)
 				assert.ErrorIs(t, result.Error, gorm.ErrRecordNotFound)
+			},
+		},
+		{
+			// A tagged key belongs to its tags, so it outlives the user that
+			// made it and only loses the reference.
+			name: "success_keeps_tagged_preauthkeys",
+			test: func(t *testing.T, db *HSDatabase) {
+				t.Helper()
+
+				user := db.CreateUserForTest("test")
+
+				tagged, err := db.CreatePreAuthKey(user.TypedID(), true, false, nil, []string{"tag:ci"})
+				require.NoError(t, err)
+
+				err = db.DestroyUser(types.UserID(user.ID))
+				require.NoError(t, err)
+
+				got, err := db.GetPreAuthKeyByID(tagged.ID)
+				require.NoError(t, err)
+				assert.Nil(t, got.UserID)
+				assert.Equal(t, []string{"tag:ci"}, got.Tags)
 			},
 		},
 		{
@@ -276,6 +331,41 @@ func TestGetUserErrorPropagation(t *testing.T) {
 	}
 }
 
+// TestDuplicateUserNameIsTyped pins the root cause: a unique-index violation
+// must reach callers as a typed error on every backend, not as driver text.
+func TestDuplicateUserNameIsTyped(t *testing.T) {
+	backends := map[string]func(t *testing.T) *HSDatabase{
+		"sqlite": func(t *testing.T) *HSDatabase {
+			t.Helper()
+
+			db, err := newSQLiteTestDB()
+			require.NoError(t, err)
+
+			return db
+		},
+		"postgres": newPostgresTestDB,
+	}
+
+	for name, open := range backends {
+		t.Run(name+"/create", func(t *testing.T) {
+			db := open(t)
+			db.CreateUserForTest("dup")
+
+			_, err := db.CreateUser(types.User{Name: "dup"})
+			require.ErrorIs(t, err, gorm.ErrDuplicatedKey)
+		})
+
+		t.Run(name+"/rename", func(t *testing.T) {
+			db := open(t)
+			db.CreateUserForTest("dup")
+			other := db.CreateUserForTest("other")
+
+			err := db.RenameUser(types.UserID(other.ID), "dup")
+			require.ErrorIs(t, err, gorm.ErrDuplicatedKey)
+		})
+	}
+}
+
 func TestRenameUser(t *testing.T) {
 	tests := []struct {
 		name string
@@ -326,8 +416,7 @@ func TestRenameUser(t *testing.T) {
 				assert.Equal(t, "test2", userTest2.Name)
 
 				err := db.RenameUser(types.UserID(userTest2.ID), "test")
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "UNIQUE constraint failed")
+				require.ErrorIs(t, err, gorm.ErrDuplicatedKey)
 			},
 		},
 	}

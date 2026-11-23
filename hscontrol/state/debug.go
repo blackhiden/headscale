@@ -181,15 +181,11 @@ func (s *State) DebugRegistrationCache() map[string]any {
 	return map[string]any{
 		"type":        "expirable-lru",
 		"expiration":  s.authCacheExpiration.String(),
-		"max_entries": defaultRegisterCacheMaxEntries,
+		"max_entries": s.authCacheMaxEntries,
+		"ssh_reserve": authCacheSSHReserve,
 		"current_len": s.authCache.Len(),
 		"status":      "active",
 	}
-}
-
-// DebugConfig returns debug information about the current configuration.
-func (s *State) DebugConfig() *types.Config {
-	return s.cfg
 }
 
 // DebugPolicy returns the current policy data as a string.
@@ -309,11 +305,11 @@ func (s *State) DebugOverviewJSON() DebugOverviewInfo {
 				info.Nodes.Online++
 			}
 
-			if node.Expiry().Valid() && node.Expiry().Get().Before(now) {
+			if node.IsExpiredAt(now) {
 				info.Nodes.Expired++
 			}
 
-			if node.AuthKey().Valid() && node.AuthKey().Ephemeral() {
+			if node.IsEphemeral() {
 				info.Nodes.Ephemeral++
 			}
 		}

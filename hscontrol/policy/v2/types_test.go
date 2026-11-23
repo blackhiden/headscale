@@ -2,9 +2,11 @@ package v2
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -366,7 +368,7 @@ func TestUnmarshalPolicy(t *testing.T) {
 	]
 }
 			`,
-			wantErr: "alias not supported for SSH source: v2.Asterix",
+			wantErr: `[ssh] "*" is not allowed`,
 		},
 		{
 			name: "invalid-username",
@@ -651,7 +653,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   ]
 }
 `,
-			wantErr: `autogroup:internet can only be used in ACL destinations`,
+			wantErr: `[ssh] invalid dst "autogroup:internet"`,
 		},
 		{
 			name: "ssh-basic",
@@ -785,7 +787,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   ]
 }
 `,
-			wantErr: `group not defined in policy: "group:notdefined"`,
+			wantErr: `group not found: "group:notdefined"`,
 		},
 		{
 			name: "group-must-be-defined-acl-dst",
@@ -804,7 +806,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   ]
 }
 `,
-			wantErr: `group not defined in policy: "group:notdefined"`,
+			wantErr: `group not found: "group:notdefined"`,
 		},
 		{
 			name: "group-must-be-defined-acl-ssh-src",
@@ -823,7 +825,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   ]
 }
 `,
-			wantErr: `user destination requires source to contain only that same user "user@"`,
+			wantErr: `[ssh] users in dst are only allowed from the same user`,
 		},
 		{
 			name: "group-must-be-defined-acl-tagOwner",
@@ -834,7 +836,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   },
 }
 `,
-			wantErr: `group not defined in policy: "group:notdefined"`,
+			wantErr: `group not found: "group:notdefined"`,
 		},
 		{
 			name: "group-must-be-defined-acl-autoapprover-route",
@@ -847,7 +849,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   },
 }
 `,
-			wantErr: `group not defined in policy: "group:notdefined"`,
+			wantErr: `group not found: "group:notdefined"`,
 		},
 		{
 			name: "group-must-be-defined-acl-autoapprover-exitnode",
@@ -858,7 +860,7 @@ func TestUnmarshalPolicy(t *testing.T) {
    },
 }
 `,
-			wantErr: `group not defined in policy: "group:notdefined"`,
+			wantErr: `group not found: "group:notdefined"`,
 		},
 		{
 			name: "tag-must-be-defined-acl-src",
@@ -1544,9 +1546,39 @@ func TestUnmarshalPolicy(t *testing.T) {
   },
 }
 `,
-			wantErr: `tag "tag:child" references undefined tag "tag:nonexistent"`,
+			wantErr: `tagOwners["tag:child"]: "tag:nonexistent": does not exist`,
 		},
 		// SSH source/destination validation tests (#3009, #3010)
+		{
+			name: "ssh-check-tag-src-rejected",
+			input: `
+{
+  "tagOwners": {"tag:client": ["admin@"], "tag:server": ["admin@"]},
+  "ssh": [{
+    "action": "check",
+    "src": ["admin@", "tag:client"],
+    "dst": ["tag:server"],
+    "users": ["root"]
+  }]
+}
+`,
+			wantErr: `[ssh] "check" action does not support tags in src`,
+		},
+		{
+			name: "ssh-check-autogroup-tagged-src-rejected",
+			input: `
+{
+  "tagOwners": {"tag:server": ["admin@"]},
+  "ssh": [{
+    "action": "check",
+    "src": ["admin@", "autogroup:tagged"],
+    "dst": ["tag:server"],
+    "users": ["root"]
+  }]
+}
+`,
+			wantErr: `[ssh] "check" action does not support tags in src`,
+		},
 		{
 			name: "ssh-tag-to-user-rejected",
 			input: `
@@ -1560,7 +1592,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   }]
 }
 `,
-			wantErr: "tags in SSH source cannot access user-owned devices",
+			wantErr: `[ssh] users in dst are only allowed from the same user`,
 		},
 		{
 			name: "ssh-autogroup-tagged-to-user-rejected",
@@ -1574,7 +1606,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   }]
 }
 `,
-			wantErr: "tags in SSH source cannot access user-owned devices",
+			wantErr: `[ssh] users in dst are only allowed from the same user`,
 		},
 		{
 			name: "ssh-tag-to-autogroup-self-rejected",
@@ -1589,7 +1621,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   }]
 }
 `,
-			wantErr: "autogroup:self destination requires source to contain only users or groups",
+			wantErr: `[ssh] "tag:server" is not allowed in src for autogroup:self`,
 		},
 		{
 			name: "ssh-group-to-user-rejected",
@@ -1604,7 +1636,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   }]
 }
 `,
-			wantErr: `user destination requires source to contain only that same user "admin@"`,
+			wantErr: `[ssh] users in dst are only allowed from the same user`,
 		},
 		{
 			name: "ssh-same-user-to-user-allowed",
@@ -1668,7 +1700,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   }]
 }
 `,
-			wantErr: "tags in SSH source cannot access autogroup:member",
+			wantErr: `[ssh] invalid dst "autogroup:member"`,
 		},
 		{
 			name: "ssh-autogroup-tagged-to-autogroup-tagged-allowed",
@@ -1706,7 +1738,7 @@ func TestUnmarshalPolicy(t *testing.T) {
   }]
 }
 `,
-			wantErr: "wildcard (*) is not supported as SSH destination",
+			wantErr: `[ssh] invalid dst "*"`,
 		},
 		{
 			name: "ssh-group-to-tag-allowed",
@@ -2347,6 +2379,101 @@ func TestUnmarshalPolicy(t *testing.T) {
 	}
 }
 
+func TestUnmarshalPolicyCommentsMatchPlainJSON(t *testing.T) {
+	const plain = `{
+		"groups": {"group:admins": ["admin@example.com"]},
+		"hosts": {"db": "100.64.0.10"},
+		"acls": [{"action": "accept", "src": ["group:admins"], "dst": ["db:5432"]}]
+	}`
+
+	want, err := unmarshalPolicy([]byte(plain))
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name:  "plain json",
+			input: plain,
+		},
+		{
+			name: "line comments",
+			input: `{
+				// people allowed to reach the database
+				"groups": {"group:admins": ["admin@example.com"]}, // on-call rota
+				"hosts": {"db": "100.64.0.10"},
+				// postgres only
+				"acls": [{"action": "accept", "src": ["group:admins"], "dst": ["db:5432"]}]
+			}`,
+		},
+		{
+			name: "block comments",
+			input: `/* production policy */
+			{
+				"groups": {"group:admins": [/* lead */ "admin@example.com"]},
+				"hosts": {"db": "100.64.0.10"},
+				/*
+				  postgres only
+				*/
+				"acls": [{"action": "accept", "src": ["group:admins"], "dst": ["db:5432"]}]
+			}`,
+		},
+		{
+			name: "trailing commas",
+			input: `{
+				"groups": {"group:admins": ["admin@example.com",],},
+				"hosts": {"db": "100.64.0.10",},
+				"acls": [{"action": "accept", "src": ["group:admins",], "dst": ["db:5432",],},],
+			}`,
+		},
+		{
+			name: "comments and trailing commas mixed",
+			input: `{
+				"groups": {
+					"group:admins": [
+						"admin@example.com", // lead
+					],
+				},
+				/* inventory */
+				"hosts": {"db": "100.64.0.10",},
+				"acls": [
+					{"action": "accept", "src": ["group:admins"], "dst": ["db:5432"]}, // postgres
+				],
+			}`,
+		},
+		{
+			name:    "unterminated block comment",
+			input:   `{"acls": [] /* never closed`,
+			wantErr: "parsing HuJSON",
+		},
+	}
+
+	cmps := append(util.Comparers,
+		cmp.Comparer(func(x, y Prefix) bool {
+			return x == y
+		}),
+		cmpopts.IgnoreUnexported(Policy{}),
+	)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := unmarshalPolicy([]byte(tt.input))
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if diff := cmp.Diff(want, got, cmps...); diff != "" {
+				t.Errorf("unmarshalPolicy mismatch (-plain +commented):\n%s", diff)
+			}
+		})
+	}
+}
+
 func gp(s string) *Group          { return new(Group(s)) }
 func up(s string) *Username       { return new(Username(s)) }
 func hp(s string) *Host           { return new(Host(s)) }
@@ -2820,6 +2947,33 @@ func TestResolvePolicy(t *testing.T) {
 				t.Fatalf("unexpected prefs (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// TestTagResolveIndexedMatchesScan resolves tags with and without the
+// per-compile tag index: the index must name exactly the nodes HasTag does.
+func TestTagResolveIndexedMatchesScan(t *testing.T) {
+	v4 := func(s string) *netip.Addr { a := netip.MustParseAddr(s); return &a }
+
+	nodes := types.Nodes{
+		{ID: 1, IPv4: v4("100.64.0.1"), IPv6: v4("fd7a:115c:a1e0::1"), Tags: []string{"tag:a", "tag:b"}},
+		{ID: 2, IPv4: v4("100.64.0.2"), Tags: []string{"tag:b"}},
+		{ID: 3, IPv4: v4("100.64.0.3")},
+		{ID: 4, IPv4: v4("100.64.0.4"), Tags: []string{"tag:a", "tag:a"}},
+		{ID: 5, IPv6: v4("fd7a:115c:a1e0::5"), Tags: []string{"tag:c"}},
+	}
+
+	pol := &Policy{}
+	indexed := pol.withNodesByTag(nodes.ViewSlice())
+
+	for _, tag := range []Tag{"tag:a", "tag:b", "tag:c", "tag:missing"} {
+		want, err := tag.resolve(pol, nil, nodes.ViewSlice())
+		require.NoError(t, err)
+
+		got, err := tag.resolve(indexed, nil, nodes.ViewSlice())
+		require.NoError(t, err)
+
+		assert.Equal(t, want.Prefixes(), got.Prefixes(), "%s", tag)
 	}
 }
 
@@ -3499,9 +3653,37 @@ func TestResolveTagOwners(t *testing.T) {
 			},
 			want: map[Tag]*netipx.IPSet{
 				Tag("tag:bigbrother"):   mustIPSet("100.64.0.1/32"),
-				Tag("tag:smallbrother"): mustIPSet("100.64.0.1/32"),
+				Tag("tag:smallbrother"): mustIPSet(),
 			},
 			wantErr: false,
+		},
+		{
+			name: "tag-owner-chain-keeps-direct-owners",
+			policy: &Policy{
+				TagOwners: TagOwners{
+					Tag("tag:a"): Owners{new(Username("user1@"))},
+					Tag("tag:b"): Owners{new(Tag("tag:a"))},
+					Tag("tag:c"): Owners{new(Tag("tag:b")), new(Username("user2@"))},
+				},
+			},
+			want: map[Tag]*netipx.IPSet{
+				Tag("tag:a"): mustIPSet("100.64.0.1/32"),
+				Tag("tag:b"): mustIPSet(),
+				Tag("tag:c"): mustIPSet("100.64.0.2/32"),
+			},
+		},
+		{
+			name: "tag-owner-cycle",
+			policy: &Policy{
+				TagOwners: TagOwners{
+					Tag("tag:a"): Owners{new(Tag("tag:b")), new(Username("user1@"))},
+					Tag("tag:b"): Owners{new(Tag("tag:a"))},
+				},
+			},
+			want: map[Tag]*netipx.IPSet{
+				Tag("tag:a"): mustIPSet("100.64.0.1/32"),
+				Tag("tag:b"): mustIPSet(),
+			},
 		},
 	}
 
@@ -4204,193 +4386,6 @@ func mustParseAlias(s string) Alias {
 	return alias
 }
 
-func TestFlattenTagOwners(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   TagOwners
-		want    TagOwners
-		wantErr string
-	}{
-		{
-			name: "tag-owns-tag",
-			input: TagOwners{
-				Tag("tag:bigbrother"):   Owners{new(Group("group:user1"))},
-				Tag("tag:smallbrother"): Owners{new(Tag("tag:bigbrother"))},
-			},
-			want: TagOwners{
-				Tag("tag:bigbrother"):   Owners{new(Group("group:user1"))},
-				Tag("tag:smallbrother"): Owners{new(Group("group:user1"))},
-			},
-			wantErr: "",
-		},
-		{
-			// SaaS tolerates tag:a <-> tag:b cycles by dropping the
-			// cycle edge; both tags resolve to an empty owner set
-			// because neither chain reaches a non-tag owner.
-			name: "circular-reference-resolves-to-empty",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Tag("tag:b"))},
-				Tag("tag:b"): Owners{new(Tag("tag:a"))},
-			},
-			want: TagOwners{
-				Tag("tag:a"): nil,
-				Tag("tag:b"): nil,
-			},
-			wantErr: "",
-		},
-		{
-			// tag:a -> tag:a self-reference: the only owner is the
-			// cycle edge itself; result is empty.
-			name: "self-reference-resolves-to-empty",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Tag("tag:a"))},
-			},
-			want: TagOwners{
-				Tag("tag:a"): nil,
-			},
-			wantErr: "",
-		},
-		{
-			// Cycle plus a sibling non-tag owner: the cycle edge
-			// drops out, the sibling owner survives.
-			name: "cycle-plus-sibling-keeps-sibling",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Tag("tag:b")), new(Username("alice@example.com"))},
-				Tag("tag:b"): Owners{new(Tag("tag:a"))},
-			},
-			want: TagOwners{
-				Tag("tag:a"): Owners{new(Username("alice@example.com"))},
-				Tag("tag:b"): Owners{new(Username("alice@example.com"))},
-			},
-			wantErr: "",
-		},
-		{
-			name: "mixed-owners",
-			input: TagOwners{
-				Tag("tag:x"): Owners{new(Username("user1@")), new(Tag("tag:y"))},
-				Tag("tag:y"): Owners{new(Username("user2@"))},
-			},
-			want: TagOwners{
-				Tag("tag:x"): Owners{new(Username("user1@")), new(Username("user2@"))},
-				Tag("tag:y"): Owners{new(Username("user2@"))},
-			},
-			wantErr: "",
-		},
-		{
-			name: "mixed-dupe-owners",
-			input: TagOwners{
-				Tag("tag:x"): Owners{new(Username("user1@")), new(Tag("tag:y"))},
-				Tag("tag:y"): Owners{new(Username("user1@"))},
-			},
-			want: TagOwners{
-				Tag("tag:x"): Owners{new(Username("user1@"))},
-				Tag("tag:y"): Owners{new(Username("user1@"))},
-			},
-			wantErr: "",
-		},
-		{
-			name: "no-tag-owners",
-			input: TagOwners{
-				Tag("tag:solo"): Owners{new(Username("user1@"))},
-			},
-			want: TagOwners{
-				Tag("tag:solo"): Owners{new(Username("user1@"))},
-			},
-			wantErr: "",
-		},
-		{
-			name: "tag-long-owner-chain",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Group("group:user1"))},
-				Tag("tag:b"): Owners{new(Tag("tag:a"))},
-				Tag("tag:c"): Owners{new(Tag("tag:b"))},
-				Tag("tag:d"): Owners{new(Tag("tag:c"))},
-				Tag("tag:e"): Owners{new(Tag("tag:d"))},
-				Tag("tag:f"): Owners{new(Tag("tag:e"))},
-				Tag("tag:g"): Owners{new(Tag("tag:f"))},
-			},
-			want: TagOwners{
-				Tag("tag:a"): Owners{new(Group("group:user1"))},
-				Tag("tag:b"): Owners{new(Group("group:user1"))},
-				Tag("tag:c"): Owners{new(Group("group:user1"))},
-				Tag("tag:d"): Owners{new(Group("group:user1"))},
-				Tag("tag:e"): Owners{new(Group("group:user1"))},
-				Tag("tag:f"): Owners{new(Group("group:user1"))},
-				Tag("tag:g"): Owners{new(Group("group:user1"))},
-			},
-			wantErr: "",
-		},
-		{
-			// Long cycle: every tag eventually points back to itself.
-			// Each tag resolves to the empty owner set.
-			name: "tag-long-circular-chain-resolves-to-empty",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Tag("tag:g"))},
-				Tag("tag:b"): Owners{new(Tag("tag:a"))},
-				Tag("tag:c"): Owners{new(Tag("tag:b"))},
-				Tag("tag:d"): Owners{new(Tag("tag:c"))},
-				Tag("tag:e"): Owners{new(Tag("tag:d"))},
-				Tag("tag:f"): Owners{new(Tag("tag:e"))},
-				Tag("tag:g"): Owners{new(Tag("tag:f"))},
-			},
-			want: TagOwners{
-				Tag("tag:a"): nil,
-				Tag("tag:b"): nil,
-				Tag("tag:c"): nil,
-				Tag("tag:d"): nil,
-				Tag("tag:e"): nil,
-				Tag("tag:f"): nil,
-				Tag("tag:g"): nil,
-			},
-			wantErr: "",
-		},
-		{
-			name: "undefined-tag-reference",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Tag("tag:nonexistent"))},
-			},
-			wantErr: `tag "tag:a" references undefined tag "tag:nonexistent"`,
-		},
-		{
-			name: "tag-with-empty-owners-is-valid",
-			input: TagOwners{
-				Tag("tag:a"): Owners{new(Tag("tag:b"))},
-				Tag("tag:b"): Owners{}, // empty owners but exists
-			},
-			want: TagOwners{
-				Tag("tag:a"): nil,
-				Tag("tag:b"): nil,
-			},
-			wantErr: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := flattenTagOwners(tt.input)
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("flattenTagOwners() expected error %q, got nil", tt.wantErr)
-				}
-
-				if err.Error() != tt.wantErr {
-					t.Fatalf("flattenTagOwners() expected error %q, got %q", tt.wantErr, err.Error())
-				}
-
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("flattenTagOwners() unexpected error: %v", err)
-			}
-
-			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("flattenTagOwners() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
 func TestSSHCheckPeriodUnmarshal(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -4555,7 +4550,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 			},
 		},
@@ -4564,7 +4559,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Always: true},
 			},
@@ -4574,7 +4569,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: time.Hour},
 			},
@@ -4584,7 +4579,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionAccept,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: time.Hour},
 			},
@@ -4595,7 +4590,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: 30 * time.Second},
 			},
@@ -4605,7 +4600,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: 168 * time.Hour},
 			},
@@ -4615,7 +4610,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: 168*time.Hour + time.Second},
 			},
@@ -4626,7 +4621,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: 200 * time.Hour},
 			},
@@ -4637,7 +4632,7 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 			ssh: SSH{
 				Action:       SSHActionCheck,
 				Sources:      SSHSrcAliases{up("user@")},
-				Destinations: SSHDstAliases{agp("autogroup:member")},
+				Destinations: SSHDstAliases{agp("autogroup:self")},
 				Users:        SSHUsers{"root"},
 				CheckPeriod:  &SSHCheckPeriod{Duration: -time.Minute},
 			},
@@ -4668,7 +4663,7 @@ func TestSSHRuleSaaSValidation(t *testing.T) {
 		ssh := SSH{
 			Action:       SSHActionAccept,
 			Sources:      SSHSrcAliases{up("user@")},
-			Destinations: SSHDstAliases{agp("autogroup:member")},
+			Destinations: SSHDstAliases{agp("autogroup:self")},
 			Users:        SSHUsers{"root"},
 		}
 		if modify != nil {
@@ -4740,7 +4735,7 @@ func TestSSHRuleSaaSValidation(t *testing.T) {
 			ssh: baseSSH(func(s *SSH) {
 				s.Destinations = SSHDstAliases{hp("srv")}
 			}),
-			wantErr: ErrSSHDestinationHostAlias,
+			wantErr: ErrSSHInvalidDst,
 		},
 	}
 
@@ -4759,6 +4754,168 @@ func TestSSHRuleSaaSValidation(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+		})
+	}
+}
+
+// TestSSHRuleErrorsLabelled verifies every error raised for an SSH rule
+// carries the [ssh] label, including errors from checks shared with ACLs
+// and grants (#3335).
+func TestSSHRuleErrorsLabelled(t *testing.T) {
+	tests := []struct {
+		name    string
+		rules   string
+		wantErr string
+	}{
+		{
+			name:    "users missing",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:self"]}`,
+			wantErr: `[ssh] users must be specified`,
+		},
+		{
+			name:    "action missing",
+			rules:   `{"src": ["odin@"], "dst": ["autogroup:self"], "users": ["root"]}`,
+			wantErr: `[ssh] action must be specified`,
+		},
+		{
+			name:    "wildcard user",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:self"], "users": ["*"]}`,
+			wantErr: `[ssh] user "*" is not valid`,
+		},
+		{
+			name:    "empty acceptEnv",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:self"], "users": ["root"], "acceptEnv": [""]}`,
+			wantErr: `[ssh] acceptEnv values cannot be empty`,
+		},
+		{
+			name:    "checkPeriod on accept",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:self"], "users": ["root"], "checkPeriod": "1h"}`,
+			wantErr: `[ssh] "checkPeriod" can only be specified for the "check" action`,
+		},
+		{
+			name:    "checkPeriod above max",
+			rules:   `{"action": "check", "src": ["odin@"], "dst": ["autogroup:self"], "users": ["root"], "checkPeriod": "200h"}`,
+			wantErr: `[ssh] checkPeriod 200h0m0s is above the max (168h)`,
+		},
+		{
+			name:    "unknown tag in src",
+			rules:   `{"action": "accept", "src": ["tag:nope"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] tag not found: "tag:nope"`,
+		},
+		{
+			name:    "unknown tag in dst",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["tag:nope"], "users": ["root"]}`,
+			wantErr: `[ssh] tag not found: "tag:nope"`,
+		},
+		{
+			name:    "unknown group in src",
+			rules:   `{"action": "accept", "src": ["group:nope"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] group not found: "group:nope"`,
+		},
+		{
+			name:    "wildcard src",
+			rules:   `{"action": "accept", "src": ["*"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] "*" is not allowed`,
+		},
+		{
+			name:    "IP src",
+			rules:   `{"action": "accept", "src": ["100.64.0.1"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] "100.64.0.1": IPs and CIDRs are not allowed`,
+		},
+		{
+			name:    "host src",
+			rules:   `{"action": "accept", "src": ["srv"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] "srv": hosts are not allowed`,
+		},
+		{
+			name:    "autogroup:self src",
+			rules:   `{"action": "accept", "src": ["autogroup:self"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] "autogroup:self" is not allowed in src`,
+		},
+		{
+			name:    "CIDR dst",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["100.64.0.0/24"], "users": ["root"]}`,
+			wantErr: `[ssh] invalid dst "100.64.0.0/24"`,
+		},
+		{
+			name:    "group dst",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["group:admins"], "users": ["root"]}`,
+			wantErr: `[ssh] groups are not allowed dst`,
+		},
+		{
+			name:    "autogroup:member dst",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:member"], "users": ["root"]}`,
+			wantErr: `[ssh] invalid dst "autogroup:member"`,
+		},
+		{
+			name:    "autogroup:internet dst",
+			rules:   `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:internet"], "users": ["root"]}`,
+			wantErr: `[ssh] invalid dst "autogroup:internet"`,
+		},
+		{
+			name:    "check with tag src",
+			rules:   `{"action": "check", "src": ["tag:server"], "dst": ["tag:server"], "users": ["root"]}`,
+			wantErr: `[ssh] "check" action does not support tags in src`,
+		},
+		{
+			name: "error in second rule",
+			rules: `{"action": "accept", "src": ["odin@"], "dst": ["autogroup:self"], "users": ["root"]},
+				{"action": "accept", "src": ["odin@"], "dst": ["autogroup:self"]}`,
+			wantErr: `[ssh] users must be specified`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := unmarshalPolicy([]byte(`{
+				"tagOwners": {"tag:server": ["odin@"]},
+				"groups": {"group:admins": ["odin@"]},
+				"hosts": {"srv": "100.64.0.9"},
+				"ssh": [` + tt.rules + `]
+			}`))
+			require.EqualError(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestSSHUserOwnedDestinations verifies which sources may reach a user in
+// dst or autogroup:self. Texts and verdicts follow SaaS, except for
+// autogroup:tagged sources; see validateSSHSrcDstCombination.
+func TestSSHUserOwnedDestinations(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     string
+		dst     string
+		wantErr string
+	}{
+		{name: "same user", src: `"odin@"`, dst: `"odin@"`},
+		{name: "group of only that user", src: `"group:odin"`, dst: `"odin@"`},
+		{name: "autogroup:tagged and that user", src: `"autogroup:tagged", "odin@"`, dst: `"odin@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "group of two users", src: `"group:both"`, dst: `"odin@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "other user", src: `"thor@"`, dst: `"odin@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "autogroup:member", src: `"autogroup:member"`, dst: `"odin@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "only autogroup:tagged", src: `"autogroup:tagged"`, dst: `"odin@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "tag and that user", src: `"tag:server", "odin@"`, dst: `"odin@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "one of two user dsts", src: `"odin@"`, dst: `"odin@", "thor@"`, wantErr: `[ssh] users in dst are only allowed from the same user`},
+		{name: "autogroup:tagged to self", src: `"autogroup:tagged"`, dst: `"autogroup:self"`, wantErr: `[ssh] "autogroup:tagged" is not allowed in src for autogroup:self`},
+		{name: "autogroup:member and autogroup:tagged to self", src: `"autogroup:member", "autogroup:tagged"`, dst: `"autogroup:self"`, wantErr: `[ssh] "autogroup:tagged" is not allowed in src for autogroup:self`},
+		{name: "tag to self", src: `"group:odin", "tag:server"`, dst: `"autogroup:self"`, wantErr: `[ssh] "tag:server" is not allowed in src for autogroup:self`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := unmarshalPolicy([]byte(`{
+				"tagOwners": {"tag:server": ["odin@"]},
+				"groups": {"group:odin": ["odin@"], "group:both": ["odin@", "thor@"]},
+				"ssh": [{"action": "accept", "src": [` + tt.src + `], "dst": [` + tt.dst + `], "users": ["root"]}]
+			}`))
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.EqualError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -5393,6 +5550,36 @@ func TestUnmarshalGrants(t *testing.T) {
 			wantErr: "ip and app can not both be empty",
 		},
 		{
+			name: "invalid-grant-ip-port-list",
+			input: `
+{
+	"grants": [
+		{
+			"src": ["*"],
+			"dst": ["*"],
+			"ip": ["tcp:80,443"]
+		}
+	]
+}
+`,
+			wantErr: `only one port range allowed: "tcp:80,443"`,
+		},
+		{
+			name: "invalid-grant-ip-bare-port-list",
+			input: `
+{
+	"grants": [
+		{
+			"src": ["*"],
+			"dst": ["*"],
+			"ip": ["80-90,443"]
+		}
+	]
+}
+`,
+			wantErr: `only one port range allowed: "80-90,443"`,
+		},
+		{
 			name: "valid-grant-empty-sources",
 			input: `
 {
@@ -5474,7 +5661,7 @@ func TestUnmarshalGrants(t *testing.T) {
 	]
 }
 `,
-			wantErr: "group not defined in policy",
+			wantErr: "group not found",
 		},
 		{
 			name: "invalid-grant-undefined-source-tag",
@@ -6165,12 +6352,60 @@ func TestUnmarshalPolicySSHTests(t *testing.T) {
 			},
 		},
 		{
+			name: "src-cidr",
+			input: `
+{
+  "tagOwners": {"tag:server": ["admin@example.org"]},
+  "sshTests": [
+    {"src": "100.64.0.0/24", "dst": ["tag:server"], "deny": ["root"]}
+  ]
+}
+`,
+			wantErr: ErrSSHTestSrcDisallowedElement,
+		},
+		{
+			name: "src-hosts-cidr",
+			input: `
+{
+  "hosts": {"lan": "192.168.1.0/24"},
+  "tagOwners": {"tag:server": ["admin@example.org"]},
+  "sshTests": [
+    {"src": "lan", "dst": ["tag:server"], "deny": ["root"]}
+  ]
+}
+`,
+			wantErr: ErrSSHTestSrcDisallowedElement,
+		},
+		{
+			name: "src-bare-ip-accepted",
+			input: `
+{
+  "tagOwners": {"tag:server": ["admin@example.org"]},
+  "sshTests": [
+    {"src": "100.64.0.30", "dst": ["tag:server"], "accept": ["root"]}
+  ]
+}
+`,
+		},
+		{
 			name: "dst-autogroup-internet",
 			input: `
 {
   "tagOwners": {"tag:server": ["admin@example.org"]},
   "sshTests": [
     {"src": "thor@example.org", "dst": ["autogroup:internet"], "accept": ["root"]}
+  ]
+}
+`,
+			wantErr: ErrSSHTestDstDisallowedElement,
+		},
+		{
+			name: "dst-autogroup-member",
+			input: `
+{
+  "tagOwners": {"tag:server": ["admin@example.org"]},
+  "sshTests": [
+    {"src": "thor@example.org", "dst": ["autogroup:member"], "accept": ["root"]}
   ]
 }
 `,
@@ -6283,6 +6518,7 @@ func TestValidateCapabilityName(t *testing.T) {
 		{name: "custom domain allowed", cap: "example.com/cap/foo", wantErr: nil},
 		{name: "allowlisted tailscale cap", cap: "tailscale.com/cap/drive", wantErr: nil},
 		{name: "setec secrets cap allowed", cap: "tailscale.com/cap/secrets", wantErr: nil},
+		{name: "tailsql cap allowed", cap: "tailscale.com/cap/tailsql", wantErr: nil},
 		{name: "non-allowlisted tailscale cap rejected", cap: "tailscale.com/cap/nope", wantErr: ErrCapNameTailscaleDomain},
 		{name: "url scheme rejected", cap: "https://tailscale.com/cap/drive", wantErr: ErrCapNameInvalidForm},
 	}
@@ -6417,4 +6653,266 @@ func TestPolicyMetadataFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestUnmarshalPolicyMaxDstPorts checks that the size limit counts what the
+// filter holds an entry for, the combinations of destination prefix and port
+// range, and not the length of either list.
+func TestUnmarshalPolicyMaxDstPorts(t *testing.T) {
+	list := func(item string, n int) string {
+		return strings.TrimSuffix(strings.Repeat(item+",", n), ",")
+	}
+	grant := func(extra, dst string, dsts int, ip string) string {
+		return fmt.Sprintf(
+			`{"src": ["*"], %s "dst": [%s], "ip": [%s]}`,
+			extra, list(`"`+dst+`"`, dsts), ip,
+		)
+	}
+	// One range per ip entry; repeats still count.
+	ports := func(n int) string {
+		return list(`"443"`, n)
+	}
+
+	tests := []struct {
+		name    string
+		policy  string
+		wantErr bool
+	}{
+		{
+			name:   "grant with many ports",
+			policy: `{"grants": [` + grant("", "*", 1, ports(50_000)) + `]}`,
+		},
+		{
+			name:   "grant with many destinations",
+			policy: `{"grants": [` + grant("", "*", 50_000, ports(1)) + `]}`,
+		},
+		{
+			name: "many destinations and many ports in different grants",
+			policy: `{"grants": [` + grant("", "*", 50_000, ports(1)) + `,` +
+				grant("", "*", 1, ports(50_000)) + `]}`,
+		},
+		{
+			name:   "grant at the limit",
+			policy: `{"grants": [` + grant("", "*", 100, ports(1000)) + `]}`,
+		},
+		{
+			name:    "grant with many destinations and many ports",
+			policy:  `{"grants": [` + grant("", "*", 1000, ports(1000)) + `]}`,
+			wantErr: true,
+		},
+		{
+			name: "via grant",
+			policy: `{"tagOwners": {"tag:router": []}, "grants": [` +
+				grant(`"via": ["tag:router"],`, "10.0.0.0/24", 1000, ports(1000)) +
+				`]}`,
+			wantErr: true,
+		},
+		{
+			name:    "grants that add up",
+			policy:  `{"grants": [` + list(grant("", "*", 100, ports(100)), 11) + `]}`,
+			wantErr: true,
+		},
+		{
+			name: "autogroup:internet counts as its address ranges",
+			policy: `{"grants": [` +
+				grant("", "autogroup:internet", 150, ports(100)) + `]}`,
+			wantErr: true,
+		},
+		{
+			name: "acl with many ports",
+			policy: `{"acls": [{"action": "accept", "src": ["*"], "dst": ["*:` +
+				list("443", 50_000) + `"]}]}`,
+		},
+		{
+			name: "acl with many ports on autogroup:internet",
+			policy: `{"acls": [{"action": "accept", "src": ["*"], ` +
+				`"dst": ["autogroup:internet:` + list("443", 50_000) + `"]}]}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := unmarshalPolicy([]byte(tt.policy))
+
+			if tt.wantErr {
+				require.ErrorIs(t, err, ErrTooManyDstPorts)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestResolveUserPrecedence(t *testing.T) {
+	const (
+		address    = "alice@example.com"
+		providerID = "https://idp.example/alice"
+	)
+
+	owner := types.User{ID: 1, Name: "alice", Email: address}
+	oidcName := types.User{ID: 2, Name: address, Provider: "oidc"}
+	localName := types.User{ID: 3, Name: address}
+	both := types.User{ID: 4, Name: address, Email: address}
+	provider := types.User{
+		ID:                 5,
+		Name:               "provider-user",
+		ProviderIdentifier: sql.NullString{String: providerID, Valid: true},
+	}
+
+	tests := []struct {
+		name    string
+		token   Username
+		users   types.Users
+		want    types.User
+		wantErr error
+	}{
+		{
+			name:  "email owner beats OIDC username",
+			token: Username(address),
+			users: types.Users{owner, oidcName},
+			want:  owner,
+		},
+		{
+			name:  "email owner beats local username",
+			token: Username(address),
+			users: types.Users{owner, localName},
+			want:  owner,
+		},
+		{
+			name:  "address-shaped username without email owner",
+			token: Username(address),
+			users: types.Users{oidcName, {ID: 6, Name: "other", Email: "other@example.com"}},
+			want:  oidcName,
+		},
+		{
+			name:  "email and username on the same user count once",
+			token: Username(address),
+			users: types.Users{both, oidcName},
+			want:  both,
+		},
+		{
+			name:    "duplicate usernames remain ambiguous",
+			token:   Username(address),
+			users:   types.Users{oidcName, localName},
+			wantErr: ErrMultipleUsersFound,
+		},
+		{
+			name:    "duplicate emails remain ambiguous despite a unique username",
+			token:   Username(address),
+			users:   types.Users{owner, {ID: 7, Name: "second-owner", Email: address}, oidcName},
+			wantErr: ErrMultipleUsersFound,
+		},
+		{
+			name:  "provider identifier wins",
+			token: Username(providerID + "@"),
+			users: types.Users{provider, {ID: 8, Name: providerID}},
+			want:  provider,
+		},
+		{
+			name:    "unknown user",
+			token:   "missing@",
+			users:   types.Users{owner, oidcName, localName},
+			wantErr: ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		for _, reverse := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/reverse=%t", tt.name, reverse), func(t *testing.T) {
+				users := slices.Clone(tt.users)
+				if reverse {
+					slices.Reverse(users)
+				}
+
+				got, err := tt.token.resolveUser(users)
+				if tt.wantErr != nil {
+					require.ErrorIs(t, err, tt.wantErr)
+
+					return
+				}
+
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got)
+			})
+		}
+	}
+}
+
+func TestBareAtTokenMatchesNobody(t *testing.T) {
+	users := types.Users{
+		{ID: 1, Name: "first-private-user"},
+		{ID: 2, Name: "second-private-user"},
+	}
+
+	for count := range 3 {
+		t.Run(fmt.Sprintf("users=%d", count), func(t *testing.T) {
+			token := Username("@")
+			_, err := token.resolveUser(users[:count])
+			require.ErrorIs(t, err, ErrUserNotFound)
+
+			for _, user := range users {
+				require.NotContains(t, err.Error(), user.Name)
+			}
+
+			pm, err := NewPolicyManager([]byte(`{
+				"grants": [{"src":["@"], "dst":["*"], "ip":["*"]}]
+			}`), users[:count], types.Nodes{}.ViewSlice())
+			require.NoError(t, err, "stored policies with a bare @ must still load")
+
+			filter, _ := pm.Filter()
+			require.Empty(t, filter)
+		})
+	}
+}
+
+func TestSetPolicyBareAtToken(t *testing.T) {
+	users := types.Users{
+		{ID: 1, Name: "first-private-user"},
+		{ID: 2, Name: "second-private-user"},
+	}
+
+	nodes := types.Nodes{node("first-node", "100.64.0.1", "fd7a:115c:a1e0::1", users[0])}
+	nodes[0].ID = 1
+
+	const allowAll = `"acls": [{"action":"accept", "src":["*"], "dst":["*:*"]}]`
+
+	for _, count := range []int{1, 2} {
+		for _, tt := range []struct {
+			name string
+			src  string
+			dst  string
+		}{
+			{name: "source", src: "@", dst: "100.64.0.1:22"},
+			{name: "destination", src: "100.64.0.1", dst: "@:22"},
+		} {
+			t.Run(fmt.Sprintf("%s/users=%d", tt.name, count), func(t *testing.T) {
+				pm, err := NewPolicyManager([]byte(`{`+allowAll+`}`), users[:count], nodes.ViewSlice())
+				require.NoError(t, err)
+
+				candidate := fmt.Sprintf(`{%s, "tests":[{"src":%q, "accept":[%q]}]}`, allowAll, tt.src, tt.dst)
+				_, err = pm.SetPolicy([]byte(candidate))
+				require.ErrorIs(t, err, errPolicyTestsFailed)
+
+				for _, user := range users {
+					require.NotContains(t, err.Error(), user.Name)
+				}
+			})
+		}
+	}
+}
+
+func TestParsePolicy(t *testing.T) {
+	pol, err := ParsePolicy([]byte(`{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`))
+	require.NoError(t, err)
+	require.NotNil(t, pol)
+
+	_, err = ParsePolicy([]byte(`{"acls":[{"action":"accept","src":["group:missing"],"dst":["*:*"]}]}`))
+	require.ErrorIs(t, err, ErrGroupNotDefined)
+
+	pol, err = ParsePolicy([]byte(""))
+	require.NoError(t, err)
+	require.Nil(t, pol)
 }

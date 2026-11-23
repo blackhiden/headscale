@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,7 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"tailscale.com/control/controlclient"
 	"tailscale.com/tailcfg"
+	"tailscale.com/tsnet"
+	"tailscale.com/types/key"
+	"tailscale.com/types/logger"
 	"tailscale.com/types/netmap"
+	"tailscale.com/types/persist"
 )
 
 // TestConnectionLifecycle exercises the core node lifecycle:
@@ -68,7 +73,7 @@ func TestConnectionLifecycle(t *testing.T) {
 
 		h.Client(2).Disconnect(t)
 
-		// After the 10-second grace period, the remaining clients
+		// After the 15-second grace period, the remaining clients
 		// should see the departed node as offline. The peer stays
 		// in the peer list (non-ephemeral nodes are not removed).
 		h.Client(0).WaitForCondition(t, "peer goes offline", 30*time.Second,
@@ -176,13 +181,15 @@ func TestNodeExpiryPreservesControlConnection(t *testing.T) {
 				assert.Equal(c, 1, current.ActiveSessions())
 				assert.Equal(c, epoch, current.SessionEpoch())
 				assert.True(c, h.Server.App.MapBatcher().IsConnected(id))
-				assert.True(c, client.Netmap().SelfNode.Expired())
-				assert.False(c, client.Netmap().SelfNode.Online().Get())
+				assert.True(c, client.Netmap().SelfNode.KeyExpiry().Before(time.Now()))
+				assert.False(c, client.Netmap().SelfNode.Online().Valid())
+				assert.False(c, client.Netmap().SelfNode.LastSeen().Valid())
 
+				// Peers still see the connected node online, as on Tailscale SaaS.
 				peer, found := observer.PeerByName(client.Name)
 				if assert.True(c, found) {
 					assert.True(c, peer.Expired())
-					assert.False(c, peer.Online().Get())
+					assert.True(c, peer.Online().Get())
 				}
 			}, 5*time.Second, 10*time.Millisecond, "expiry must take the node offline without ending its control session")
 
@@ -219,8 +226,7 @@ func TestNodeExpiryPreservesControlConnection(t *testing.T) {
 				assert.Equal(c, epoch, current.SessionEpoch())
 				assert.Equal(c, nodeKey, current.NodeKey())
 				assert.Equal(c, 1, current.ActiveSessions())
-				assert.False(c, client.Netmap().SelfNode.Expired())
-				assert.True(c, client.Netmap().SelfNode.Online().Get())
+				assert.True(c, client.Netmap().SelfNode.KeyExpiry().IsZero())
 
 				peer, found := observer.PeerByName(client.Name)
 				if assert.True(c, found) {
@@ -323,9 +329,8 @@ func TestReloginOfExpiredNodeClearsPeerExpiry(t *testing.T) {
 }
 
 // TestReloginPeerVisibleHostinfoReachesPeers covers the rest of the #3531
-// class: a relogin stores the RegisterRequest's Hostinfo, so the following
-// MapRequest carries no Hostinfo delta, and a peer-visible change made at
-// relogin reaches peers only if the relogin itself sends the whole node.
+// class: peers must see changed services after the first MapRequest following
+// relogin. A key-only patch cannot carry that change.
 func TestReloginPeerVisibleHostinfoReachesPeers(t *testing.T) {
 	t.Parallel()
 
@@ -359,6 +364,237 @@ func TestReloginPeerVisibleHostinfoReachesPeers(t *testing.T) {
 				"peer must see the Hostinfo the node relogged in with")
 		}
 	}, 5*time.Second, 10*time.Millisecond, "observer must see the relogin's peer-visible Hostinfo")
+}
+
+// TestReloginKeepsNodeKeyUnlessForced pins the shape of
+// [servertest.TestClient.Relogin]: a login with a given key presents the
+// current node key, and only a forced one rotates it. The node stays the
+// same either way.
+func TestReloginKeepsNodeKeyUnlessForced(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "relogin")
+	key := srv.CreatePreAuthKey(t, types.UserID(user.ID))
+	client := servertest.NewClient(t, srv, "relogin",
+		servertest.WithUser(user), servertest.WithAuthKey(key))
+
+	id := findNodeID(t, srv, client.Name)
+	nodeKey := func() string {
+		node, ok := srv.State().GetNodeByID(id)
+		require.True(t, ok)
+
+		return node.NodeKey().String()
+	}
+	first := nodeKey()
+
+	hi := &tailcfg.Hostinfo{BackendLogID: "servertest-relogin", Hostname: "relogin"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	require.NoError(t, client.Relogin(ctx, key, false, hi))
+	assert.Equal(t, first, nodeKey(), "a login without force keeps the node key")
+
+	require.NoError(t, client.Relogin(ctx, key, true, hi))
+	assert.NotEqual(t, first, nodeKey(), "a forced login rotates the node key")
+
+	assert.Len(t, srv.State().GetNodesByMachineKeyAllUsers(client.MachineKey()), 1,
+		"relogin keeps one node per machine")
+	client.WaitForCondition(t, "netmap after relogin", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool { return nm.SelfNode.ID() == id.NodeID() })
+}
+
+// TestLoginProfilesAndRestart pins the shapes of the login helpers: an
+// interactive login approved for a user, a refused key login recorded with
+// its answers, a second profile on the same machine, a switch back, and a
+// restart that keeps the login but not the disco key.
+func TestLoginProfilesAndRestart(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "owner")
+	other := srv.CreateUser(t, "other")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	approve := func(user *types.User) func(string) error {
+		return func(authID string) error { return srv.ApproveAuth(ctx, authID, user.Name) }
+	}
+
+	client := servertest.NewClient(t, srv, "machine", servertest.WithInteractiveLogin(approve(owner)))
+
+	first := findNodeID(t, srv, client.Name)
+	node, ok := srv.State().GetNodeByID(first)
+	require.True(t, ok)
+	assert.Equal(t, owner.Name, node.User().Name(), "the approving user owns the node")
+
+	once := srv.CreateEphemeralPreAuthKey(t, types.UserID(owner.ID))
+	_, err := servertest.TryNewClient(t, srv, "spent", servertest.WithAuthKey(once))
+	require.NoError(t, err)
+
+	refused, err := servertest.TryNewClient(t, srv, "late", servertest.WithAuthKey(once))
+	require.Error(t, err, "a spent single-use key is refused")
+
+	attempts := refused.RegisterAttempts()
+	require.NotEmpty(t, attempts)
+	assert.Equal(t, err.Error(), attempts[len(attempts)-1].Err, "the refusal is the last attempt")
+	assert.Empty(t, srv.State().GetNodesByMachineKeyAllUsers(refused.MachineKey()), "a refused login leaves no node")
+
+	hi := &tailcfg.Hostinfo{BackendLogID: "servertest-machine", Hostname: "machine"}
+	ownerLogin := client.Persist()
+
+	require.NoError(t, client.Login(ctx, persist.Persist{}, "", controlclient.LoginInteractive, hi, approve(other)))
+	assert.Len(t, srv.State().GetNodesByMachineKeyAllUsers(client.MachineKey()), 2,
+		"another user's profile adds a node on the machine")
+
+	require.NoError(t, client.Login(ctx, ownerLogin, "", controlclient.LoginDefault, hi, nil))
+	client.WaitForCondition(t, "back on the first profile", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool { return nm.SelfNode.ID() == first.NodeID() })
+
+	before, ok := srv.State().GetNodeByID(first)
+	require.True(t, ok)
+
+	require.NoError(t, client.Restart(ctx, hi))
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		after, ok := srv.State().GetNodeByID(first)
+		if assert.True(c, ok) {
+			assert.Equal(c, before.NodeKey(), after.NodeKey(), "a restart keeps the node key")
+			assert.NotEqual(c, before.DiscoKey(), after.DiscoKey(), "a restart brings a new disco key")
+		}
+	}, 10*time.Second, 50*time.Millisecond)
+}
+
+// TestPathsDiscoAndExpiryHelpers pins the shapes of the path, disco and
+// expiry helpers: reported endpoints and home DERP reach a peer and survive a
+// restart, a disco rotation reaches the peer too, an expired node's rotation
+// leaves a login waiting while it keeps polling, and a client's own expiry
+// request is answered.
+func TestPathsDiscoAndExpiryHelpers(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "owner")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ep := tailcfg.Endpoint{Addr: netip.MustParseAddrPort("192.0.2.1:41641"), Type: tailcfg.EndpointExplicitConf}
+	hi := &tailcfg.Hostinfo{
+		BackendLogID: "servertest-subject",
+		Hostname:     "subject",
+		NetInfo:      &tailcfg.NetInfo{PreferredDERP: 1},
+	}
+
+	subject := servertest.NewClient(t, srv, "subject",
+		servertest.WithUser(user), servertest.WithHostinfo(hi), servertest.WithEndpoints(ep))
+	viewer := servertest.NewClient(t, srv, "viewer", servertest.WithUser(user))
+
+	id := findNodeID(t, srv, "subject")
+	peerOf := func(nm *netmap.NetworkMap) (tailcfg.NodeView, bool) {
+		for _, p := range nm.Peers {
+			if p.ID() == id.NodeID() {
+				return p, true
+			}
+		}
+
+		return tailcfg.NodeView{}, false
+	}
+
+	viewer.WaitForCondition(t, "subject's paths", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		p, ok := peerOf(nm)
+		return ok && p.HomeDERP() == 1 && p.Endpoints().Len() == 1
+	})
+
+	// A restarted tailscaled no longer holds the key it joined with, so
+	// later logins carry none.
+	require.NoError(t, subject.Restart(ctx, hi))
+
+	before, _ := peerOf(viewer.Netmap())
+
+	require.NoError(t, subject.RotateDisco(ctx))
+	viewer.WaitForCondition(t, "subject's new disco key", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		p, ok := peerOf(nm)
+		return ok && p.DiscoKey() != before.DiscoKey()
+	})
+
+	soon := time.Now().Add(time.Hour)
+
+	err := subject.SetExpirySooner(ctx, soon)
+	if err != nil {
+		attempts := subject.RegisterAttempts()
+		assert.Equal(t, err.Error(), attempts[len(attempts)-1].Err, "a refusal is the last attempt")
+	} else {
+		node, ok := srv.State().GetNodeByID(id)
+		require.True(t, ok)
+		assert.WithinDuration(t, soon, node.Expiry().Get(), time.Second, "the requested expiry is stored")
+	}
+
+	now := time.Now()
+	_, c, err := srv.State().SetNodeExpiry(id, &now)
+	require.NoError(t, err)
+	srv.App.Change(c)
+	subject.WaitForCondition(t, "own key expired", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfKeyExpiry().Before(time.Now())
+	})
+
+	attempts := len(subject.RegisterAttempts())
+	updates := subject.UpdateCount()
+
+	require.NoError(t, subject.RotateDisco(ctx))
+
+	got := subject.RegisterAttempts()[attempts:]
+	require.NotEmpty(t, got)
+	assert.NotEmpty(t, got[0].AuthURL, "an expired node is asked to log in")
+	assert.NotEmpty(t, got[0].OldNodeKey, "with a new node key")
+
+	require.Eventually(t, func() bool { return subject.UpdateCount() > updates }, 10*time.Second, 50*time.Millisecond,
+		"the poll goes on while the login waits")
+}
+
+// TestFramesCountResponsesWithoutControlTime checks that Frames counts the
+// responses headscale sends without a ControlTime: a removal ahead of its
+// batch. A client that rebuilds its netmap on every response counts one frame
+// per rebuild.
+func TestFramesCountResponsesWithoutControlTime(t *testing.T) {
+	t.Parallel()
+
+	requireFramePerRebuild := func(t *testing.T, cl *servertest.TestClient) {
+		t.Helper()
+
+		assert.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Equal(c, cl.UpdateCount(), cl.Frames())
+		}, 10*time.Second, 50*time.Millisecond)
+	}
+
+	t.Run("removal", func(t *testing.T) {
+		t.Parallel()
+
+		srv := servertest.NewServer(t)
+		user1 := srv.CreateUser(t, "frames-user1")
+		user2 := srv.CreateUser(t, "frames-user2")
+		viewer := servertest.NewClient(t, srv, "frames-viewer", servertest.WithUser(user1))
+		servertest.NewClient(t, srv, "frames-peer", servertest.WithUser(user2))
+		viewer.WaitForPeers(t, 1, 15*time.Second)
+
+		changed, err := srv.State().SetPolicy([]byte(`{
+			"acls": [
+				{"action": "accept", "src": ["frames-user1@"], "dst": ["frames-user1@:*"]},
+				{"action": "accept", "src": ["frames-user2@"], "dst": ["frames-user2@:*"]}
+			]
+		}`))
+		require.NoError(t, err)
+		require.True(t, changed)
+
+		changes, err := srv.State().ReloadPolicy()
+		require.NoError(t, err)
+		srv.App.Change(changes...)
+
+		viewer.WaitForPeerCount(t, 0, 15*time.Second)
+		requireFramePerRebuild(t, viewer)
+	})
 }
 
 func TestNodeExpiryRouteFailover(t *testing.T) {
@@ -423,6 +659,132 @@ func TestNodeExpiryRouteFailover(t *testing.T) {
 	}
 }
 
+// TestReloginWithoutExpiryClearsPeerExpiry: a relogin can drop a node's expiry on
+// the default config, and peers must not keep the old one and cut the node off.
+func TestReloginWithoutExpiryClearsPeerExpiry(t *testing.T) {
+	t.Parallel()
+
+	h := servertest.NewHarness(t, 2)
+	client, observer := h.Client(0), h.Client(1)
+	id := findNodeID(t, h.Server, client.Name)
+
+	future := time.Now().Add(time.Hour).UTC()
+	_, c, err := h.Server.State().SetNodeExpiry(id, &future)
+	require.NoError(t, err)
+	h.Server.App.Change(c)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		p, ok := observer.PeerByName(client.Name)
+		if assert.True(c, ok) {
+			assert.True(c, p.KeyExpiry().Equal(future))
+		}
+	}, 10*time.Second, 50*time.Millisecond, "observer holds the expiry")
+
+	nv, ok := h.Server.State().GetNodeByID(id)
+	require.True(t, ok)
+
+	key := h.Server.CreatePreAuthKey(t, nv.TypedUserID())
+	hostinfo := &tailcfg.Hostinfo{BackendLogID: "servertest-" + client.Name, Hostname: client.Name}
+	require.NoError(t, client.Relogin(t.Context(), key, true, hostinfo))
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		cur, ok := h.Server.State().GetNodeByID(id)
+		if assert.True(c, ok) {
+			assert.False(c, cur.Expiry().Valid(), "the server holds no expiry")
+		}
+
+		p, ok := observer.PeerByName(client.Name)
+		if assert.True(c, ok) {
+			assert.True(c, p.KeyExpiry().IsZero(), "observer holds %v", p.KeyExpiry())
+		}
+	}, 10*time.Second, 50*time.Millisecond, "observer drops the expiry")
+}
+
+// TestReloginFollowsNewHostname: a node's name follows a new hostname at a login
+// as at a map request, and later hostname changes still rename it. An admin-set
+// name stays.
+func TestReloginFollowsNewHostname(t *testing.T) {
+	t.Parallel()
+
+	hostinfo := func(name string) *tailcfg.Hostinfo {
+		return &tailcfg.Hostinfo{Hostname: name, BackendLogID: "servertest"}
+	}
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "owner")
+	id := types.UserID(owner.ID)
+	client := servertest.NewClient(t, srv, "first", servertest.WithUser(owner))
+
+	client.WaitForCondition(t, "a first map", 20*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm != nil && nm.SelfNode.Valid()
+	})
+
+	givenName := func() string {
+		nodes := srv.State().ListNodes()
+		require.Equal(t, 1, nodes.Len())
+
+		return nodes.At(0).GivenName()
+	}
+
+	require.NoError(t, client.LogoutAndDisconnect(t.Context()))
+	require.NoError(t, client.Relogin(t.Context(), srv.CreatePreAuthKey(t, id), false, hostinfo("second")))
+	assert.Equal(t, "second", givenName())
+
+	client.Direct().SetHostinfo(hostinfo("third"))
+	require.NoError(t, client.Direct().SendUpdate(t.Context()))
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, "third", givenName())
+	}, 10*time.Second, 100*time.Millisecond, "a later hostname change renames too")
+
+	_, _, err := srv.State().RenameNode(srv.State().ListNodes().At(0).ID(), "chosen")
+	require.NoError(t, err)
+
+	require.NoError(t, client.LogoutAndDisconnect(t.Context()))
+	require.NoError(t, client.Relogin(t.Context(), srv.CreatePreAuthKey(t, id), false, hostinfo("fourth")))
+	assert.Equal(t, "chosen", givenName(), "a login keeps an admin-set name")
+}
+
+// TestLogoutOfDeletedDeviceRegistersNothing: a client sends its auth key with a
+// logout, and that must not bring back the device an admin just deleted.
+func TestLogoutOfDeletedDeviceRegistersNothing(t *testing.T) {
+	t.Parallel()
+
+	for name, key := range map[string]func(*servertest.TestServer, types.UserID) string{
+		"reusable": func(srv *servertest.TestServer, id types.UserID) string { return srv.CreatePreAuthKey(t, id) },
+		"ephemeral": func(srv *servertest.TestServer, id types.UserID) string {
+			return srv.CreateEphemeralPreAuthKey(t, id)
+		},
+		"tagged": func(srv *servertest.TestServer, id types.UserID) string {
+			return srv.CreateTaggedPreAuthKey(t, id, []string{"tag:server"})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := servertest.NewServer(t)
+			owner := srv.CreateUser(t, "owner")
+
+			_, err := srv.State().SetPolicy([]byte(`{"tagOwners":{"tag:server":["owner@"]}}`))
+			require.NoError(t, err)
+
+			client := servertest.NewClient(t, srv, "device", servertest.WithAuthKey(key(srv, types.UserID(owner.ID))))
+			client.WaitForCondition(t, "a first map", 20*time.Second, func(nm *netmap.NetworkMap) bool {
+				return nm != nil && nm.SelfNode.Valid()
+			})
+
+			nodes := srv.State().ListNodes()
+			require.Equal(t, 1, nodes.Len())
+
+			c, err := srv.State().DeleteNode(nodes.At(0))
+			require.NoError(t, err)
+			srv.App.Change(c...)
+
+			require.NoError(t, client.LogoutAndDisconnect(t.Context()))
+			assert.Equal(t, 0, srv.State().ListNodes().Len())
+		})
+	}
+}
+
 // TestLogoutReloginAllClientsConverge is an in-process reproduction of the
 // flaky integration tests TestAuthKeyLogoutAndReloginSameUser,
 // TestAuthWebFlowLogoutAndReloginSameUser and
@@ -437,7 +799,7 @@ func TestNodeExpiryRouteFailover(t *testing.T) {
 // unknown peers) match the real Tailscale client.
 func TestLogoutReloginAllClientsConverge(t *testing.T) {
 	if testing.Short() {
-		t.Skip("relogin convergence test includes 10s+ disconnect grace per iteration")
+		t.Skip("relogin convergence test includes 15s+ disconnect grace per iteration")
 	}
 
 	const (
@@ -502,7 +864,7 @@ func TestLogoutReloginAllClientsConverge(t *testing.T) {
 // older releases, so the rapid session replacement is the prime suspect.
 func TestLogoutReloginWithPollChurn(t *testing.T) {
 	if testing.Short() {
-		t.Skip("relogin convergence test includes 10s+ disconnect grace per iteration")
+		t.Skip("relogin convergence test includes 15s+ disconnect grace per iteration")
 	}
 
 	const (
@@ -571,7 +933,7 @@ func TestLogoutReloginWithPollChurn(t *testing.T) {
 
 // logoutAllAndWaitOffline logs every client out concurrently, then blocks
 // until the server reports each node expired and offline — the integration
-// tests' logout barrier, including the ~10s disconnect grace period.
+// tests' logout barrier, including the ~15s disconnect grace period.
 func logoutAllAndWaitOffline(t *testing.T, h *servertest.TestHarness) {
 	t.Helper()
 
@@ -659,4 +1021,169 @@ func describeNetmap(c *servertest.TestClient) string {
 	}
 
 	return out.String()
+}
+
+// TestPeerLastSeenPatches takes a node down and up. As on Tailscale SaaS, its
+// peer gets a last seen time with the offline patch and none with the online
+// one. The recorder runs before the netmap lands, so a netmap settles both.
+func TestPeerLastSeenPatches(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "seen-user")
+
+	watcher := servertest.NewClient(t, srv, "seen-watcher",
+		servertest.WithUser(user), servertest.WithDeltaUpdates())
+	node := servertest.NewClient(t, srv, "seen-node", servertest.WithUser(user))
+
+	peerOnline := func(want bool) func(*netmap.NetworkMap) bool {
+		return func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1 && nm.Peers[0].Online().Valid() && nm.Peers[0].Online().Get() == want
+		}
+	}
+
+	// A new peer can first appear offline, which must not pass for going down.
+	watcher.WaitForCondition(t, "peer online", 15*time.Second, peerOnline(true))
+
+	down := time.Now()
+
+	node.Disconnect(t)
+	watcher.WaitForCondition(t, "peer offline", 30*time.Second, peerOnline(false))
+
+	seen := watcher.DeltaLastSeen()
+	require.Len(t, seen, 1, "offline patch carried no last seen time")
+	assert.WithinRange(t, seen[0], down, time.Now())
+
+	node.Reconnect(t)
+	watcher.WaitForCondition(t, "peer online", 15*time.Second, peerOnline(true))
+
+	assert.Len(t, watcher.DeltaLastSeen(), 1, "online patch carried a last seen time")
+}
+
+func TestServerStateCleanup(t *testing.T) {
+	var srv *servertest.TestServer
+
+	t.Run("server", func(t *testing.T) { srv = servertest.NewServer(t) })
+
+	database, err := srv.State().DB().DB.DB()
+	require.NoError(t, err)
+	require.ErrorContains(t, database.Ping(), "database is closed")
+}
+
+// TestTsnetRestartWithAnotherKey drives a real tsnet program that joins and
+// then restarts with TS_AUTHKEY holding a key it did not join with, under the
+// node key it already has. As on SaaS (testdata/steps/reauth-wake-tsnet.hujson)
+// the restart only wakes it: the node comes back unchanged, and the key is
+// neither judged nor spent.
+func TestTsnetRestartWithAnotherKey(t *testing.T) {
+	t.Parallel()
+
+	prod, cache := []string{"tag:prod"}, []string{"tag:cache"}
+
+	for _, tt := range []struct {
+		name     string
+		joinTags []string // nil joins as the user's device
+		keyTags  []string
+		keyState string // unused, spent, expired or revoked
+	}{
+		{"same tags, spent", prod, prod, "spent"},
+		{"same tags, expired", prod, prod, "expired"},
+		{"same tags, revoked", prod, prod, "revoked"},
+		{"same tags, unused", prod, prod, "unused"},
+		{"other tags, unused", prod, cache, "unused"},
+		{"tagged key on user device, unused", nil, prod, "unused"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := servertest.NewServer(t, servertest.WithRealListener())
+			st := srv.State()
+
+			var joinUser *types.UserID
+			if tt.joinTags == nil {
+				joinUser = srv.CreateUser(t, "owner").TypedID()
+			}
+
+			joinKey, err := st.CreatePreAuthKey(joinUser, true, false, nil, tt.joinTags)
+			require.NoError(t, err)
+
+			dir := t.TempDir()
+			up := func(authKey string, logf logger.Logf) (*tsnet.Server, error) {
+				ts := &tsnet.Server{Dir: dir, Hostname: "wake", ControlURL: srv.URL, AuthKey: authKey, Logf: logf}
+
+				ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+				defer cancel()
+
+				_, err := ts.Up(ctx)
+
+				return ts, err
+			}
+
+			first, err := up(joinKey.Key, logger.Discard)
+			require.NoError(t, err)
+
+			nodes := st.ListNodes()
+			require.Equal(t, 1, nodes.Len())
+			before := nodes.At(0)
+
+			presented, err := st.CreatePreAuthKey(nil, false, false, nil, tt.keyTags)
+			require.NoError(t, err)
+
+			switch tt.keyState {
+			case "spent":
+				_, _, err = st.HandleNodeFromPreAuthKey(tailcfg.RegisterRequest{
+					Auth:     &tailcfg.RegisterResponseAuth{AuthKey: presented.Key},
+					NodeKey:  key.NewNode().Public(),
+					Hostinfo: &tailcfg.Hostinfo{Hostname: "sibling"},
+				}, key.NewMachine().Public())
+			case "expired":
+				err = st.ExpirePreAuthKey(presented.ID)
+			case "revoked":
+				err = st.RevokePreAuthKey(presented.ID)
+			}
+
+			require.NoError(t, err)
+			require.NoError(t, first.Close())
+
+			// Up returns once the node polls on its saved login; the login that
+			// sends the key is answered after, and a refusal logs it out.
+			var (
+				mu      sync.Mutex
+				answers []string
+			)
+
+			second, err := up(presented.Key, func(format string, args ...any) {
+				if line := fmt.Sprintf(format, args...); strings.Contains(line, "RegisterReq: got response") {
+					mu.Lock()
+					defer mu.Unlock()
+
+					answers = append(answers, line)
+				}
+			})
+
+			t.Cleanup(func() { second.Close() })
+			require.NoError(t, err)
+
+			assert.EventuallyWithT(t, func(c *assert.CollectT) {
+				mu.Lock()
+				defer mu.Unlock()
+
+				if assert.NotEmpty(c, answers, "the login that sends the key is answered") {
+					assert.Contains(c, answers[0], "machineAuthorized=true",
+						"a restart under the node's own node key must not judge the key it sends")
+				}
+			}, 10*time.Second, 50*time.Millisecond)
+
+			after, ok := st.GetNodeByID(before.ID())
+			require.True(t, ok)
+			assert.Equal(t, before.NodeKey(), after.NodeKey())
+			assert.Equal(t, before.Tags().AsSlice(), after.Tags().AsSlice())
+			assert.Equal(t, before.UserID(), after.UserID())
+			assert.Equal(t, before.AuthKeyID(), after.AuthKeyID())
+
+			stored, err := st.GetPreAuthKeyByID(presented.ID)
+			require.NoError(t, err)
+			assert.Equal(t, tt.keyState == "spent", stored.Used, "a restart must not spend the key it sends")
+		})
+	}
 }

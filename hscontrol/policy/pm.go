@@ -16,7 +16,7 @@ type PolicyManager interface {
 	Filter() ([]tailcfg.FilterRule, []matcher.Match)
 	// FilterForNode returns filter rules for a specific node, handling autogroup:self
 	FilterForNode(node types.NodeView) ([]tailcfg.FilterRule, error)
-	// MatchersForNode returns matchers for peer relationship determination (unreduced)
+	// MatchersForNode returns the unreduced matchers that filter the routes a node sees
 	MatchersForNode(node types.NodeView) ([]matcher.Match, error)
 	// BuildPeerMap constructs peer relationship maps for the given nodes
 	BuildPeerMap(nodes views.Slice[types.NodeView]) map[types.NodeID][]types.NodeID
@@ -26,6 +26,8 @@ type PolicyManager interface {
 	// client-provided URL params.
 	SSHCheckParams(srcNodeID, dstNodeID types.NodeID, localUser string) (time.Duration, bool)
 	SetPolicy(pol []byte) (bool, error)
+	// DERPMap returns the policy's derpMap, nil without one.
+	DERPMap() *tailcfg.DERPMap
 	// SetUsers replaces the user list. policyChanged reports whether clients
 	// need a policy refresh; peerMapChanged reports whether user-derived peer
 	// adjacency may have changed. Both are false when the list is unchanged.
@@ -47,9 +49,9 @@ type PolicyManager interface {
 	TagExists(tag string) bool
 
 	// TagOwnedByTags reports whether a credential holding ownerTags may apply
-	// tag: true if tag is one of ownerTags, or tag's tag-to-tag ownership chain
-	// transitively includes one of ownerTags. Authorises the tags an OAuth
-	// access token may set on the auth keys it mints.
+	// tag: true if tag is one of ownerTags, or tag's tagOwners list one of
+	// them (one hop). Authorises the tags an OAuth access token may set on the
+	// auth keys it mints.
 	TagOwnedByTags(tag string, ownerTags []string) bool
 
 	// NodeCanApproveRoute reports whether the given node can approve the given route.
@@ -63,24 +65,36 @@ type PolicyManager interface {
 	// avoid a tailnet-wide recompute on every ordinary reconnect.
 	NodeNeedsPeerRecompute(node types.NodeView) bool
 
+	// NodeIsViaTarget reports whether a grant steers traffic through the node.
+	NodeIsViaTarget(node types.NodeView) bool
+
 	// ViaRoutesForPeer computes via grant effects for a viewer-peer pair.
 	// It returns which routes should be included (peer is via-designated for viewer)
 	// and excluded (steered to a different peer). When no via grants apply,
 	// both fields are empty and the caller falls back to existing behavior.
 	ViaRoutesForPeer(viewer, peer types.NodeView) types.ViaRouteResult
 
-	// NodeCapMap returns the policy-derived CapMap for the given node,
-	// or nil when no nodeAttrs entry targets it. The returned map is
-	// owned by the manager; treat it as read-only and copy before
-	// merging into a [tailcfg.Node]. It describes the node's own
-	// capabilities, not a per-viewer view.
+	// SetRouterSession sets the via election's runtime check: when a
+	// router's control session began and whether it may win.
+	// The callback runs under the policy lock and must remain lock-free.
+	SetRouterSession(session func(types.NodeID) (time.Time, bool))
+
+	// NodeCapMap returns compiled policy capabilities for the given node,
+	// or nil when none target it. The map is a defensive clone; its values
+	// are shared and read-only. It describes the node's own capabilities,
+	// not a per-viewer view.
 	NodeCapMap(id types.NodeID) tailcfg.NodeCapMap
 
-	// NodeCapMaps returns a snapshot of the per-node policy CapMap so
-	// callers can amortise lock acquisitions over a peer loop. The
-	// outer map is a fresh container; the inner [tailcfg.NodeCapMap]
-	// values are shared with the manager and read-only.
+	// NodeCapMaps snapshots every node's policy CapMap. The outer map is
+	// caller-owned; inner maps are shared with the manager and read-only.
+	// NodeCapMapsForPeers limits copying when fewer peers are requested.
 	NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap
+
+	// NodeCapMapsForPeers snapshots requested peer caps under one lock. It may
+	// include unselected entries when copying the whole compiled table is less work.
+	// The outer map is caller-owned; inner maps are shared and read-only.
+	// Empty selections or no compiled policy capabilities return nil; missing IDs read nil.
+	NodeCapMapsForPeers(peers views.Slice[types.NodeView]) map[types.NodeID]tailcfg.NodeCapMap
 
 	// NodesWithChangedCapMap returns the IDs of nodes whose nodeAttrs
 	// CapMap shifted during recent updateLocked calls. The buffer
@@ -108,6 +122,12 @@ func NewPolicyManager(pol []byte, users []types.User, nodes views.Slice[types.No
 	}
 
 	return polMan, err
+}
+
+// ValidatePolicy reports whether a policy write of pol would be accepted
+// against users and nodes; see [policyv2.ValidatePolicy].
+func ValidatePolicy(pol []byte, users []types.User, nodes views.Slice[types.NodeView]) error {
+	return policyv2.ValidatePolicy(pol, users, nodes)
 }
 
 // PolicyManagersForTest returns all available [PolicyManager] implementations to

@@ -2,7 +2,9 @@ package v2
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/netip"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -151,21 +153,21 @@ func TestParsing(t *testing.T) {
 }`,
 			want: []tailcfg.FilterRule{
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{"100.115.94.0-100.127.255.255", "100.64.0.0-100.115.91.255", "fd7a:115c:a1e0::/48"},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
 					IPProto: []int{ProtocolTCP},
 				},
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{"100.115.94.0-100.127.255.255", "100.64.0.0-100.115.91.255", "fd7a:115c:a1e0::/48"},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRange{First: 53, Last: 53}},
 					},
 					IPProto: []int{ProtocolUDP},
 				},
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{"100.115.94.0-100.127.255.255", "100.64.0.0-100.115.91.255", "fd7a:115c:a1e0::/48"},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
@@ -200,7 +202,7 @@ func TestParsing(t *testing.T) {
 `,
 			want: []tailcfg.FilterRule{
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{"100.115.94.0-100.127.255.255", "100.64.0.0-100.115.91.255", "fd7a:115c:a1e0::/48"},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
@@ -341,7 +343,7 @@ func TestParsing(t *testing.T) {
 `,
 			want: []tailcfg.FilterRule{
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{"100.115.94.0-100.127.255.255", "100.64.0.0-100.115.91.255", "fd7a:115c:a1e0::/48"},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
@@ -458,7 +460,7 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: user2Principal,
-					SSHUsers:   map[string]string{"root": "", "ssh-it-user": "ssh-it-user"},
+					SSHUsers:   map[string]string{"0": "", "root": "", "ssh-it-user": "ssh-it-user"},
 					Action:     acceptAction,
 				},
 			}},
@@ -485,7 +487,7 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: user2Principal,
-					SSHUsers:   map[string]string{"root": "", "ubuntu": "ubuntu", "admin": "admin", "deploy": "deploy"},
+					SSHUsers:   map[string]string{"0": "", "root": "", "ubuntu": "ubuntu", "admin": "admin", "deploy": "deploy"},
 					Action:     acceptAction,
 				},
 			}},
@@ -512,7 +514,7 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: user2Principal,
-					SSHUsers:   map[string]string{"*": "=", "root": ""},
+					SSHUsers:   map[string]string{"0": "", "*": "=", "root": ""},
 					Action:     acceptAction,
 				},
 			}},
@@ -539,7 +541,7 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: user2Principal,
-					SSHUsers:   map[string]string{"root": "root"},
+					SSHUsers:   map[string]string{"0": "", "root": "root"},
 					Action:     acceptAction,
 				},
 			}},
@@ -566,7 +568,7 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: user2Principal,
-					SSHUsers:   map[string]string{"*": "=", "root": "root"},
+					SSHUsers:   map[string]string{"0": "", "*": "=", "root": "root"},
 					Action:     acceptAction,
 				},
 			}},
@@ -593,7 +595,7 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: user2Principal,
-					SSHUsers:   map[string]string{"*": "=", "root": "root", "ubuntu": "ubuntu", "admin": "admin"},
+					SSHUsers:   map[string]string{"0": "", "*": "=", "root": "root", "ubuntu": "ubuntu", "admin": "admin"},
 					Action:     acceptAction,
 				},
 			}},
@@ -713,7 +715,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.2"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
@@ -723,7 +725,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.3"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
@@ -733,12 +735,12 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.4"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.5"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 			}},
@@ -763,7 +765,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.2"}},
-					SSHUsers:   map[string]string{"root": "root"},
+					SSHUsers:   map[string]string{"0": "", "root": "root"},
 					Action:     acceptAction,
 				},
 				{
@@ -773,7 +775,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.3"}},
-					SSHUsers:   map[string]string{"root": "root"},
+					SSHUsers:   map[string]string{"0": "", "root": "root"},
 					Action:     acceptAction,
 				},
 				{
@@ -783,12 +785,12 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.4"}},
-					SSHUsers:   map[string]string{"root": "root"},
+					SSHUsers:   map[string]string{"0": "", "root": "root"},
 					Action:     acceptAction,
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.5"}},
-					SSHUsers:   map[string]string{"root": "root"},
+					SSHUsers:   map[string]string{"0": "", "root": "root"},
 					Action:     acceptAction,
 				},
 			}},
@@ -813,22 +815,22 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.2"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.3"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.4"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.5"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 			}},
@@ -867,7 +869,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.10"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
@@ -911,7 +913,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.5"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 			}},
@@ -940,7 +942,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			want: &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.2"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
@@ -950,7 +952,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.3"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
@@ -960,7 +962,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.4"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 				{
@@ -970,7 +972,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 				},
 				{
 					Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.5"}},
-					SSHUsers:   map[string]string{"root": ""},
+					SSHUsers:   map[string]string{"0": "", "root": ""},
 					Action:     acceptAction,
 				},
 			}},
@@ -1055,6 +1057,7 @@ func TestCompileSSHPolicy_CheckAction(t *testing.T) {
 
 	// Verify SSH users are correctly mapped
 	expectedUsers := map[string]string{
+		"0":           "",
 		"ssh-it-user": "ssh-it-user",
 		"root":        "",
 	}
@@ -1199,7 +1202,7 @@ func TestSSHIntegrationReproduction(t *testing.T) {
 	want := &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 		{
 			Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.2"}},
-			SSHUsers:   map[string]string{"root": "", "ssh-it-user": "ssh-it-user"},
+			SSHUsers:   map[string]string{"0": "", "root": "", "ssh-it-user": "ssh-it-user"},
 			Action: &tailcfg.SSHAction{
 				Accept:                    true,
 				AllowAgentForwarding:      true,
@@ -1250,7 +1253,7 @@ func TestSSHJSONSerialization(t *testing.T) {
 	want := &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 		{
 			Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.1"}},
-			SSHUsers:   map[string]string{"root": "", "ssh-it-user": "ssh-it-user", "ubuntu": "ubuntu", "admin": "admin"},
+			SSHUsers:   map[string]string{"0": "", "root": "", "ssh-it-user": "ssh-it-user", "ubuntu": "ubuntu", "admin": "admin"},
 			Action: &tailcfg.SSHAction{
 				Accept:                    true,
 				AllowAgentForwarding:      true,
@@ -2640,7 +2643,7 @@ func TestCompileSSHPolicy_CheckPeriodVariants(t *testing.T) {
 					{
 						Action:       SSHActionCheck,
 						Sources:      SSHSrcAliases{up("user1@")},
-						Destinations: SSHDstAliases{agp("autogroup:member")},
+						Destinations: SSHDstAliases{agp("autogroup:self")},
 						Users:        SSHUsers{"root"},
 						CheckPeriod:  tt.checkPeriod,
 					},
@@ -3109,6 +3112,17 @@ func TestResolveLocalparts(t *testing.T) {
 			},
 			want: map[uint]string{1: "dave+ssh"},
 		},
+		{
+			name:    "numeric local part is not a login",
+			entries: []SSHUser{"localpart:*@example.com"},
+			users: types.Users{
+				{Name: "zero", Email: "0@example.com", ID: 1},
+				{Name: "zeros", Email: "00@example.com", ID: 2},
+				{Name: "employee", Email: "1042@example.com", ID: 3},
+				{Name: "mixed", Email: "1042a@example.com", ID: 4},
+			},
+			want: map[uint]string{4: "1042a"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -3499,14 +3513,14 @@ func TestSourcesHaveDangerAll(t *testing.T) {
 	}
 }
 
-func TestSrcIPsWithRoutes(t *testing.T) {
+func TestBuildSrcIPStrings(t *testing.T) {
 	t.Parallel()
 
 	// Build a resolved address set for a single IP.
 	var b netipx.IPSetBuilder
 	b.AddPrefix(netip.MustParsePrefix("100.64.0.1/32"))
 
-	resolved, err := newResolved(&b)
+	resolved, err := newResolvedAddresses(b.IPSet())
 	require.NoError(t, err)
 
 	// Node with approved subnet route.
@@ -3572,7 +3586,7 @@ func TestSrcIPsWithRoutes(t *testing.T) {
 				nodes = nodeWithRoutes
 			}
 
-			got := srcIPsWithRoutes(tt.resolved, tt.hasWildcard, tt.hasDangerAll, nodes)
+			got := buildSrcIPStrings([]ResolvedAddresses{tt.resolved}, tt.hasWildcard, tt.hasDangerAll, nodes)
 
 			if tt.hasDangerAll {
 				assert.Equal(t, []string{"*"}, got)
@@ -3584,6 +3598,26 @@ func TestSrcIPsWithRoutes(t *testing.T) {
 			}
 		})
 	}
+
+	// Each alias is written on its own: node addresses stay listed one by
+	// one next to the wildcard range that contains them, sorted as text.
+	var pair netipx.IPSetBuilder
+	pair.AddPrefix(netip.MustParsePrefix("100.64.0.2/31"))
+
+	pairSet, err := pair.IPSet()
+	require.NoError(t, err)
+
+	nodeAddrs, err := newNodeAddresses(pairSet, nil)
+	require.NoError(t, err)
+
+	wildcard, err := Asterix(0).Resolve(nil, nil, emptyNodes)
+	require.NoError(t, err)
+
+	want := append(wildcard.Strings(), "100.64.0.2", "100.64.0.3")
+	slices.Sort(want)
+
+	got := buildSrcIPStrings([]ResolvedAddresses{wildcard, nodeAddrs}, true, false, emptyNodes)
+	assert.Equal(t, want, got, "node addresses must stay listed beside the wildcard range")
 }
 
 func TestFilterAllowAllFix(t *testing.T) {
@@ -3684,7 +3718,7 @@ func TestFilterAllowAllFix(t *testing.T) {
 
 			rules := tt.pol.compileFilterRules(users, nodes)
 
-			isFilterAllowAll := cmp.Diff(tailcfg.FilterAllowAll, rules) == ""
+			isFilterAllowAll := cmp.Diff(noRulesFilter(users, nodes), rules) == ""
 			assert.Equal(t, tt.wantFilterAllow, isFilterAllowAll,
 				"FilterAllowAll mismatch: got rules=%v", rules)
 		})
@@ -3757,15 +3791,13 @@ func TestCompileViaGrant(t *testing.T) {
 	}
 
 	// Expected rule for autogroup:internet on a via-tagged exit
-	// advertiser: SrcIPs scoped to the grant source, DstPorts
-	// enumerating util.TheInternet() prefixes.
-	internetDstPorts := make(
-		[]tailcfg.NetPortRange, 0, len(util.TheInternet().Prefixes()),
-	)
+	// advertiser: SrcIPs scoped to the grant source, DstPorts the
+	// internet's address ranges, as Tailscale writes them.
+	internetDstPorts := make([]tailcfg.NetPortRange, 0, len(internetStrings()))
 
-	for _, p := range util.TheInternet().Prefixes() {
+	for _, r := range internetStrings() {
 		internetDstPorts = append(internetDstPorts, tailcfg.NetPortRange{
-			IP:    p.String(),
+			IP:    r,
 			Ports: tailcfg.PortRangeAny,
 		})
 	}
@@ -3910,7 +3942,7 @@ func TestCompileViaGrant(t *testing.T) {
 			},
 		},
 		{
-			name: "app-only via grant with no ip field returns nil",
+			name: "app-only via grant gets no filter rule",
 			grant: Grant{
 				Sources:      Aliases{up("testuser@")},
 				Destinations: Aliases{pp("10.0.0.0/24")},
@@ -3956,7 +3988,7 @@ func TestCompileViaGrant(t *testing.T) {
 			nodeView := tt.node.View()
 			nodesSlice := tt.nodes.ViewSlice()
 
-			cg, err := tt.pol.compileOneGrant(tt.grant, users, nodesSlice)
+			cg, err := tt.pol.compileOneGrant(tt.grant, users, nodesSlice, nil)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -3985,6 +4017,104 @@ func TestCompileViaGrant(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestViaGrantPeers pins who a via grant links, as via-grant-v80 and v81 record:
+// with no ports via changes nothing, so sources peer everything serving the
+// destination and nobody gets a filter; with ports, sources peer via routers only.
+func TestViaGrantPeers(t *testing.T) {
+	t.Parallel()
+
+	route := netip.MustParsePrefix("10.1.0.0/24")
+	tagged := func(id types.NodeID, advertised, approved bool, tags ...string) *types.Node {
+		nd := &types.Node{
+			ID:       id,
+			Hostname: fmt.Sprintf("n%d", id),
+			IPv4:     ap(fmt.Sprintf("100.64.0.%d", id)),
+			Tags:     tags,
+			Hostinfo: &tailcfg.Hostinfo{},
+		}
+
+		if advertised {
+			nd.Hostinfo.RoutableIPs = []netip.Prefix{route}
+		}
+
+		if approved {
+			nd.ApprovedRoutes = []netip.Prefix{route}
+		}
+
+		return nd
+	}
+
+	nodes := types.Nodes{
+		tagged(1, false, false, "tag:client"),
+		tagged(2, true, true, "tag:client", "tag:router"), // via router and a source
+		tagged(3, true, false, "tag:router"),              // route not approved
+		tagged(4, false, false, "tag:router"),
+		tagged(5, true, true, "tag:other"), // serves the route, no via tag
+		tagged(6, false, false, "tag:other"),
+	}
+
+	tests := []struct {
+		name  string
+		grant string
+		want  map[types.NodeID][]types.NodeID
+	}{
+		{
+			name:  "capability only",
+			grant: `"app": {"example.com/cap/test": [{}]}`,
+			want:  map[types.NodeID][]types.NodeID{1: {2, 5}, 2: {1, 5}, 5: {1, 2}},
+		},
+		{
+			name:  "ports",
+			grant: `"ip": ["tcp:80"]`,
+			want:  map[types.NodeID][]types.NodeID{1: {2}, 2: {1}},
+		},
+		{
+			name:  "ports and an empty capability map",
+			grant: `"ip": ["tcp:80"], "app": {}`,
+			want:  map[types.NodeID][]types.NodeID{1: {2}, 2: {1}},
+		},
+		{
+			name:  "ports and a capability",
+			grant: `"ip": ["tcp:80"], "app": {"example.com/cap/test": [{}]}`,
+			want:  map[types.NodeID][]types.NodeID{1: {2, 5}, 2: {1, 5}, 5: {1, 2}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			policy := fmt.Sprintf(`{
+				"tagOwners": {"tag:client": [], "tag:router": [], "tag:other": []},
+				"grants": [{"src": ["tag:client"], "dst": ["10.1.0.0/24"], "via": ["tag:router"], %s}]
+			}`, tt.grant)
+
+			pm, err := NewPolicyManager([]byte(policy), nil, nodes.ViewSlice())
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.want, pm.BuildPeerMap(nodes.ViewSlice()))
+		})
+	}
+
+	t.Run("capability only sends no filter", func(t *testing.T) {
+		t.Parallel()
+
+		pm, err := NewPolicyManager([]byte(`{
+			"tagOwners": {"tag:client": [], "tag:router": [], "tag:other": []},
+			"grants": [{"src": ["tag:client"], "dst": ["10.1.0.0/24"], "via": ["tag:router"], "app": {"example.com/cap/test": [{}]}}]
+		}`), nil, nodes.ViewSlice())
+		require.NoError(t, err)
+
+		for _, nd := range nodes {
+			filter, err := pm.FilterForNode(nd.View())
+			require.NoError(t, err)
+			assert.Emptyf(t, filter, "node %d", nd.ID)
+		}
+
+		assert.Empty(t, pm.ViaRoutesForPeer(nodes[0].View(), nodes[1].View()))
+	})
 }
 
 func TestCompileGrantWithAutogroupSelf_GrantPaths(t *testing.T) {
@@ -4129,7 +4259,7 @@ func TestCompileGrantWithAutogroupSelf_GrantPaths(t *testing.T) {
 			userIdx := buildUserNodeIndex(nodesSlice)
 
 			cg, err := tt.pol.compileOneGrant(
-				tt.grant, users, nodesSlice,
+				tt.grant, users, nodesSlice, nil,
 			)
 
 			if tt.wantErr != nil {
@@ -4143,21 +4273,19 @@ func TestCompileGrantWithAutogroupSelf_GrantPaths(t *testing.T) {
 			var got []tailcfg.FilterRule
 			if cg != nil {
 				got = append(got, cg.rules...)
-				got = append(got, compileAutogroupSelf(cg, nodeView, userIdx)...)
+				got = append(got, ownSelfRules(cg, nodeView, userIdx).rules...)
 				got = mergeFilterRules(got)
 			}
 
 			switch tt.name {
 			case "autogroup:self destination for untagged node produces same-user devices":
 				// Should produce rules; sources and destinations should only
-				// include user1's untagged devices (node1 and node2).
-				// IPs are merged into ranges by IPSet (e.g. "100.64.0.1-100.64.0.2").
+				// include user1's untagged devices (node1 and node2), each
+				// address on its own, as Tailscale writes them.
 				require.NotEmpty(t, got, "expected rules for autogroup:self")
 				rule := got[0]
-				// SrcIPs from IPSet may be a merged range.
-				require.Len(t, rule.SrcIPs, 1)
-				assert.Equal(t, "100.64.0.1-100.64.0.2", rule.SrcIPs[0],
-					"SrcIPs should contain merged range for user1 untagged devices")
+				assert.Equal(t, []string{"100.64.0.1", "100.64.0.2"}, rule.SrcIPs,
+					"SrcIPs should list user1's untagged devices")
 
 				var destIPs []string
 				for _, dp := range rule.DstPorts {
@@ -4214,10 +4342,9 @@ func TestDestinationsToNetPortRange_AutogroupInternet(t *testing.T) {
 	// autogroup:internet must surface as DstPorts (not be skipped at
 	// compile time). The matcher derived from these FilterRules is
 	// what makes Node.CanAccess return true for exit-node peers via
-	// DestsIsTheInternet (#3212). The wire format is currently the
-	// canonical CIDR breakdown of util.TheInternet(); aligning it to
-	// the SaaS range form is tracked separately.
-	internetPrefixCount := len(util.TheInternet().Prefixes())
+	// DestsIsTheInternet (#3212). They are written as the internet's
+	// address ranges, as Tailscale writes them.
+	internetPrefixCount := len(internetStrings())
 
 	tests := []struct {
 		name     string
@@ -4259,4 +4386,133 @@ func TestDestinationsToNetPortRange_AutogroupInternet(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestACLSourcesResolvedOnce pins that the grants an ACL is split into, one
+// per destination, share the resolved sources instead of each holding a copy.
+func TestACLSourcesResolvedOnce(t *testing.T) {
+	t.Parallel()
+
+	pol, err := unmarshalPolicy([]byte(`{"acls":[{"action":"accept",
+		"src":["10.0.0.1","10.0.1.1","10.0.2.1"],
+		"dst":["100.64.0.1:80","100.64.0.2:443","100.64.0.3:22"]}]}`))
+	require.NoError(t, err)
+
+	grants := pol.compileGrants(nil, types.Nodes{}.ViewSlice())
+	require.Len(t, grants, 3)
+
+	for _, cg := range grants {
+		require.Equal(t, []string{"10.0.0.1", "10.0.1.1", "10.0.2.1"}, cg.srcIPStrings)
+		require.Same(t, &grants[0].srcIPStrings[0], &cg.srcIPStrings[0])
+	}
+
+	rules := globalFilterRules(grants)
+	require.Len(t, rules, 1)
+	require.Len(t, rules[0].DstPorts, 3)
+}
+
+// TestMergeFilterRulesSharedSrcIPs pins that recognising a shared SrcIPs
+// slice merges exactly the rules that comparing its content would.
+func TestMergeFilterRulesSharedSrcIPs(t *testing.T) {
+	t.Parallel()
+
+	shared := []string{"100.64.0.1", "100.64.0.2"}
+	rule := func(srcIPs []string, proto int, port uint16) tailcfg.FilterRule {
+		return tailcfg.FilterRule{
+			SrcIPs: srcIPs,
+			DstPorts: []tailcfg.NetPortRange{
+				{IP: "100.64.0.3", Ports: tailcfg.PortRange{First: port, Last: port}},
+			},
+			IPProto: []int{proto},
+		}
+	}
+
+	got := mergeFilterRules([]tailcfg.FilterRule{
+		rule(shared, ProtocolTCP, 1),
+		rule(shared, ProtocolUDP, 2),
+		rule(shared[:1], ProtocolTCP, 3),
+		rule(shared, ProtocolTCP, 4),
+		rule(slices.Clone(shared), ProtocolTCP, 5),
+		rule(shared, ProtocolUDP, 6),
+	})
+
+	want := []tailcfg.FilterRule{
+		rule(shared, ProtocolTCP, 1),
+		rule(shared, ProtocolUDP, 2),
+		rule(shared[:1], ProtocolTCP, 3),
+	}
+	want[0].DstPorts = append(
+		want[0].DstPorts, rule(nil, 0, 4).DstPorts[0], rule(nil, 0, 5).DstPorts[0],
+	)
+	want[1].DstPorts = append(want[1].DstPorts, rule(nil, 0, 6).DstPorts[0])
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mergeFilterRules() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestMergeFilterRulesKeysSharedSrcIPsOnce bounds what merging the rules of
+// one wide ACL allocates: their shared SrcIPs are keyed once, not once per
+// rule. It reads the heap counters, so it does not run in parallel.
+func TestMergeFilterRulesKeysSharedSrcIPsOnce(t *testing.T) {
+	const numRules = 100
+
+	rulesSharing := func(numSrcs int) []tailcfg.FilterRule {
+		srcIPs := make([]string, numSrcs)
+		for i := range srcIPs {
+			srcIPs[i] = fmt.Sprintf("100.64.%d.%d", i/256, i%256)
+		}
+
+		rules := make([]tailcfg.FilterRule, numRules)
+		for i := range rules {
+			rules[i] = tailcfg.FilterRule{
+				SrcIPs: srcIPs,
+				DstPorts: []tailcfg.NetPortRange{
+					{IP: "100.100.0.1", Ports: tailcfg.PortRangeAny},
+				},
+				IPProto: []int{ProtocolTCP},
+			}
+		}
+
+		return rules
+	}
+
+	bytesPerMerge := func(rules []tailcfg.FilterRule) int64 {
+		const runs = 10
+
+		var before, after runtime.MemStats
+
+		runtime.ReadMemStats(&before)
+
+		for range runs {
+			mergeFilterRules(rules)
+		}
+
+		runtime.ReadMemStats(&after)
+
+		return int64(after.TotalAlloc-before.TotalAlloc) / runs //nolint:gosec
+	}
+
+	wide := rulesSharing(1024)
+	keyBytes := int64(len(filterRuleKey(wide[0])))
+
+	// Only the key, built once, may grow with the sources.
+	extra := bytesPerMerge(wide) - bytesPerMerge(rulesSharing(1))
+	assert.Less(t, extra, 8*keyBytes,
+		"merging %d rules that share %d sources", numRules, len(wide[0].SrcIPs))
+}
+
+// mergeFilterRules merges rules with identical [tailcfg.FilterRule.SrcIPs] and
+// [tailcfg.FilterRule.IPProto] by combining their [tailcfg.FilterRule.DstPorts].
+// DstPorts are NOT deduplicated to match Tailscale behavior.
+// [tailcfg.CapGrant] rules (which have no [tailcfg.FilterRule.DstPorts]) are
+// passed through without merging since [tailcfg.CapGrant] and
+// [tailcfg.FilterRule.DstPorts] are mutually exclusive in a
+// [tailcfg.FilterRule].
+func mergeFilterRules(rules []tailcfg.FilterRule) []tailcfg.FilterRule {
+	if len(rules) <= 1 {
+		return rules
+	}
+
+	return mergeKeyedRules(rules, ruleKeys(rules))
 }

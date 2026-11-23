@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 
 func TestMapResponseBuilder_Basic(t *testing.T) {
 	cfg := &types.Config{
-		BaseDomain: "example.com",
+		DNSConfig: types.DNSConfig{BaseDomain: "example.com"},
 		LogTail: types.LogTailConfig{
 			Enabled: true,
 		},
@@ -59,8 +60,8 @@ func TestMapResponseBuilder_WithCapabilityVersion(t *testing.T) {
 func TestMapResponseBuilder_WithDomain(t *testing.T) {
 	domain := "test.example.com"
 	cfg := &types.Config{
-		ServerURL:  "https://test.example.com",
-		BaseDomain: domain,
+		ServerURL: "https://test.example.com",
+		DNSConfig: types.DNSConfig{BaseDomain: domain},
 	}
 
 	mockState := &state.State{}
@@ -168,6 +169,26 @@ func TestMapResponseBuilder_WithPeerChangedPatch(t *testing.T) {
 	assert.False(t, builder.hasErrors())
 }
 
+// TestMapResponseBuilder_WithPeerChangedPatchDropsUnencodableExpiry proves a
+// patch whose key expiry json.Marshal refuses is left out, as buildTailPeers
+// leaves out such a peer, instead of failing the viewer's whole response.
+func TestMapResponseBuilder_WithPeerChangedPatchDropsUnencodableExpiry(t *testing.T) {
+	m := &mapper{cfg: &types.Config{}, state: &state.State{}}
+
+	latest := time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
+	beyond := latest.Add(time.Second)
+	changes := []*tailcfg.PeerChange{
+		{NodeID: 123, KeyExpiry: &beyond},
+		{NodeID: 456, KeyExpiry: &latest},
+	}
+
+	builder := m.NewMapResponseBuilder(types.NodeID(1)).WithPeerChangedPatch(changes)
+	assert.Equal(t, changes[1:], builder.resp.PeersChangedPatch)
+
+	_, err := json.Marshal(builder.resp)
+	require.NoError(t, err)
+}
+
 func TestMapResponseBuilder_WithPeersRemoved(t *testing.T) {
 	cfg := &types.Config{}
 	mockState := &state.State{}
@@ -224,8 +245,8 @@ func TestMapResponseBuilder_ErrorHandling(t *testing.T) {
 func TestMapResponseBuilder_ChainedCalls(t *testing.T) {
 	domain := "chained.example.com"
 	cfg := &types.Config{
-		ServerURL:  "https://chained.example.com",
-		BaseDomain: domain,
+		ServerURL: "https://chained.example.com",
+		DNSConfig: types.DNSConfig{BaseDomain: domain},
 		LogTail: types.LogTailConfig{
 			Enabled: false,
 		},

@@ -18,6 +18,10 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
 ## Conventions
 
 - Operations derived from Tailscale carry the `Tailscale compat` tag.
+- `POST /device/{id}/update-client` is undocumented by Tailscale. Its shape
+  comes from SaaS captures (`servertest/testdata/steps/update-client*.hujson`):
+  no body, `200 {}` once the node started the update, `404 "not found"` for
+  every device it will not update. It reaches the node as c2n `POST /update`.
 - The `{tailnet}` path segment must be `-` (the single Headscale tailnet);
   anything else is `404`. See `requireDefaultTailnet`.
 - Errors use **Tailscale's** body (`{"message","data","status"}`), installed as
@@ -27,8 +31,9 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
   sends) or **Bearer**: an admin API key (`hskey-api-…`), or an OAuth access
   token (`hskey-oauthtok-…`). See `authMiddleware`.
 - Each operation declares the Tailscale scope it requires (`auth_keys`,
-  `oauth_keys`, `devices:core`, `devices:routes`, `policy_file`,
-  `feature_settings`, each with a `:read` subset, plus `all`/`all:read`).
+  `oauth_keys`, `devices:core`, `devices:routes`,
+  `devices:posture_attributes`, `policy_file`, `feature_settings`, each with a
+  `:read` subset, plus `all`/`all:read`).
   `requireScope` records it both for the middleware and in the generated
   OpenAPI, as an `x-required-scope` extension and a sentence in the operation
   description, so the scope shows up in the docs and spec. Enforcement: an
@@ -36,7 +41,9 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
   token is scope-limited**, the middleware checks the operation's declared scope
   against the token's grant (`scope.Grants`, where a write scope subsumes its
   `:read` and `all`/`all:read` are super-scopes). The two are told apart by
-  credential prefix.
+  credential prefix. A token without the scope is refused as Tailscale does
+  (`scopeRefusal`): 403 when it holds the `:read` half of a write scope, 404
+  `"not found"` otherwise.
 - Resolve one entity by id with a typed getter (`GetNodeByID`, `GetUserByID`,
   `GetAPIKeyByID`, `GetPreAuthKeyByID`); add one to state/db if it is missing
   rather than scanning a `List`. Build responses from the view accessors
@@ -87,6 +94,24 @@ tolerating `RequestTags` that are a subset of the key's tags.
 `TestAPIv2OAuthTailscaleClientAuthKey` in `servertest/` drives the real client
 code through this; `.github/workflows/tailscale-action-integration.yaml` covers
 the GitHub Action. User-facing setup is in `docs/ref/api.md`.
+
+## Intentional differences from Tailscale
+
+Each has a test whose comment gives Tailscale's answer, Headscale's, the
+reason and the recording (`hscontrol/testdata/tailscale_api/probe-*`).
+
+- `POST /device/{id}/tags` with `[]` or `null` is 200 and changes nothing;
+  Tailscale answers 400. Terraform's destroy sends it.
+  `TestAPIv2DeviceTagsEmptyIsNoChange`.
+- `POST /device/{id}/authorized` with `false` is 400: Headscale has no device
+  approval (#2176). `TestAPIv2DeviceDeauthorizeRefused`.
+- `POST /device/{id}/routes` with one exit prefix approves and reports both.
+  `TestAPIv2DeviceOneExitPrefix`.
+- A key description over 50 characters is refused (422); Tailscale truncates it to 50. Tailscale refuses characters such as `.` `:` `@`; Headscale accepts all.
+  `TestAPIv2KeyDescription`.
+
+Known differences not yet removed are listed with a reason in
+`apiv2CompatSkipReasons` (`hscontrol/apiv2_compat_test.go`).
 
 ## Adding an endpoint
 

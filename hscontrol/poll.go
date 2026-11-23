@@ -24,7 +24,15 @@ import (
 
 const (
 	keepAliveInterval = 50 * time.Second
+
+	// stopWriteGrace is how long a stopped session's write in flight may
+	// take to finish before its stream is reset.
+	stopWriteGrace = 5 * time.Second
 )
+
+// errMapSessionStopped is a write refused because the batcher stopped the
+// session; the poll loop ends as if it had seen cancelCh.
+var errMapSessionStopped = errors.New("map session stopped")
 
 type contextKey string
 
@@ -40,10 +48,14 @@ type mapSession struct {
 	cancelCh       chan struct{}
 	cancelChClosed atomic.Bool
 
+	// writing is set while [mapSession.writeMap] runs, so
+	// [mapSession.stopFromBatcher] interrupts only a write that may be stuck.
+	writing atomic.Bool
+
 	keepAlive       time.Duration
 	keepAliveTicker *time.Ticker
 
-	node *types.Node
+	node types.NodeView
 	w    http.ResponseWriter
 
 	log zerolog.Logger
@@ -53,7 +65,7 @@ func (h *Headscale) newMapSession(
 	ctx context.Context,
 	req tailcfg.MapRequest,
 	w http.ResponseWriter,
-	node *types.Node,
+	node types.NodeView,
 ) *mapSession {
 	ka := keepAliveInterval + (time.Duration(rand.IntN(9000)) * time.Millisecond) //nolint:gosec // weak random is fine for jitter
 
@@ -97,10 +109,19 @@ func (m *mapSession) stopFromBatcher() {
 		close(m.cancelCh)
 
 		// A channel signal cannot interrupt a response write that is blocked on
-		// HTTP/2 flow control. Expire the stream's write deadline as well so a
-		// client that stopped reading cannot keep the map session, and therefore
-		// server shutdown, alive indefinitely.
-		err := http.NewResponseController(m.w).SetWriteDeadline(time.Now())
+		// HTTP/2 flow control, so a client that stopped reading would keep the
+		// map session, and therefore server shutdown, alive indefinitely.
+		// An expired write deadline resets the stream with INTERNAL_ERROR,
+		// which the client reports as a server error, so it is only a bound:
+		// an idle session sees cancelCh, and a write the client keeps reading
+		// finishes first, both ending the stream cleanly. writeMap checks
+		// cancelChClosed after raising writing, so one side always sees the
+		// other.
+		if !m.writing.Load() {
+			return
+		}
+
+		err := http.NewResponseController(m.w).SetWriteDeadline(time.Now().Add(stopWriteGrace))
 		if err != nil && !errors.Is(err, http.ErrNotSupported) {
 			m.log.Debug().Caller().Err(err).Msg("failed to interrupt map response write")
 		}
@@ -111,7 +132,7 @@ func (m *mapSession) stopFromBatcher() {
 // is disconnected.
 func (m *mapSession) afterServeLongPoll() {
 	if m.node.IsEphemeral() {
-		m.h.ephemeralGC.Schedule(m.node.ID, m.h.cfg.Node.Ephemeral.InactivityTimeout)
+		m.h.ephemeralGC.Schedule(m.node.ID(), m.h.cfg.Node.Ephemeral.InactivityTimeout)
 	}
 }
 
@@ -121,7 +142,7 @@ func (m *mapSession) serve() {
 	// current configuration.
 	//
 	// Process the [tailcfg.MapRequest] to update node state (endpoints, hostinfo, etc.)
-	c, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID, m.req)
+	c, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID(), m.req)
 	m.h.Change(c)
 
 	if err != nil {
@@ -151,6 +172,10 @@ func (m *mapSession) serve() {
 func (m *mapSession) serveLongPoll() {
 	m.log.Trace().Caller().Msg("long poll session started")
 
+	// Add/Done must precede cleanup: LIFO defers make shutdown's Wait cover Disconnect.
+	m.h.clientStreamsOpen.Add(1)
+	defer m.h.clientStreamsOpen.Done()
+
 	// connectGen is set by [state.State.Connect] below and captured by the deferred cleanup closure.
 	// Each Connect acquires one live session in state; the cleanup must release
 	// it with exactly one [state.State.Disconnect] call, in every exit path, or
@@ -161,7 +186,7 @@ func (m *mapSession) serveLongPoll() {
 	defer func() {
 		m.stopFromBatcher()
 
-		stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID, m.ch)
+		stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID(), m.ch)
 
 		// This session never reached [state.State.Connect]; there is no
 		// session to release.
@@ -185,27 +210,34 @@ func (m *mapSession) serveLongPoll() {
 		// A deleted or expired node cannot return online through a map
 		// reconnect, so release its session without the reconnect grace.
 		// See: https://github.com/blackhiden/headscale/issues/3410
-		node, nodeExists := m.h.state.GetNodeByID(m.node.ID)
+		node, nodeExists := m.h.state.GetNodeByID(m.node.ID())
 
 		if !stillConnected && nodeExists && !node.IsExpired() {
-			// Wait up to 10 seconds for the node to reconnect.
-			// 10 seconds was arbitrary chosen as a reasonable time to reconnect.
+			// Wait up to 15 seconds for the node to reconnect. SaaS tells peers
+			// a node left after about that long, so an outage this short moves
+			// no HA primary there either.
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 
-			for range 10 {
-				if m.h.mapBatcher.IsConnected(m.node.ID) {
+		waitForReconnect:
+			for range 15 {
+				if m.h.mapBatcher.IsConnected(m.node.ID()) {
 					break
 				}
 
-				<-ticker.C
+				select {
+				case <-m.h.mapBatcher.Done():
+					// Reconnect grace has no purpose once the server is stopping.
+					break waitForReconnect
+				case <-ticker.C:
+				}
 			}
 		}
 
 		// Release this session. The node goes offline exactly when the last
 		// live session is released, so releases from replaced or stale
 		// sessions are harmless regardless of the order they run in.
-		disconnectChanges, err := m.h.state.Disconnect(m.node.ID, connectGen)
+		disconnectChanges, err := m.h.state.Disconnect(m.node.ID(), connectGen)
 		if err != nil {
 			// A node deleted mid-session is gone by the time its own session
 			// releases; that is the expected order, not a failure.
@@ -225,11 +257,7 @@ func (m *mapSession) serveLongPoll() {
 		m.log.Info().Caller().Str(zf.Chan, fmt.Sprintf("%p", m.ch)).Msg("node has disconnected")
 	}()
 
-	// Set up the client stream
-	m.h.clientStreamsOpen.Add(1)
-	defer m.h.clientStreamsOpen.Done()
-
-	ctx, cancel := context.WithCancel(context.WithValue(m.ctx, nodeNameContextKey, m.node.Hostname))
+	ctx, cancel := context.WithCancel(context.WithValue(m.ctx, nodeNameContextKey, m.node.Hostname()))
 	defer cancel()
 
 	m.keepAliveTicker = time.NewTicker(m.keepAlive)
@@ -241,7 +269,7 @@ func (m *mapSession) serveLongPoll() {
 	// [types.NodeView.SubnetRoutes] calculates the intersection of announced and approved routes. If we
 	// call [state.State.Connect] first, [types.NodeView.SubnetRoutes] returns empty (no announced routes yet), causing
 	// the node to be incorrectly removed from AvailableRoutes.
-	mapReqChange, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID, m.req)
+	mapReqChange, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID(), m.req)
 	if err != nil {
 		m.h.Change(mapReqChange)
 
@@ -262,13 +290,13 @@ func (m *mapSession) serveLongPoll() {
 	// primary route selection occurs, which is critical for proper HA subnet router failover.
 	var connectChanges []change.Change
 
-	connectChanges, connectGen = m.h.state.Connect(m.node.ID)
+	connectChanges, connectGen = m.h.state.Connect(m.node.ID())
 
 	// Cancel ephemeral GC only after Connect succeeds. Cancelling at the start
 	// of serveLongPoll left departed nodes without a deletion timer when a
 	// reconnect attempt failed before Connect (issue #3382).
 	if m.node.IsEphemeral() {
-		m.h.ephemeralGC.Cancel(m.node.ID)
+		m.h.ephemeralGC.Cancel(m.node.ID())
 	}
 
 	m.log.Info().Caller().Str(zf.Chan, fmt.Sprintf("%p", m.ch)).Msg("node has connected")
@@ -278,7 +306,7 @@ func (m *mapSession) serveLongPoll() {
 	// adding this before connecting it to the state ensure that
 	// it does not miss any updates that might be sent in the split
 	// time between the node connecting and the batcher being ready.
-	if err := m.h.mapBatcher.AddNode(m.node.ID, m.ch, m.capVer, m.stopFromBatcher); err != nil { //nolint:noinlineerr
+	if err := m.h.mapBatcher.AddNode(m.node.ID(), m.ch, m.capVer, m.stopFromBatcher); err != nil { //nolint:noinlineerr
 		m.log.Error().Caller().Err(err).Msg("failed to add node to batcher")
 		// The map request already changed state other nodes must see.
 		m.h.Change(mapReqChange)
@@ -323,6 +351,12 @@ func (m *mapSession) serveLongPoll() {
 			}
 
 			err := m.writeMap(update)
+			if errors.Is(err, errMapSessionStopped) {
+				mapResponseEnded.WithLabelValues("cancelled").Inc()
+
+				return
+			}
+
 			if err != nil {
 				m.log.Error().Caller().Err(err).Msg("cannot write update to client")
 				return
@@ -333,13 +367,19 @@ func (m *mapSession) serveLongPoll() {
 
 		case <-m.keepAliveTicker.C:
 			err := m.writeMap(&keepAlive)
+			if errors.Is(err, errMapSessionStopped) {
+				mapResponseEnded.WithLabelValues("cancelled").Inc()
+
+				return
+			}
+
 			if err != nil {
 				m.log.Error().Caller().Err(err).Msg("cannot write keep alive")
 				return
 			}
 
 			if debugHighCardinalityMetrics {
-				mapResponseLastSentSeconds.WithLabelValues("keepalive", m.node.ID.String()).Set(float64(time.Now().Unix()))
+				mapResponseLastSentSeconds.WithLabelValues("keepalive", m.node.ID().String()).Set(float64(time.Now().Unix()))
 			}
 
 			mapResponseSent.WithLabelValues("ok", "keepalive").Inc()
@@ -353,6 +393,13 @@ func (m *mapSession) serveLongPoll() {
 // It also handles flushing the response if the [http.ResponseWriter]
 // implements [http.Flusher].
 func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
+	m.writing.Store(true)
+	defer m.writing.Store(false)
+
+	if m.cancelChClosed.Load() {
+		return errMapSessionStopped
+	}
+
 	startWrite := time.Now()
 
 	err := writeMapResponse(m.w, m.req.Compress, m.isStreaming(), msg)
@@ -364,7 +411,7 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 		Caller().
 		Str(zf.Chan, fmt.Sprintf("%p", m.ch)).
 		TimeDiff("timeSpent", time.Now(), startWrite).
-		Str(zf.MachineKey, m.node.MachineKey.String()).
+		Str(zf.MachineKey, m.node.MachineKey().String()).
 		Bool("keepalive", msg.KeepAlive).
 		Msg("finished writing mapresp to node")
 
@@ -375,9 +422,6 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 // zstd-framed when the client asked for compression, behind a little-endian
 // length prefix. Tailscale clients request zstd unconditionally and decode
 // every frame with it, so the compression step is not optional.
-//
-// It is shared with the deleted-node path in [noiseServer.PollNetMapHandler],
-// which has no [mapSession] to write through.
 func writeMapResponse(w http.ResponseWriter, compress string, flush bool, msg *tailcfg.MapResponse) error {
 	jsonBody, err := json.Marshal(msg)
 	if err != nil {
