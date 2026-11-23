@@ -1,44 +1,50 @@
 # Session
-## Current Task: Merge upstream/main into dev and create Git Flow release 🔄 IN PROGRESS
+## Current Task: Merge upstream/main into dev and create Git Flow release ✅ MERGE COMPLETE
 
-**Started:** 2026-11-23
+**Completed:** 2026-11-23
 
-### Pre-merge baseline
+### Result
 
-- Current branch before workflow: `main` at `87867713`.
-- `dev` tip before local sync: `815e9738`.
-- `origin/main`: `9ef033c7`.
-- `upstream/main` after `git fetch upstream --prune`: `0c304b06`.
-- Latest valid release tag: `v1.1.5` (`fb2048b7`). The malformed
-  `vv0.35.0-arsydoni4326-alt` tag is ignored; Git Flow adds the `v` prefix, so
-  the release name passed to git-flow must be `1.1.6` to produce `v1.1.6`.
-- Backup branch: `backup/pre-merge-20261123` (points to original `dev` tip).
-- Intended `headplane` gitlink: `9b8bfc2c15744e33cb9f8d9d2c998260bcff5aad`.
-  The checked-out submodule worktree remains at
-  `5ab2878a5d0e931486daa6de89b9fef3d4f411d6`; this known discrepancy is left
-  unchanged.
+- Fetched `upstream/main` at `0c304b06` and merged it into `dev`.
+- Merge commit: `9a56c617d426b2cebb8401a1966248a7dfa950a8`.
+- Previous latest valid tag: `v1.1.5`. Next release: `1.1.6` (tag `v1.1.6`).
+- Backup branch retained: `backup/pre-merge-20261123`.
+- Headplane gitlink retained at `9b8bfc2c15744e33cb9f8d9d2c998260bcff5aad`;
+  the checked-out submodule worktree remains at `5ab2878a…` as documented.
 
-### Decisions and discoveries
+### Conflict resolution
 
-- `dev` and `main` had diverged: `main` contained the merge-preservation and
-  schema documentation commits that `dev` lacked. The initial preservation
-  audit on `dev` failed only for `docs/MERGE-PRESERVATION.md` and `SCHEMA.md`.
-- To prevent feature/documentation loss, `main` was merged into `dev` first
-  with `git merge --no-ff main -m 'Merge main into dev before upstream merge'`.
-  No content conflicts occurred.
-- That merge selected `main`'s Headplane gitlink; `FP-016` requires restoring
-  `dev`'s intended gitlink before proceeding.
-- No application code has been changed for this task.
+- 83 conflicts were resolved: 44 import-only, 6 clean normalized merges, and
+  33 manual/configuration resolutions.
+- Preserved fork features `FP-001`–`FP-016`, including the module path, update
+  checker, DERP/webhook/machine-approval APIs, Headplane integration, OIDC
+  groups, QR registration, server info, readiness endpoint, and docs.
+- Accepted upstream's newer config loader, auth-cache admission, tagged-PAK
+  re-registration, policy group pre-resolution, deleted-node behavior, and
+  migrations, then re-applied fork behavior where required.
+- Kept the deprecated `headplane` config key accepted for rollback
+  compatibility and restored the QR expiry default in `SetAuthCacheEntry`.
+- Accepted fork deletions of `docs-deploy.yml`, `version-bump.yml`, and
+  `nix/example-configuration.nix`; no feature was retired.
+
+### Validation
+
+- `go build ./cmd/headscale` — PASS.
+- Preservation audit — PASS.
+- `git -C headplane` check:fork — PASS.
+- `go test ./cmd/...` — PASS.
+- `go test ./hscontrol/... -skip '^(TestTailSQLAccess|TestAPIv2)$'` — all
+  packages PASS except the pre-existing upstream servertest timeout, which also
+  reproduces on clean `upstream/main`.
+- Focused QR, config, health/readiness, and tagged-PAK tests — PASS.
+- Environment-only limitations: `TestTailSQLAccess` fails on clean upstream;
+  `TestAPIv2` requires `tscli`/`tofu` from the Nix dev shell; the servertest
+  package times out on clean upstream in this environment.
 
 ### Pending work
 
-- Restore the intended Headplane gitlink and re-run the preservation audit.
-- Merge `upstream/main` into `dev`, resolving conflicts per
-  `docs/MERGE-PRESERVATION.md`.
-- Run build, preservation audit, and relevant tests.
 - Start and finish Git Flow release `1.1.6`, producing tag `v1.1.6`.
-- Update `CHANGELOG.md`, `docs/MERGE-PRESERVATION.md` decision log, and this
-  session record with final results.
+- Verify final `main`, `dev`, tag, and release-branch state.
 
 ---
 

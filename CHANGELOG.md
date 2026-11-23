@@ -2,6 +2,19 @@
 
 ## Next
 
+### Upstream synchronization
+
+- Synchronized `upstream/main` at `0c304b06` into `dev` and preserved all fork
+  features `FP-001`–`FP-016`. The merge commit is `9a56c617`.
+- Kept the fork module path, update checker, DERP/webhook/machine-approval APIs,
+  Headplane gitlink and schema migrations, OIDC groups, QR registration, server
+  info, readiness endpoint, and documentation.
+- Accepted upstream's newer auth-cache admission, tagged pre-auth-key
+  re-registration, config loader, policy group resolution, and deleted-node
+  behavior while re-applying the fork-specific behavior on top.
+- The deprecated `headplane` config key remains accepted for rollback
+  compatibility; Headplane owns those settings at runtime.
+
 ### Documentation
 
 - Reworked `docs/MERGE-PRESERVATION.md` into a feature-loss-proof merge

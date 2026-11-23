@@ -547,6 +547,21 @@ Append one row for every upstream merge. Never delete old rows.
 | Date | Upstream SHA | Merge commit | FP IDs reviewed | Deletions accepted | Restores | Audit | Operator |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-22 | `9ef033c7` | `3c788b7a` | `FP-001`–`FP-016` | none | none | baseline | Cline |
+| 2026-11-23 | `0c304b06` | `9a56c617` | `FP-001`–`FP-016` | `.github/workflows/docs-deploy.yml`, `.github/workflows/version-bump.yml`, `nix/example-configuration.nix` | `headplane` gitlink restored to `9b8bfc2c` | PASS | Cline |
+
+Notes for the 2026-11-23 merge:
+
+- Upstream changes accepted: config loader and generated options, auth-cache
+  admission and tagged-PAK re-registration, policy group pre-resolution,
+  deleted-node 404 behavior, new migrations, and dependency updates.
+- Upstream changes rejected to preserve fork behavior: DockerHub login in the
+  main container workflow, replacement of the Headplane gitlink, and removal of
+  the deprecated `headplane` config key.
+- Features explicitly retired: none. The three deleted files above were already
+  removed by the fork before this merge; upstream's modified versions were not
+  restored.
+- Follow-up work: environment-only test limitations remain (`TestTailSQLAccess`,
+  `TestAPIv2` missing `tscli`/`tofu`, and the upstream servertest timeout).
 
 Copy this template for the next merge:
 
