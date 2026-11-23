@@ -36,16 +36,26 @@ WORKDIR /go/src/headscale
 
 # Download dependencies first - only invalidated when go.mod/go.sum change
 COPY go.mod go.sum /go/src/headscale/
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	--mount=type=bind,source=go.mod,target=go.mod \
+	--mount=type=bind,source=go.sum,target=go.sum \
+  set -eux; \
+  go mod download
 
 # Copy source and build
 COPY . .
-RUN CGO_ENABLED=0 go build -buildmode=pie \
-  -ldflags="-s -w \
-    -X 'github.com/blackhiden/headscale/hscontrol/types.Version=${APP_VERSION}' \
-    -X 'github.com/blackhiden/headscale/hscontrol/types.Commit=${APP_COMMIT}' \
-    -X 'github.com/blackhiden/headscale/hscontrol/types.BuildDate=${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}'" \
-  -o /go/bin/headscale ./cmd/headscale
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    CGO_ENABLED=1 \
+    GOOS=linux \
+    go build -buildmode=pie \
+    -ldflags="-s -w \
+      -X 'github.com/blackhiden/headscale/hscontrol/types.Version=${APP_VERSION}' \
+      -X 'github.com/blackhiden/headscale/hscontrol/types.Commit=${APP_COMMIT}' \
+      -X 'github.com/blackhiden/headscale/hscontrol/types.BuildDate=${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}'" \
+    -o /go/bin/headscale ./cmd/headscale
 
 # Runtime stage
 FROM debian:trixie-slim
