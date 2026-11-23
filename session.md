@@ -1,5 +1,5 @@
 # Session
-## Current Task: Merge upstream/main into dev and create Git Flow release ✅ MERGE COMPLETE
+## Current Task: Merge upstream/main into dev and create Git Flow release ✅ COMPLETE
 
 **Completed:** 2026-11-23
 
@@ -41,10 +41,18 @@
   `TestAPIv2` requires `tscli`/`tofu` from the Nix dev shell; the servertest
   package times out on clean upstream in this environment.
 
-### Pending work
+### Release result
 
-- Start and finish Git Flow release `1.1.6`, producing tag `v1.1.6`.
-- Verify final `main`, `dev`, tag, and release-branch state.
+- Git Flow release branch: `release/1.1.6` (created and deleted).
+- Release tag: `v1.1.6` at `41917c4589998f38f02c7a672c3b984a0d3cc276`.
+- `main` at `41917c45` contains the release merge.
+- `dev` at `d1ba1e19` contains `upstream/main`, merge commit `9a56c617`, and
+  the release back-merge.
+- Final `go build ./cmd/headscale` — PASS.
+- No push, force-push, reset, or tag deletion was performed.
+- The `headplane` gitlink remains `9b8bfc2c…`; the checked-out submodule
+  worktree is now `f9b2a3ed…` after the release checkouts. This known
+  discrepancy was left unchanged.
 
 ---
 
