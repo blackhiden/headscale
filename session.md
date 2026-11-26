@@ -1,6 +1,53 @@
 # Session
 
-## Current Task: Merge upstream/main into dev and create Git Flow release v1.1.7
+## Current Task: Merge upstream/main (configuration overhaul) into dev ✅ COMPLETE
+
+**Completed:** 2026-11-27
+
+### Objective
+
+Finish the in-progress merge of `upstream/main` (`d9bf885c`, the configuration
+overhaul) into `dev` and resolve its remaining conflict.
+
+### Conflict resolution
+
+One conflict remained, in `docs/ref/configuration.md`:
+
+- Took upstream's new "Example configuration" section (`headscale generate
+  config`), which replaces the removed root `config-example.yaml`.
+- Dropped the fork's dead `blackhiden/headscale` `config-example.yaml` GitHub
+  links: the root file no longer exists (upstream removed it in `fe908c2d`),
+  and the version shown in the docs is now `docs/ref/config-example.yaml`,
+  generated from `hscontrol/types/config.go`.
+- Preserved the fork's "Headplane Configuration" section (`FP-006`), which is
+  still referenced by `docs/usage/authentication.md` and
+  `docs/troubleshooting.md`.
+- The first 49 lines of the resolved file are byte-identical to
+  `MERGE_HEAD:docs/ref/configuration.md`; the fork section is appended below.
+
+### Validation
+
+- `git diff --check` — PASS (no leftover conflict markers).
+- Preservation audit from `docs/MERGE-PRESERVATION.md` section 4 — PASS.
+- `go build ./cmd/headscale` — PASS.
+- `go test ./hscontrol/config -count=1` — PASS (20.5s).
+- `headscale generate config` matches `docs/ref/config-example.yaml` apart from
+  the generated header, so the mkdocs include in the page is valid.
+- `mdformat` and `prettier` are not installed in this workspace, so the exact
+  Nix formatting gate was not run locally.
+
+### Known documentation drift (not changed, out of scope)
+
+- `docs/troubleshooting.md` still says `headscale configtest`, which upstream
+  renamed to `headscale check config`.
+- `docs/ref/configuration.md` and `docs/usage/authentication.md` describe
+  setting `headplane.password` in Headscale's `config.yaml`; the strict loader
+  accepts `headplane.*` only for rollback compatibility
+  (`hscontrol/config/load.go`) and Headplane owns that setting now.
+
+---
+
+## Previous Task: Merge upstream/main into dev and create Git Flow release v1.1.7
 
 **Started:** 2026-11-23
 

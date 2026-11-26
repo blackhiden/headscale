@@ -574,6 +574,7 @@ Append one row for every upstream merge. Never delete old rows.
 | 2026-11-22 | `9ef033c7` | `3c788b7a` | `FP-001`–`FP-016` | none | none | baseline | Cline |
 | 2026-11-23 | `0c304b06` | `9a56c617` | `FP-001`–`FP-016` | `.github/workflows/docs-deploy.yml`, `.github/workflows/version-bump.yml`, `nix/example-configuration.nix` | `headplane` gitlink restored to `9b8bfc2c` | PASS | Cline |
 | 2026-11-23 | `160d8d2e` | `4992e42b` | `FP-001`–`FP-017` | none | none | PASS | Cline |
+| 2026-11-27 | `d9bf885c` | this commit | `FP-001`–`FP-017` | none | none | PASS | Cline |
 
 Notes for the 2026-11-23 `160d8d2e` merge:
 
@@ -606,6 +607,31 @@ Notes for the 2026-11-23 merge:
 - `FP-017` was added after release `v1.1.6` in commit `7aa662f2` when deployment
   configs using the legacy key locations were found to be rejected by the new
   strict config loader. No feature was retired.
+
+Notes for the 2026-11-27 `d9bf885c` merge (configuration overhaul):
+
+- Upstream changes accepted: generated configuration and reference
+  (`headscale generate config`, `docs/ref/config-example.yaml`), the strict key
+  and value validation, `headscale check config`/`check all` replacing
+  `configtest`, `file:` secrets, JSON/HuJSON configuration, the NixOS options
+  built on the generated options, and the DNS-01 challenge provider docs.
+- Upstream changes rejected to preserve fork behavior: none of substance. The
+  fork's example-configuration links to root `config-example.yaml` were dropped
+  because upstream removed that file; the fork's `Headplane Configuration`
+  section (`FP-006`) was preserved.
+- Features explicitly retired: none.
+- No `FP-*` path, symbol, or migration was deleted by this merge.
+- The `headplane` gitlink was not changed by this merge.
+- Merge commit: this commit (`Merge upstream/main into dev`, 2026-11-27). A commit
+  cannot record its own SHA; find it with `git log --merges -1`.
+- Validation: preservation audit PASS; `git diff --check` PASS;
+  `go build ./cmd/headscale` PASS; `go test ./hscontrol/config` PASS; the
+  `headscale generate config` output matches `docs/ref/config-example.yaml`
+  apart from the generated header, so the mkdocs include is valid.
+- Follow-up work: `docs/troubleshooting.md` still names the removed
+  `headscale configtest` command, and the Headplane password docs still place
+  `headplane.password` in Headscale's configuration file, where the strict
+  loader only accepts `headplane.*` for rollback compatibility (`FP-006`).
 
 Copy this template for the next merge:
 
