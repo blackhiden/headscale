@@ -24,7 +24,6 @@ import (
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/dnstype"
-	"tailscale.com/util/dnsname"
 )
 
 const (
@@ -39,10 +38,11 @@ const (
 )
 
 var (
-	errInvalidPKCEMethod         = errors.New("pkce.method must be either 'plain' or 'S256'")
-	errURLSyntax                 = errors.New("invalid URL syntax")
-	ErrNoPrefixConfigured        = errors.New("no IPv4 or IPv6 prefix configured, minimum one prefix is required")
-	ErrInvalidAllocationStrategy = errors.New("invalid prefix allocation strategy")
+	errInvalidPKCEMethod            = errors.New("pkce.method must be either 'plain' or 'S256'")
+	errURLSyntax                    = errors.New("invalid URL syntax")
+	ErrNoPrefixConfigured           = errors.New("no IPv4 or IPv6 prefix configured, minimum one prefix is required")
+	ErrInvalidAllocationStrategy    = errors.New("invalid prefix allocation strategy")
+	ErrPrefixOutsideTailscaleRanges = errors.New("prefix outside the Tailscale ranges")
 )
 
 // DefaultBaseDomain is dns.base_domain's default. `.internal` is reserved
@@ -200,7 +200,7 @@ type Config struct { //nolint:recvcheck // MarshalJSON reads a value, so a Confi
 	// Prefixes are the IP ranges node addresses are allocated from. Keep at
 	// least one of `prefixes.v4` and `prefixes.v6`. Use the Tailscale
 	// ranges, `100.64.0.0/10` and `fd7a:115c:a1e0::/48`, or ranges inside
-	// them: the client assumes them, and other ranges are unsupported.
+	// them: the client assumes them, and headscale refuses other ranges.
 	Prefixes PrefixesConfig `koanf:"prefixes"`
 
 	// Policy is where the access control policy is kept: in a file
@@ -301,9 +301,8 @@ type NoiseConfig struct {
 }
 
 // PrefixesConfig are the ranges node IPs are allocated from. At least one
-// is required. Use the Tailscale ranges (100.64.0.0/10, fd7a:115c:a1e0::/48)
-// or subsets of them: the client assumes them, and breaks in subtle ways
-// outside them.
+// is required, inside the Tailscale ranges (100.64.0.0/10,
+// fd7a:115c:a1e0::/48), which the client assumes.
 type PrefixesConfig struct {
 	// V4 is the IPv4 range, e.g. `100.64.0.0/10`. Empty gives nodes no IPv4
 	// address. Use a prefix inside `100.64.0.0/10`. A range outside it is not
@@ -419,9 +418,8 @@ type DNSChallengeConfig struct {
 	// lowercased on load, at every depth; two that differ only in case
 	// are an error. Any setting may be `file:<path>` to read it from a
 	// file; a non-string one, such as acme-dns `config`, is the JSON in it.
-	// `headscale generate config --running` and `/debug/config`
-	// show `name` and `file:` references; every other setting is
-	// `<redacted>`, as any may be a credential. See
+	// `/debug/config` shows `name` and `file:` references; every other
+	// setting is `<redacted>`, as any may be a credential. See
 	// [DNS-01 challenge provider](https://headscale.net/stable/ref/dns/#dns-01-challenge-provider)
 	// to set a provider up, acme-dns included, and to set it from
 	// environment variables.
@@ -542,9 +540,8 @@ type PostgresConfig struct {
 	User string `example:"\"headscale\"" koanf:"user"`
 
 	// Pass is the password, or `file:<path>` to read it from a file, read
-	// only when `database.type` is `postgres`. `headscale generate config
-	// --running` and `/debug/config` show a literal password as
-	// `<redacted>` and a `file:` reference as written.
+	// only when `database.type` is `postgres`. `/debug/config` shows a
+	// literal password as `<redacted>` and a `file:` reference as written.
 	Pass Secret `example:"\"file:/run/secrets/postgres_password\"" json:"-" koanf:"pass"`
 
 	// Ssl is the TLS mode: `true` keeps the driver's default `sslmode`,
@@ -735,8 +732,8 @@ type OIDCConfig struct {
 
 	// ClientSecret is the client secret from the provider, or
 	// `file:<path>` to read it from a file; required when `oidc.issuer` is
-	// set. `headscale generate config --running` and `/debug/config` show a
-	// literal secret as `<redacted>` and a `file:` reference as written.
+	// set. `/debug/config` shows a literal secret as `<redacted>` and a
+	// `file:` reference as written.
 	ClientSecret Secret `example:"\"file:/run/secrets/oidc_client_secret\"" json:"-" koanf:"client_secret"`
 
 	// Scope are the scopes requested; include `openid`.
@@ -1114,11 +1111,6 @@ func (c *Config) ServesRoute(p netip.Prefix) bool {
 		(c.Prefixes.V6 == nil || !c.Prefixes.V6.Contains(addr))
 }
 
-// outsideRange reports whether p holds addresses outside r.
-func outsideRange(p, r netip.Prefix) bool {
-	return p.Bits() < r.Bits() || !r.Contains(p.Addr())
-}
-
 // parseResolvers converts nameserver strings into DNS resolvers: an IP is a
 // plain resolver, a URL a DoH one. Anything else is skipped;
 // [DNSConfig.NameserverWarnings] lists it for config.Warnings.
@@ -1207,42 +1199,12 @@ func dnsToTailcfgDNS(dns DNSConfig) *tailcfg.DNSConfig {
 	return &cfg
 }
 
-// TailcfgDNSConfig builds the DNS config clients get from DNSConfig and the
-// IP prefixes. It is never nil.
+// TailcfgDNSConfig builds the DNS config clients get from DNSConfig. It is
+// never nil. Clients route reverse lookups for the Tailscale ranges, the only
+// ones node addresses come from, themselves (magicDNSRootDomains in
+// tailscale.com/ipn/ipnlocal), so it adds no reverse routes.
 func (c *Config) TailcfgDNSConfig() *tailcfg.DNSConfig {
-	cfg := dnsToTailcfgDNS(c.DNSConfig)
-	if !cfg.Proxied {
-		return cfg
-	}
-
-	// Clients route reverse lookups for the Tailscale ranges themselves
-	// (magicDNSRootDomains in tailscale.com/ipn/ipnlocal) and SaaS sends
-	// no reverse routes, so only a prefix outside those ranges needs them.
-	var reverse []dnsname.FQDN
-	if v4 := c.Prefixes.V4; v4 != nil && outsideRange(*v4, tsaddr.CGNATRange()) {
-		reverse = append(reverse, util.GenerateIPv4DNSRootDomain(*v4)...)
-	}
-
-	if v6 := c.Prefixes.V6; v6 != nil && outsideRange(*v6, tsaddr.TailscaleULARange()) {
-		reverse = append(reverse, util.GenerateIPv6DNSRootDomain(*v6)...)
-	}
-
-	for _, d := range reverse {
-		// Empty non-nil slice rather than nil: tailcfg.DNSConfig.Clone
-		// and dns.Config.Clone in tailscale drop map entries whose
-		// value is nil (see tailscale.com/tailcfg/tailcfg_clone.go and
-		// tailscale.com/net/dns/dns_clone.go: `if sv == nil { continue }`).
-		// Sending nil here caused the client's wgengine LinkChange:major
-		// handler to clobber /etc/resolv.conf on every tunnel-IP rebind
-		// — the handler reapplies a Clone of lastDNSConfig and the magic
-		// DNS routes vanish, taking the resolver with them for ~6 min
-		// until the next route-changing netmap. Empty slice survives
-		// Clone and carries the same "resolve locally" semantics
-		// ([tailcfg.DNSConfig.Routes] documents the empty-resolver form).
-		cfg.Routes[d.WithoutTrailingDot()] = []*dnstype.Resolver{}
-	}
-
-	return cfg
+	return dnsToTailcfgDNS(c.DNSConfig)
 }
 
 // StartDNS builds the DNS config clients get, from here on changed only by

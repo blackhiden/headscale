@@ -575,6 +575,7 @@ Append one row for every upstream merge. Never delete old rows.
 | 2026-11-23 | `0c304b06` | `9a56c617` | `FP-001`–`FP-016` | `.github/workflows/docs-deploy.yml`, `.github/workflows/version-bump.yml`, `nix/example-configuration.nix` | `headplane` gitlink restored to `9b8bfc2c` | PASS | Cline |
 | 2026-11-23 | `160d8d2e` | `4992e42b` | `FP-001`–`FP-017` | none | none | PASS | Cline |
 | 2026-11-27 | `d9bf885c` | this commit | `FP-001`–`FP-017` | none | none | PASS | Cline |
+| 2026-11-28 | `00822e63` | this commit | `FP-001`–`FP-017` | none | none | PASS | Cline |
 
 Notes for the 2026-11-23 `160d8d2e` merge:
 
@@ -632,6 +633,41 @@ Notes for the 2026-11-27 `d9bf885c` merge (configuration overhaul):
   `headscale configtest` command, and the Headplane password docs still place
   `headplane.password` in Headscale's configuration file, where the strict
   loader only accepts `headplane.*` for rollback compatibility (`FP-006`).
+
+Notes for the 2026-11-28 `00822e63` merge:
+
+- Upstream changes accepted: the changelog restyle, refused-policy
+  documentation and enforcement, `user:*@domain` refusal as a group member,
+  capability destinations written once, `via` router coverage and exit-node
+  rules, the v1 API query/body/status middleware, and the removal of
+  `headscale generate config --running`.
+- Upstream changes rejected to preserve fork behavior: none. The fork's v1 RBAC
+  (admin API key versus scope-limited OAuth token) was re-applied on top of
+  upstream's `authMiddleware`, keeping `principalAdminKey`, `principalScopesKey`,
+  `requireScope` and the `devices:core` check for machine approval (`FP-005`).
+- Features explicitly retired: none. Upstream's deletion of
+  `hscontrol/policy/v2/issue_3212_test.go` was accepted: the fork's copy only
+  carried module-path rewrites, and the captures now run in the
+  `routes_results` golden suite.
+- Conflicts resolved: `CHANGELOG.md` (upstream restyle plus the fork's
+  `Dockerfile.tailscale-HEAD` entry and fork release section),
+  `flakehashes.json` (recomputed with `go run ./cmd/vendorhash update`),
+  `gen/client/v1/client.gen.go` (regenerated with `make client`),
+  `hscontrol/api/v1/api.go` (upstream middleware plus fork RBAC), and
+  `hscontrol/state/auth_cache_test.go` (upstream registration-lock tests plus
+  the fork QR-expiry test).
+- Merge artifacts repaired: upstream module paths in six test files, unused
+  imports left by upstream removals (`generate.go`, `generate_test.go`,
+  `apiv1_policy_test.go`, `apiv2_compat_test.go`, `auth_tags_test.go`,
+  `node_health.go`), and the stale `--running` line in
+  `docs/ref/configuration.md`.
+- The `headplane` gitlink was not changed by this merge.
+- Validation: preservation audit PASS; `git diff --check` PASS;
+  `go build ./...` PASS; `go vet ./...` PASS; `go test ./hscontrol/state`,
+  `./hscontrol/config` and `./cmd/headscale/cli` PASS. `TestTailSQLAccess`
+  remains the known environment-only failure that also reproduces on clean
+  upstream.
+- Follow-up work: none for the merge itself.
 
 Copy this template for the next merge:
 

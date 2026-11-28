@@ -66,7 +66,8 @@ type ApproveMachineRequestBody struct {
 	// UserId Optional user ID to assign
 	//
 	// Example: user-1
-	UserId *string `json:"userId,omitempty"`
+	UserId               *string                `json:"userId,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // ApproveMachinesOutputBody defines model for ApproveMachinesOutputBody.
@@ -88,7 +89,8 @@ type ApproveMachinesRequestBody struct {
 	// UserId Optional user ID to assign to all nodes
 	//
 	// Example: user-1
-	UserId *string `json:"userId,omitempty"`
+	UserId               *string                `json:"userId,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // AuthApproveOutputBody defines model for AuthApproveOutputBody.
@@ -96,7 +98,8 @@ type AuthApproveOutputBody = map[string]interface{}
 
 // AuthApproveRequestBody defines model for AuthApproveRequestBody.
 type AuthApproveRequestBody struct {
-	AuthId *string `json:"authId,omitempty"`
+	AuthId               *string                `json:"authId,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // AuthRegisterOutputBody defines model for AuthRegisterOutputBody.
@@ -106,8 +109,9 @@ type AuthRegisterOutputBody struct {
 
 // AuthRegisterRequestBody defines model for AuthRegisterRequestBody.
 type AuthRegisterRequestBody struct {
-	AuthId *string `json:"authId,omitempty"`
-	User   *string `json:"user,omitempty"`
+	AuthId               *string                `json:"authId,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // AuthRejectOutputBody defines model for AuthRejectOutputBody.
@@ -115,7 +119,8 @@ type AuthRejectOutputBody = map[string]interface{}
 
 // AuthRejectRequestBody defines model for AuthRejectRequestBody.
 type AuthRejectRequestBody struct {
-	AuthId *string `json:"authId,omitempty"`
+	AuthId               *string                `json:"authId,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // BackfillNodeIPsOutputBody defines model for BackfillNodeIPsOutputBody.
@@ -130,6 +135,11 @@ type BulkApprovalResult struct {
 	Success bool    `json:"success"`
 }
 
+// CPUInfo defines model for CPUInfo.
+type CPUInfo struct {
+	Count int64 `json:"count"`
+}
+
 // CheckPolicyOutputBody defines model for CheckPolicyOutputBody.
 type CheckPolicyOutputBody = map[string]interface{}
 
@@ -140,24 +150,27 @@ type CreateApiKeyOutputBody struct {
 
 // CreateApiKeyRequestBody defines model for CreateApiKeyRequestBody.
 type CreateApiKeyRequestBody struct {
-	Expiration *time.Time `json:"expiration,omitempty"`
+	Expiration           *time.Time             `json:"expiration,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // CreatePreAuthKeyRequestBody defines model for CreatePreAuthKeyRequestBody.
 type CreatePreAuthKeyRequestBody struct {
-	AclTags    *[]string  `json:"aclTags,omitempty"`
-	Ephemeral  *bool      `json:"ephemeral,omitempty"`
-	Expiration *time.Time `json:"expiration,omitempty"`
-	Reusable   *bool      `json:"reusable,omitempty"`
-	User       *string    `json:"user,omitempty"`
+	AclTags              *[]string              `json:"aclTags,omitempty"`
+	Ephemeral            *bool                  `json:"ephemeral,omitempty"`
+	Expiration           *time.Time             `json:"expiration,omitempty"`
+	Reusable             *bool                  `json:"reusable,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // CreateUserRequestBody defines model for CreateUserRequestBody.
 type CreateUserRequestBody struct {
-	DisplayName *string `json:"displayName,omitempty"`
-	Email       *string `json:"email,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	PictureUrl  *string `json:"pictureUrl,omitempty"`
+	DisplayName          *string                `json:"displayName,omitempty"`
+	Email                *string                `json:"email,omitempty"`
+	Name                 *string                `json:"name,omitempty"`
+	PictureUrl           *string                `json:"pictureUrl,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // CreateWebhookOutputBody defines model for CreateWebhookOutputBody.
@@ -186,7 +199,8 @@ type CreateWebhookRequestBody struct {
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
 
 	// Url Destination endpoint for webhook POST requests
-	Url string `json:"url"`
+	Url                  string                 `json:"url"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // CurrentVersionResponse defines model for CurrentVersionResponse.
@@ -224,10 +238,11 @@ type DERPResponseBody struct {
 
 // DebugCreateNodeRequestBody defines model for DebugCreateNodeRequestBody.
 type DebugCreateNodeRequestBody struct {
-	Key    *string   `json:"key,omitempty"`
-	Name   *string   `json:"name,omitempty"`
-	Routes *[]string `json:"routes,omitempty"`
-	User   *string   `json:"user,omitempty"`
+	Key                  *string                `json:"key,omitempty"`
+	Name                 *string                `json:"name,omitempty"`
+	Routes               *[]string              `json:"routes,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // DeleteApiKeyOutputBody defines model for DeleteApiKeyOutputBody.
@@ -245,47 +260,10 @@ type DeleteUserOutputBody = map[string]interface{}
 // DeleteWebhookOutputBody defines model for DeleteWebhookOutputBody.
 type DeleteWebhookOutputBody = map[string]interface{}
 
-// ErrorDetail defines model for ErrorDetail.
-type ErrorDetail struct {
-	// Location Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
-	Location *string `json:"location,omitempty"`
-
-	// Message Error message text
-	Message *string `json:"message,omitempty"`
-
-	// Value The value at the given location
-	Value interface{} `json:"value,omitempty"`
-}
-
-// ErrorModel defines model for ErrorModel.
-type ErrorModel struct {
-	// Detail A human-readable explanation specific to this occurrence of the problem.
-	//
-	// Example: Property foo is required but is missing.
-	Detail *string `json:"detail,omitempty"`
-
-	// Errors Optional list of individual error details
-	Errors *[]ErrorDetail `json:"errors,omitempty"`
-
-	// Instance A URI reference that identifies the specific occurrence of the problem.
-	//
-	// Example: https://example.com/error-log/abc123
-	Instance *string `json:"instance,omitempty"`
-
-	// Status HTTP status code
-	//
-	// Example: 400
-	Status *int64 `json:"status,omitempty"`
-
-	// Title A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
-	//
-	// Example: Bad Request
-	Title *string `json:"title,omitempty"`
-
-	// Type A URI reference to human-readable documentation for the error.
-	//
-	// Example: https://example.com/errors/example
-	Type *string `json:"type,omitempty"`
+// DeploymentInfo defines model for DeploymentInfo.
+type DeploymentInfo struct {
+	DockerVersion *string `json:"dockerVersion,omitempty"`
+	Mode          string  `json:"mode"`
 }
 
 // ExpireApiKeyOutputBody defines model for ExpireApiKeyOutputBody.
@@ -293,14 +271,16 @@ type ExpireApiKeyOutputBody = map[string]interface{}
 
 // ExpireApiKeyRequestBody defines model for ExpireApiKeyRequestBody.
 type ExpireApiKeyRequestBody struct {
-	Id     *string `json:"id,omitempty"`
-	Prefix *string `json:"prefix,omitempty"`
+	Id                   *string                `json:"id,omitempty"`
+	Prefix               *string                `json:"prefix,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // ExpireNodeRequestBody defines model for ExpireNodeRequestBody.
 type ExpireNodeRequestBody struct {
-	DisableExpiry *bool      `json:"disableExpiry,omitempty"`
-	Expiry        *time.Time `json:"expiry,omitempty"`
+	DisableExpiry        *bool                  `json:"disableExpiry,omitempty"`
+	Expiry               *time.Time             `json:"expiry,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // ExpirePreAuthKeyOutputBody defines model for ExpirePreAuthKeyOutputBody.
@@ -308,12 +288,20 @@ type ExpirePreAuthKeyOutputBody = map[string]interface{}
 
 // ExpirePreAuthKeyRequestBody defines model for ExpirePreAuthKeyRequestBody.
 type ExpirePreAuthKeyRequestBody struct {
-	Id *string `json:"id,omitempty"`
+	Id                   *string                `json:"id,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // GetWebhookOutputBody defines model for GetWebhookOutputBody.
 type GetWebhookOutputBody struct {
 	Webhook Webhook `json:"webhook"`
+}
+
+// GoInfo defines model for GoInfo.
+type GoInfo struct {
+	Arch    string `json:"arch"`
+	Os      string `json:"os"`
+	Version string `json:"version"`
 }
 
 // HealthResponseBody defines model for HealthResponseBody.
@@ -344,6 +332,11 @@ type ListUsersOutputBody struct {
 // ListWebhooksOutputBody defines model for ListWebhooksOutputBody.
 type ListWebhooksOutputBody struct {
 	Webhooks []Webhook `json:"webhooks"`
+}
+
+// MemoryInfo defines model for MemoryInfo.
+type MemoryInfo struct {
+	TotalBytes int64 `json:"totalBytes"`
 }
 
 // Node defines model for Node.
@@ -392,13 +385,14 @@ type NodePreAuthKey struct {
 
 // PolicyRequestBody defines model for PolicyRequestBody.
 type PolicyRequestBody struct {
-	Policy *string `json:"policy,omitempty"`
+	Policy               *string                `json:"policy,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // PolicyResponseBody defines model for PolicyResponseBody.
 type PolicyResponseBody struct {
-	Policy    string    `json:"policy"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Policy    string     `json:"policy"`
+	UpdatedAt *time.Time `json:"updatedAt"`
 }
 
 // PreAuthKey defines model for PreAuthKey.
@@ -426,14 +420,55 @@ type RemoteVersionResponse struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// ServerInfoResponseBody defines model for ServerInfoResponseBody.
+type ServerInfoResponseBody struct {
+	Arch       string         `json:"arch"`
+	BuildTime  string         `json:"buildTime"`
+	Commit     string         `json:"commit"`
+	Cpu        CPUInfo        `json:"cpu"`
+	Deployment DeploymentInfo `json:"deployment"`
+	Go         GoInfo         `json:"go"`
+	Memory     MemoryInfo     `json:"memory"`
+	Os         string         `json:"os"`
+	PublicIp   string         `json:"publicIp"`
+	Storage    StorageInfo    `json:"storage"`
+	Tailnet    TailnetInfo    `json:"tailnet"`
+	Version    string         `json:"version"`
+}
+
 // SetApprovedRoutesRequestBody defines model for SetApprovedRoutesRequestBody.
 type SetApprovedRoutesRequestBody struct {
-	Routes *[]string `json:"routes,omitempty"`
+	Routes               *[]string              `json:"routes,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // SetTagsRequestBody defines model for SetTagsRequestBody.
 type SetTagsRequestBody struct {
-	Tags *[]string `json:"tags,omitempty"`
+	Tags                 *[]string              `json:"tags,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// Status defines model for Status.
+type Status struct {
+	// Code gRPC status code
+	Code int32 `json:"code"`
+
+	// Details Always empty; kept for the 0.29 shape.
+	Details []interface{} `json:"details"`
+	Message string        `json:"message"`
+}
+
+// StorageInfo defines model for StorageInfo.
+type StorageInfo struct {
+	TotalBytes int64 `json:"totalBytes"`
+}
+
+// TailnetInfo defines model for TailnetInfo.
+type TailnetInfo struct {
+	DerpRegions    int64  `json:"derpRegions"`
+	IpRangeV4      string `json:"ipRangeV4"`
+	IpRangeV6      string `json:"ipRangeV6"`
+	MagicDnsDomain string `json:"magicDnsDomain"`
 }
 
 // UpdateCheckResult defines model for UpdateCheckResult.
@@ -451,13 +486,14 @@ type UpdateWebhookOutputBody struct {
 
 // UpdateWebhookRequestBody defines model for UpdateWebhookRequestBody.
 type UpdateWebhookRequestBody struct {
-	Enabled        *bool              `json:"enabled,omitempty"`
-	Events         *[]string          `json:"events,omitempty"`
-	Headers        *map[string]string `json:"headers,omitempty"`
-	Name           *string            `json:"name,omitempty"`
-	Secret         *string            `json:"secret,omitempty"`
-	TimeoutSeconds *int64             `json:"timeoutSeconds,omitempty"`
-	Url            *string            `json:"url,omitempty"`
+	Enabled              *bool                  `json:"enabled,omitempty"`
+	Events               *[]string              `json:"events,omitempty"`
+	Headers              *map[string]string     `json:"headers,omitempty"`
+	Name                 *string                `json:"name,omitempty"`
+	Secret               *string                `json:"secret,omitempty"`
+	TimeoutSeconds       *int64                 `json:"timeoutSeconds,omitempty"`
+	Url                  *string                `json:"url,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // User defines model for User.
@@ -515,6 +551,14 @@ type BackfillNodeIPsParams struct {
 type RegisterNodeParams struct {
 	User *string `form:"user,omitempty" json:"user,omitempty"`
 	Key  *string `form:"key,omitempty" json:"key,omitempty"`
+}
+
+// ExpireNodeParams defines parameters for ExpireNode.
+type ExpireNodeParams struct {
+	Expiry *time.Time `form:"expiry,omitempty" json:"expiry,omitempty"`
+
+	// DisableExpiry When true, sets expiry to null (node will never expire).
+	DisableExpiry *bool `form:"disableExpiry,omitempty" json:"disableExpiry,omitempty"`
 }
 
 // DeletePreAuthKeyParams defines parameters for DeletePreAuthKey.
@@ -588,6 +632,1561 @@ type CreateWebhookJSONRequestBody = CreateWebhookRequestBody
 
 // UpdateWebhookJSONRequestBody defines body for UpdateWebhook for application/json ContentType.
 type UpdateWebhookJSONRequestBody = UpdateWebhookRequestBody
+
+// Getter for additional properties for ApproveMachineRequestBody. Returns the specified
+// element and whether it was found
+func (a ApproveMachineRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ApproveMachineRequestBody
+func (a *ApproveMachineRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ApproveMachineRequestBody to handle AdditionalProperties
+func (a *ApproveMachineRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["nodeId"]; found {
+		err = json.Unmarshal(raw, &a.NodeId)
+		if err != nil {
+			return fmt.Errorf("error reading 'nodeId': %w", err)
+		}
+		delete(object, "nodeId")
+	}
+
+	if raw, found := object["userId"]; found {
+		err = json.Unmarshal(raw, &a.UserId)
+		if err != nil {
+			return fmt.Errorf("error reading 'userId': %w", err)
+		}
+		delete(object, "userId")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ApproveMachineRequestBody to handle AdditionalProperties
+func (a ApproveMachineRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["nodeId"], err = json.Marshal(a.NodeId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'nodeId': %w", err)
+	}
+
+	if a.UserId != nil {
+		object["userId"], err = json.Marshal(a.UserId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'userId': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ApproveMachinesRequestBody. Returns the specified
+// element and whether it was found
+func (a ApproveMachinesRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ApproveMachinesRequestBody
+func (a *ApproveMachinesRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ApproveMachinesRequestBody to handle AdditionalProperties
+func (a *ApproveMachinesRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["nodeIds"]; found {
+		err = json.Unmarshal(raw, &a.NodeIds)
+		if err != nil {
+			return fmt.Errorf("error reading 'nodeIds': %w", err)
+		}
+		delete(object, "nodeIds")
+	}
+
+	if raw, found := object["userId"]; found {
+		err = json.Unmarshal(raw, &a.UserId)
+		if err != nil {
+			return fmt.Errorf("error reading 'userId': %w", err)
+		}
+		delete(object, "userId")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ApproveMachinesRequestBody to handle AdditionalProperties
+func (a ApproveMachinesRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.NodeIds != nil {
+		object["nodeIds"], err = json.Marshal(a.NodeIds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'nodeIds': %w", err)
+		}
+	}
+
+	if a.UserId != nil {
+		object["userId"], err = json.Marshal(a.UserId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'userId': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AuthApproveRequestBody. Returns the specified
+// element and whether it was found
+func (a AuthApproveRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AuthApproveRequestBody
+func (a *AuthApproveRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AuthApproveRequestBody to handle AdditionalProperties
+func (a *AuthApproveRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["authId"]; found {
+		err = json.Unmarshal(raw, &a.AuthId)
+		if err != nil {
+			return fmt.Errorf("error reading 'authId': %w", err)
+		}
+		delete(object, "authId")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AuthApproveRequestBody to handle AdditionalProperties
+func (a AuthApproveRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AuthId != nil {
+		object["authId"], err = json.Marshal(a.AuthId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'authId': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AuthRegisterRequestBody. Returns the specified
+// element and whether it was found
+func (a AuthRegisterRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AuthRegisterRequestBody
+func (a *AuthRegisterRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AuthRegisterRequestBody to handle AdditionalProperties
+func (a *AuthRegisterRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["authId"]; found {
+		err = json.Unmarshal(raw, &a.AuthId)
+		if err != nil {
+			return fmt.Errorf("error reading 'authId': %w", err)
+		}
+		delete(object, "authId")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AuthRegisterRequestBody to handle AdditionalProperties
+func (a AuthRegisterRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AuthId != nil {
+		object["authId"], err = json.Marshal(a.AuthId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'authId': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AuthRejectRequestBody. Returns the specified
+// element and whether it was found
+func (a AuthRejectRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AuthRejectRequestBody
+func (a *AuthRejectRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AuthRejectRequestBody to handle AdditionalProperties
+func (a *AuthRejectRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["authId"]; found {
+		err = json.Unmarshal(raw, &a.AuthId)
+		if err != nil {
+			return fmt.Errorf("error reading 'authId': %w", err)
+		}
+		delete(object, "authId")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AuthRejectRequestBody to handle AdditionalProperties
+func (a AuthRejectRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AuthId != nil {
+		object["authId"], err = json.Marshal(a.AuthId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'authId': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for CreateApiKeyRequestBody. Returns the specified
+// element and whether it was found
+func (a CreateApiKeyRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CreateApiKeyRequestBody
+func (a *CreateApiKeyRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CreateApiKeyRequestBody to handle AdditionalProperties
+func (a *CreateApiKeyRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["expiration"]; found {
+		err = json.Unmarshal(raw, &a.Expiration)
+		if err != nil {
+			return fmt.Errorf("error reading 'expiration': %w", err)
+		}
+		delete(object, "expiration")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CreateApiKeyRequestBody to handle AdditionalProperties
+func (a CreateApiKeyRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Expiration != nil {
+		object["expiration"], err = json.Marshal(a.Expiration)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'expiration': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for CreatePreAuthKeyRequestBody. Returns the specified
+// element and whether it was found
+func (a CreatePreAuthKeyRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CreatePreAuthKeyRequestBody
+func (a *CreatePreAuthKeyRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CreatePreAuthKeyRequestBody to handle AdditionalProperties
+func (a *CreatePreAuthKeyRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["aclTags"]; found {
+		err = json.Unmarshal(raw, &a.AclTags)
+		if err != nil {
+			return fmt.Errorf("error reading 'aclTags': %w", err)
+		}
+		delete(object, "aclTags")
+	}
+
+	if raw, found := object["ephemeral"]; found {
+		err = json.Unmarshal(raw, &a.Ephemeral)
+		if err != nil {
+			return fmt.Errorf("error reading 'ephemeral': %w", err)
+		}
+		delete(object, "ephemeral")
+	}
+
+	if raw, found := object["expiration"]; found {
+		err = json.Unmarshal(raw, &a.Expiration)
+		if err != nil {
+			return fmt.Errorf("error reading 'expiration': %w", err)
+		}
+		delete(object, "expiration")
+	}
+
+	if raw, found := object["reusable"]; found {
+		err = json.Unmarshal(raw, &a.Reusable)
+		if err != nil {
+			return fmt.Errorf("error reading 'reusable': %w", err)
+		}
+		delete(object, "reusable")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CreatePreAuthKeyRequestBody to handle AdditionalProperties
+func (a CreatePreAuthKeyRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AclTags != nil {
+		object["aclTags"], err = json.Marshal(a.AclTags)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'aclTags': %w", err)
+		}
+	}
+
+	if a.Ephemeral != nil {
+		object["ephemeral"], err = json.Marshal(a.Ephemeral)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'ephemeral': %w", err)
+		}
+	}
+
+	if a.Expiration != nil {
+		object["expiration"], err = json.Marshal(a.Expiration)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'expiration': %w", err)
+		}
+	}
+
+	if a.Reusable != nil {
+		object["reusable"], err = json.Marshal(a.Reusable)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'reusable': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for CreateUserRequestBody. Returns the specified
+// element and whether it was found
+func (a CreateUserRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CreateUserRequestBody
+func (a *CreateUserRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CreateUserRequestBody to handle AdditionalProperties
+func (a *CreateUserRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["displayName"]; found {
+		err = json.Unmarshal(raw, &a.DisplayName)
+		if err != nil {
+			return fmt.Errorf("error reading 'displayName': %w", err)
+		}
+		delete(object, "displayName")
+	}
+
+	if raw, found := object["email"]; found {
+		err = json.Unmarshal(raw, &a.Email)
+		if err != nil {
+			return fmt.Errorf("error reading 'email': %w", err)
+		}
+		delete(object, "email")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["pictureUrl"]; found {
+		err = json.Unmarshal(raw, &a.PictureUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'pictureUrl': %w", err)
+		}
+		delete(object, "pictureUrl")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CreateUserRequestBody to handle AdditionalProperties
+func (a CreateUserRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.DisplayName != nil {
+		object["displayName"], err = json.Marshal(a.DisplayName)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'displayName': %w", err)
+		}
+	}
+
+	if a.Email != nil {
+		object["email"], err = json.Marshal(a.Email)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'email': %w", err)
+		}
+	}
+
+	if a.Name != nil {
+		object["name"], err = json.Marshal(a.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'name': %w", err)
+		}
+	}
+
+	if a.PictureUrl != nil {
+		object["pictureUrl"], err = json.Marshal(a.PictureUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'pictureUrl': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for CreateWebhookRequestBody. Returns the specified
+// element and whether it was found
+func (a CreateWebhookRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CreateWebhookRequestBody
+func (a *CreateWebhookRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CreateWebhookRequestBody to handle AdditionalProperties
+func (a *CreateWebhookRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["enabled"]; found {
+		err = json.Unmarshal(raw, &a.Enabled)
+		if err != nil {
+			return fmt.Errorf("error reading 'enabled': %w", err)
+		}
+		delete(object, "enabled")
+	}
+
+	if raw, found := object["events"]; found {
+		err = json.Unmarshal(raw, &a.Events)
+		if err != nil {
+			return fmt.Errorf("error reading 'events': %w", err)
+		}
+		delete(object, "events")
+	}
+
+	if raw, found := object["headers"]; found {
+		err = json.Unmarshal(raw, &a.Headers)
+		if err != nil {
+			return fmt.Errorf("error reading 'headers': %w", err)
+		}
+		delete(object, "headers")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["secret"]; found {
+		err = json.Unmarshal(raw, &a.Secret)
+		if err != nil {
+			return fmt.Errorf("error reading 'secret': %w", err)
+		}
+		delete(object, "secret")
+	}
+
+	if raw, found := object["timeoutSeconds"]; found {
+		err = json.Unmarshal(raw, &a.TimeoutSeconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'timeoutSeconds': %w", err)
+		}
+		delete(object, "timeoutSeconds")
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CreateWebhookRequestBody to handle AdditionalProperties
+func (a CreateWebhookRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Enabled != nil {
+		object["enabled"], err = json.Marshal(a.Enabled)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'enabled': %w", err)
+		}
+	}
+
+	if a.Events != nil {
+		object["events"], err = json.Marshal(a.Events)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'events': %w", err)
+		}
+	}
+
+	if a.Headers != nil {
+		object["headers"], err = json.Marshal(a.Headers)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'headers': %w", err)
+		}
+	}
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	if a.Secret != nil {
+		object["secret"], err = json.Marshal(a.Secret)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'secret': %w", err)
+		}
+	}
+
+	if a.TimeoutSeconds != nil {
+		object["timeoutSeconds"], err = json.Marshal(a.TimeoutSeconds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'timeoutSeconds': %w", err)
+		}
+	}
+
+	object["url"], err = json.Marshal(a.Url)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'url': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for DebugCreateNodeRequestBody. Returns the specified
+// element and whether it was found
+func (a DebugCreateNodeRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for DebugCreateNodeRequestBody
+func (a *DebugCreateNodeRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for DebugCreateNodeRequestBody to handle AdditionalProperties
+func (a *DebugCreateNodeRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["key"]; found {
+		err = json.Unmarshal(raw, &a.Key)
+		if err != nil {
+			return fmt.Errorf("error reading 'key': %w", err)
+		}
+		delete(object, "key")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["routes"]; found {
+		err = json.Unmarshal(raw, &a.Routes)
+		if err != nil {
+			return fmt.Errorf("error reading 'routes': %w", err)
+		}
+		delete(object, "routes")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for DebugCreateNodeRequestBody to handle AdditionalProperties
+func (a DebugCreateNodeRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Key != nil {
+		object["key"], err = json.Marshal(a.Key)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'key': %w", err)
+		}
+	}
+
+	if a.Name != nil {
+		object["name"], err = json.Marshal(a.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'name': %w", err)
+		}
+	}
+
+	if a.Routes != nil {
+		object["routes"], err = json.Marshal(a.Routes)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'routes': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ExpireApiKeyRequestBody. Returns the specified
+// element and whether it was found
+func (a ExpireApiKeyRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ExpireApiKeyRequestBody
+func (a *ExpireApiKeyRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ExpireApiKeyRequestBody to handle AdditionalProperties
+func (a *ExpireApiKeyRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["prefix"]; found {
+		err = json.Unmarshal(raw, &a.Prefix)
+		if err != nil {
+			return fmt.Errorf("error reading 'prefix': %w", err)
+		}
+		delete(object, "prefix")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ExpireApiKeyRequestBody to handle AdditionalProperties
+func (a ExpireApiKeyRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Id != nil {
+		object["id"], err = json.Marshal(a.Id)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'id': %w", err)
+		}
+	}
+
+	if a.Prefix != nil {
+		object["prefix"], err = json.Marshal(a.Prefix)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'prefix': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ExpireNodeRequestBody. Returns the specified
+// element and whether it was found
+func (a ExpireNodeRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ExpireNodeRequestBody
+func (a *ExpireNodeRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ExpireNodeRequestBody to handle AdditionalProperties
+func (a *ExpireNodeRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["disableExpiry"]; found {
+		err = json.Unmarshal(raw, &a.DisableExpiry)
+		if err != nil {
+			return fmt.Errorf("error reading 'disableExpiry': %w", err)
+		}
+		delete(object, "disableExpiry")
+	}
+
+	if raw, found := object["expiry"]; found {
+		err = json.Unmarshal(raw, &a.Expiry)
+		if err != nil {
+			return fmt.Errorf("error reading 'expiry': %w", err)
+		}
+		delete(object, "expiry")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ExpireNodeRequestBody to handle AdditionalProperties
+func (a ExpireNodeRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.DisableExpiry != nil {
+		object["disableExpiry"], err = json.Marshal(a.DisableExpiry)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'disableExpiry': %w", err)
+		}
+	}
+
+	if a.Expiry != nil {
+		object["expiry"], err = json.Marshal(a.Expiry)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'expiry': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ExpirePreAuthKeyRequestBody. Returns the specified
+// element and whether it was found
+func (a ExpirePreAuthKeyRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ExpirePreAuthKeyRequestBody
+func (a *ExpirePreAuthKeyRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ExpirePreAuthKeyRequestBody to handle AdditionalProperties
+func (a *ExpirePreAuthKeyRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ExpirePreAuthKeyRequestBody to handle AdditionalProperties
+func (a ExpirePreAuthKeyRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Id != nil {
+		object["id"], err = json.Marshal(a.Id)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'id': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PolicyRequestBody. Returns the specified
+// element and whether it was found
+func (a PolicyRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PolicyRequestBody
+func (a *PolicyRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PolicyRequestBody to handle AdditionalProperties
+func (a *PolicyRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["policy"]; found {
+		err = json.Unmarshal(raw, &a.Policy)
+		if err != nil {
+			return fmt.Errorf("error reading 'policy': %w", err)
+		}
+		delete(object, "policy")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PolicyRequestBody to handle AdditionalProperties
+func (a PolicyRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Policy != nil {
+		object["policy"], err = json.Marshal(a.Policy)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'policy': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for SetApprovedRoutesRequestBody. Returns the specified
+// element and whether it was found
+func (a SetApprovedRoutesRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for SetApprovedRoutesRequestBody
+func (a *SetApprovedRoutesRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for SetApprovedRoutesRequestBody to handle AdditionalProperties
+func (a *SetApprovedRoutesRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["routes"]; found {
+		err = json.Unmarshal(raw, &a.Routes)
+		if err != nil {
+			return fmt.Errorf("error reading 'routes': %w", err)
+		}
+		delete(object, "routes")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for SetApprovedRoutesRequestBody to handle AdditionalProperties
+func (a SetApprovedRoutesRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Routes != nil {
+		object["routes"], err = json.Marshal(a.Routes)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'routes': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for SetTagsRequestBody. Returns the specified
+// element and whether it was found
+func (a SetTagsRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for SetTagsRequestBody
+func (a *SetTagsRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for SetTagsRequestBody to handle AdditionalProperties
+func (a *SetTagsRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["tags"]; found {
+		err = json.Unmarshal(raw, &a.Tags)
+		if err != nil {
+			return fmt.Errorf("error reading 'tags': %w", err)
+		}
+		delete(object, "tags")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for SetTagsRequestBody to handle AdditionalProperties
+func (a SetTagsRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Tags != nil {
+		object["tags"], err = json.Marshal(a.Tags)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tags': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for UpdateWebhookRequestBody. Returns the specified
+// element and whether it was found
+func (a UpdateWebhookRequestBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for UpdateWebhookRequestBody
+func (a *UpdateWebhookRequestBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for UpdateWebhookRequestBody to handle AdditionalProperties
+func (a *UpdateWebhookRequestBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["enabled"]; found {
+		err = json.Unmarshal(raw, &a.Enabled)
+		if err != nil {
+			return fmt.Errorf("error reading 'enabled': %w", err)
+		}
+		delete(object, "enabled")
+	}
+
+	if raw, found := object["events"]; found {
+		err = json.Unmarshal(raw, &a.Events)
+		if err != nil {
+			return fmt.Errorf("error reading 'events': %w", err)
+		}
+		delete(object, "events")
+	}
+
+	if raw, found := object["headers"]; found {
+		err = json.Unmarshal(raw, &a.Headers)
+		if err != nil {
+			return fmt.Errorf("error reading 'headers': %w", err)
+		}
+		delete(object, "headers")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["secret"]; found {
+		err = json.Unmarshal(raw, &a.Secret)
+		if err != nil {
+			return fmt.Errorf("error reading 'secret': %w", err)
+		}
+		delete(object, "secret")
+	}
+
+	if raw, found := object["timeoutSeconds"]; found {
+		err = json.Unmarshal(raw, &a.TimeoutSeconds)
+		if err != nil {
+			return fmt.Errorf("error reading 'timeoutSeconds': %w", err)
+		}
+		delete(object, "timeoutSeconds")
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for UpdateWebhookRequestBody to handle AdditionalProperties
+func (a UpdateWebhookRequestBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Enabled != nil {
+		object["enabled"], err = json.Marshal(a.Enabled)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'enabled': %w", err)
+		}
+	}
+
+	if a.Events != nil {
+		object["events"], err = json.Marshal(a.Events)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'events': %w", err)
+		}
+	}
+
+	if a.Headers != nil {
+		object["headers"], err = json.Marshal(a.Headers)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'headers': %w", err)
+		}
+	}
+
+	if a.Name != nil {
+		object["name"], err = json.Marshal(a.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'name': %w", err)
+		}
+	}
+
+	if a.Secret != nil {
+		object["secret"], err = json.Marshal(a.Secret)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'secret': %w", err)
+		}
+	}
+
+	if a.TimeoutSeconds != nil {
+		object["timeoutSeconds"], err = json.Marshal(a.TimeoutSeconds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'timeoutSeconds': %w", err)
+		}
+	}
+
+	if a.Url != nil {
+		object["url"], err = json.Marshal(a.Url)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'url': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -866,14 +2465,14 @@ type ClientInterface interface {
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-	ExpireNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExpireNodeWithBody(ctx context.Context, nodeId string, params *ExpireNodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExpireNode Expire node
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-	ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ExpireNode(ctx context.Context, nodeId string, params *ExpireNodeParams, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RenameNode Rename node
 	//
@@ -968,6 +2567,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetServerInfo Get server technical info
+	//
+	// Returns non-sensitive technical information about the Headscale server.
+	//
+	// Corresponds with GET /api/v1/server-info (the `GetServerInfo` operationId).
+	GetServerInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCheck Check for updates
 	//
@@ -1546,8 +3152,8 @@ func (c *Client) SetApprovedRoutes(ctx context.Context, nodeId string, body SetA
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-func (c *Client) ExpireNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExpireNodeRequestWithBody(c.Server, nodeId, contentType, body)
+func (c *Client) ExpireNodeWithBody(ctx context.Context, nodeId string, params *ExpireNodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExpireNodeRequestWithBody(c.Server, nodeId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1563,8 +3169,8 @@ func (c *Client) ExpireNodeWithBody(ctx context.Context, nodeId string, contentT
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-func (c *Client) ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExpireNodeRequest(c.Server, nodeId, body)
+func (c *Client) ExpireNode(ctx context.Context, nodeId string, params *ExpireNodeParams, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExpireNodeRequest(c.Server, nodeId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1799,6 +3405,23 @@ func (c *Client) ExpirePreAuthKeyWithBody(ctx context.Context, contentType strin
 // Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 func (c *Client) ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExpirePreAuthKeyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetServerInfo Get server technical info
+//
+// Returns non-sensitive technical information about the Headscale server.
+//
+// Corresponds with GET /api/v1/server-info (the `GetServerInfo` operationId).
+func (c *Client) GetServerInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServerInfoRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2845,18 +4468,18 @@ func NewSetApprovedRoutesRequestWithBody(server string, nodeId string, contentTy
 }
 
 // NewExpireNodeRequest calls the generic ExpireNode builder with application/json body
-func NewExpireNodeRequest(server string, nodeId string, body ExpireNodeJSONRequestBody) (*http.Request, error) {
+func NewExpireNodeRequest(server string, nodeId string, params *ExpireNodeParams, body ExpireNodeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewExpireNodeRequestWithBody(server, nodeId, "application/json", bodyReader)
+	return NewExpireNodeRequestWithBody(server, nodeId, params, "application/json", bodyReader)
 }
 
 // NewExpireNodeRequestWithBody constructs an http.Request for the ExpireNode method, with any body, and a specified content type
-func NewExpireNodeRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+func NewExpireNodeRequestWithBody(server string, nodeId string, params *ExpireNodeParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2879,6 +4502,45 @@ func NewExpireNodeRequestWithBody(server string, nodeId string, contentType stri
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Expiry != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "expiry", *params.Expiry, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.DisableExpiry != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "disableExpiry", *params.DisableExpiry, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
@@ -3243,6 +4905,33 @@ func NewExpirePreAuthKeyRequestWithBody(server string, contentType string, body 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetServerInfoRequest constructs an http.Request for the GetServerInfo method
+func NewGetServerInfoRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/server-info")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -3943,14 +5632,14 @@ type ClientWithResponsesInterface interface {
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-	ExpireNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error)
+	ExpireNodeWithBodyWithResponse(ctx context.Context, nodeId string, params *ExpireNodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error)
 
 	// ExpireNodeWithResponse Expire node
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-	ExpireNodeWithResponse(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error)
+	ExpireNodeWithResponse(ctx context.Context, nodeId string, params *ExpireNodeParams, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error)
 
 	// RenameNodeWithResponse Rename node
 	//
@@ -4053,6 +5742,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKeyWithResponse(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpirePreAuthKeyResponse, error)
+
+	// GetServerInfoWithResponse Get server technical info
+	//
+	// Returns non-sensitive technical information about the Headscale server.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/server-info (the `GetServerInfo` operationId).
+	GetServerInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetServerInfoResponse, error)
 
 	// UpdateCheckWithResponse Check for updates
 	//
@@ -4167,8 +5865,8 @@ type ListApiKeysResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ListApiKeysOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4176,9 +5874,9 @@ func (r ListApiKeysResponse) GetJSON200() *ListApiKeysOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListApiKeysResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListApiKeysResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4215,8 +5913,8 @@ type CreateApiKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CreateApiKeyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4224,9 +5922,9 @@ func (r CreateApiKeyResponse) GetJSON200() *CreateApiKeyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateApiKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateApiKeyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4263,8 +5961,8 @@ type ExpireApiKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ExpireApiKeyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4272,9 +5970,9 @@ func (r ExpireApiKeyResponse) GetJSON200() *ExpireApiKeyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ExpireApiKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ExpireApiKeyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4311,8 +6009,8 @@ type DeleteApiKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DeleteApiKeyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4320,9 +6018,9 @@ func (r DeleteApiKeyResponse) GetJSON200() *DeleteApiKeyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteApiKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteApiKeyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4359,8 +6057,8 @@ type AuthApproveResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *AuthApproveOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4368,9 +6066,9 @@ func (r AuthApproveResponse) GetJSON200() *AuthApproveOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r AuthApproveResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r AuthApproveResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4407,8 +6105,8 @@ type AuthRegisterResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *AuthRegisterOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4416,9 +6114,9 @@ func (r AuthRegisterResponse) GetJSON200() *AuthRegisterOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r AuthRegisterResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r AuthRegisterResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4455,8 +6153,8 @@ type AuthRejectResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *AuthRejectOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4464,9 +6162,9 @@ func (r AuthRejectResponse) GetJSON200() *AuthRejectOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r AuthRejectResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r AuthRejectResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4501,13 +6199,13 @@ func (r AuthRejectResponse) ContentType() string {
 type GetConfigResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetConfigResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetConfigResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4544,8 +6242,8 @@ type DebugCreateNodeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4553,9 +6251,9 @@ func (r DebugCreateNodeResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DebugCreateNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DebugCreateNodeResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4592,8 +6290,8 @@ type GetDerpResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DERPResponseBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4601,9 +6299,9 @@ func (r GetDerpResponse) GetJSON200() *DERPResponseBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetDerpResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetDerpResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4640,8 +6338,8 @@ type HealthResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *HealthResponseBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4649,9 +6347,9 @@ func (r HealthResponse) GetJSON200() *HealthResponseBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r HealthResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r HealthResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4688,8 +6386,8 @@ type ApproveMachinesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ApproveMachinesOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4697,9 +6395,9 @@ func (r ApproveMachinesResponse) GetJSON200() *ApproveMachinesOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ApproveMachinesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ApproveMachinesResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4736,8 +6434,8 @@ type ApproveMachineResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ApproveMachineOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4745,9 +6443,9 @@ func (r ApproveMachineResponse) GetJSON200() *ApproveMachineOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ApproveMachineResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ApproveMachineResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4784,8 +6482,8 @@ type ListNodesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ListNodesOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4793,9 +6491,9 @@ func (r ListNodesResponse) GetJSON200() *ListNodesOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListNodesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListNodesResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4832,8 +6530,8 @@ type BackfillNodeIPsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *BackfillNodeIPsOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4841,9 +6539,9 @@ func (r BackfillNodeIPsResponse) GetJSON200() *BackfillNodeIPsOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r BackfillNodeIPsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r BackfillNodeIPsResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4880,8 +6578,8 @@ type RegisterNodeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4889,9 +6587,9 @@ func (r RegisterNodeResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r RegisterNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r RegisterNodeResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4928,8 +6626,8 @@ type DeleteNodeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DeleteNodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4937,9 +6635,9 @@ func (r DeleteNodeResponse) GetJSON200() *DeleteNodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteNodeResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -4976,8 +6674,8 @@ type GetNodeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -4985,9 +6683,9 @@ func (r GetNodeResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetNodeResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5024,8 +6722,8 @@ type SetApprovedRoutesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5033,9 +6731,9 @@ func (r SetApprovedRoutesResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetApprovedRoutesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetApprovedRoutesResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5072,8 +6770,8 @@ type ExpireNodeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5081,9 +6779,9 @@ func (r ExpireNodeResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ExpireNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ExpireNodeResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5120,8 +6818,8 @@ type RenameNodeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5129,9 +6827,9 @@ func (r RenameNodeResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r RenameNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r RenameNodeResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5168,8 +6866,8 @@ type SetTagsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *NodeOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5177,9 +6875,9 @@ func (r SetTagsResponse) GetJSON200() *NodeOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetTagsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetTagsResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5216,8 +6914,8 @@ type GetPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PolicyResponseBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5225,9 +6923,9 @@ func (r GetPolicyResponse) GetJSON200() *PolicyResponseBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetPolicyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetPolicyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5264,8 +6962,8 @@ type SetPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PolicyResponseBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5273,9 +6971,9 @@ func (r SetPolicyResponse) GetJSON200() *PolicyResponseBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetPolicyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetPolicyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5312,8 +7010,8 @@ type CheckPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CheckPolicyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5321,9 +7019,9 @@ func (r CheckPolicyResponse) GetJSON200() *CheckPolicyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CheckPolicyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CheckPolicyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5360,8 +7058,8 @@ type DeletePreAuthKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DeletePreAuthKeyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5369,9 +7067,9 @@ func (r DeletePreAuthKeyResponse) GetJSON200() *DeletePreAuthKeyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeletePreAuthKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeletePreAuthKeyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5408,8 +7106,8 @@ type ListPreAuthKeysResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ListPreAuthKeysOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5417,9 +7115,9 @@ func (r ListPreAuthKeysResponse) GetJSON200() *ListPreAuthKeysOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListPreAuthKeysResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListPreAuthKeysResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5456,8 +7154,8 @@ type CreatePreAuthKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PreAuthKeyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5465,9 +7163,9 @@ func (r CreatePreAuthKeyResponse) GetJSON200() *PreAuthKeyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreatePreAuthKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreatePreAuthKeyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5504,8 +7202,8 @@ type ExpirePreAuthKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ExpirePreAuthKeyOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5513,9 +7211,9 @@ func (r ExpirePreAuthKeyResponse) GetJSON200() *ExpirePreAuthKeyOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ExpirePreAuthKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ExpirePreAuthKeyResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5547,13 +7245,61 @@ func (r ExpirePreAuthKeyResponse) ContentType() string {
 	return ""
 }
 
+type GetServerInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ServerInfoResponseBody
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetServerInfoResponse) GetJSON200() *ServerInfoResponseBody {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetServerInfoResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetServerInfoResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServerInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServerInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetServerInfoResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type UpdateCheckResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *UpdateCheckResult
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5561,9 +7307,9 @@ func (r UpdateCheckResponse) GetJSON200() *UpdateCheckResult {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r UpdateCheckResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UpdateCheckResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5600,8 +7346,8 @@ type ListUsersResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ListUsersOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5609,9 +7355,9 @@ func (r ListUsersResponse) GetJSON200() *ListUsersOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListUsersResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListUsersResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5648,8 +7394,10 @@ type CreateUserResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *UserOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Status
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5657,9 +7405,14 @@ func (r CreateUserResponse) GetJSON200() *UserOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateUserResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r CreateUserResponse) GetJSON409() *Status {
+	return r.JSON409
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateUserResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5696,8 +7449,8 @@ type DeleteUserResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DeleteUserOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5705,9 +7458,9 @@ func (r DeleteUserResponse) GetJSON200() *DeleteUserOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteUserResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteUserResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5744,8 +7497,10 @@ type RenameUserResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *UserOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Status
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5753,9 +7508,14 @@ func (r RenameUserResponse) GetJSON200() *UserOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r RenameUserResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r RenameUserResponse) GetJSON409() *Status {
+	return r.JSON409
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r RenameUserResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5792,8 +7552,8 @@ type ListWebhooksResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ListWebhooksOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5801,9 +7561,9 @@ func (r ListWebhooksResponse) GetJSON200() *ListWebhooksOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListWebhooksResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListWebhooksResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5840,8 +7600,8 @@ type CreateWebhookResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CreateWebhookOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5849,9 +7609,9 @@ func (r CreateWebhookResponse) GetJSON200() *CreateWebhookOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateWebhookResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5888,8 +7648,8 @@ type DeleteWebhookResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DeleteWebhookOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5897,9 +7657,9 @@ func (r DeleteWebhookResponse) GetJSON200() *DeleteWebhookOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteWebhookResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5936,8 +7696,8 @@ type GetWebhookResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *GetWebhookOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5945,9 +7705,9 @@ func (r GetWebhookResponse) GetJSON200() *GetWebhookOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetWebhookResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -5984,8 +7744,8 @@ type UpdateWebhookResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *UpdateWebhookOutputBody
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *ErrorModel
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Status
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -5993,9 +7753,9 @@ func (r UpdateWebhookResponse) GetJSON200() *UpdateWebhookOutputBody {
 	return r.JSON200
 }
 
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r UpdateWebhookResponse) GetApplicationproblemJSONDefault() *ErrorModel {
-	return r.ApplicationproblemJSONDefault
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UpdateWebhookResponse) GetJSONDefault() *Status {
+	return r.JSONDefault
 }
 
 // GetBody returns the raw response body bytes
@@ -6418,8 +8178,8 @@ func (c *ClientWithResponses) SetApprovedRoutesWithResponse(ctx context.Context,
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-func (c *ClientWithResponses) ExpireNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error) {
-	rsp, err := c.ExpireNodeWithBody(ctx, nodeId, contentType, body, reqEditors...)
+func (c *ClientWithResponses) ExpireNodeWithBodyWithResponse(ctx context.Context, nodeId string, params *ExpireNodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error) {
+	rsp, err := c.ExpireNodeWithBody(ctx, nodeId, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -6431,8 +8191,8 @@ func (c *ClientWithResponses) ExpireNodeWithBodyWithResponse(ctx context.Context
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
-func (c *ClientWithResponses) ExpireNodeWithResponse(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error) {
-	rsp, err := c.ExpireNode(ctx, nodeId, body, reqEditors...)
+func (c *ClientWithResponses) ExpireNodeWithResponse(ctx context.Context, nodeId string, params *ExpireNodeParams, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error) {
+	rsp, err := c.ExpireNode(ctx, nodeId, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -6623,6 +8383,21 @@ func (c *ClientWithResponses) ExpirePreAuthKeyWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseExpirePreAuthKeyResponse(rsp)
+}
+
+// GetServerInfoWithResponse Get server technical info
+//
+// Returns non-sensitive technical information about the Headscale server.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/server-info (the `GetServerInfo` operationId).
+func (c *ClientWithResponses) GetServerInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetServerInfoResponse, error) {
+	rsp, err := c.GetServerInfo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServerInfoResponse(rsp)
 }
 
 // UpdateCheckWithResponse Check for updates
@@ -6832,11 +8607,11 @@ func ParseListApiKeysResponse(rsp *http.Response) (*ListApiKeysResponse, error) 
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -6865,11 +8640,11 @@ func ParseCreateApiKeyResponse(rsp *http.Response) (*CreateApiKeyResponse, error
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -6898,11 +8673,11 @@ func ParseExpireApiKeyResponse(rsp *http.Response) (*ExpireApiKeyResponse, error
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -6931,11 +8706,11 @@ func ParseDeleteApiKeyResponse(rsp *http.Response) (*DeleteApiKeyResponse, error
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -6964,11 +8739,11 @@ func ParseAuthApproveResponse(rsp *http.Response) (*AuthApproveResponse, error) 
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -6997,11 +8772,11 @@ func ParseAuthRegisterResponse(rsp *http.Response) (*AuthRegisterResponse, error
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7030,11 +8805,11 @@ func ParseAuthRejectResponse(rsp *http.Response) (*AuthRejectResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7056,11 +8831,11 @@ func ParseGetConfigResponse(rsp *http.Response) (*GetConfigResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7089,11 +8864,11 @@ func ParseDebugCreateNodeResponse(rsp *http.Response) (*DebugCreateNodeResponse,
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7122,11 +8897,11 @@ func ParseGetDerpResponse(rsp *http.Response) (*GetDerpResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7155,11 +8930,11 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7188,11 +8963,11 @@ func ParseApproveMachinesResponse(rsp *http.Response) (*ApproveMachinesResponse,
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7221,11 +8996,11 @@ func ParseApproveMachineResponse(rsp *http.Response) (*ApproveMachineResponse, e
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7254,11 +9029,11 @@ func ParseListNodesResponse(rsp *http.Response) (*ListNodesResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7287,11 +9062,11 @@ func ParseBackfillNodeIPsResponse(rsp *http.Response) (*BackfillNodeIPsResponse,
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7320,11 +9095,11 @@ func ParseRegisterNodeResponse(rsp *http.Response) (*RegisterNodeResponse, error
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7353,11 +9128,11 @@ func ParseDeleteNodeResponse(rsp *http.Response) (*DeleteNodeResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7386,11 +9161,11 @@ func ParseGetNodeResponse(rsp *http.Response) (*GetNodeResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7419,11 +9194,11 @@ func ParseSetApprovedRoutesResponse(rsp *http.Response) (*SetApprovedRoutesRespo
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7452,11 +9227,11 @@ func ParseExpireNodeResponse(rsp *http.Response) (*ExpireNodeResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7485,11 +9260,11 @@ func ParseRenameNodeResponse(rsp *http.Response) (*RenameNodeResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7518,11 +9293,11 @@ func ParseSetTagsResponse(rsp *http.Response) (*SetTagsResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7551,11 +9326,11 @@ func ParseGetPolicyResponse(rsp *http.Response) (*GetPolicyResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7584,11 +9359,11 @@ func ParseSetPolicyResponse(rsp *http.Response) (*SetPolicyResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7617,11 +9392,11 @@ func ParseCheckPolicyResponse(rsp *http.Response) (*CheckPolicyResponse, error) 
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7650,11 +9425,11 @@ func ParseDeletePreAuthKeyResponse(rsp *http.Response) (*DeletePreAuthKeyRespons
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7683,11 +9458,11 @@ func ParseListPreAuthKeysResponse(rsp *http.Response) (*ListPreAuthKeysResponse,
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7716,11 +9491,11 @@ func ParseCreatePreAuthKeyResponse(rsp *http.Response) (*CreatePreAuthKeyRespons
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7749,11 +9524,44 @@ func ParseExpirePreAuthKeyResponse(rsp *http.Response) (*ExpirePreAuthKeyRespons
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServerInfoResponse parses an HTTP response from a GetServerInfoWithResponse call
+func ParseGetServerInfoResponse(rsp *http.Response) (*GetServerInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServerInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ServerInfoResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Status
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
 
 	}
 
@@ -7782,11 +9590,11 @@ func ParseUpdateCheckResponse(rsp *http.Response) (*UpdateCheckResponse, error) 
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7815,11 +9623,11 @@ func ParseListUsersResponse(rsp *http.Response) (*ListUsersResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7847,12 +9655,19 @@ func ParseCreateUserResponse(rsp *http.Response) (*CreateUserResponse, error) {
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Status
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
 
 	}
 
@@ -7881,11 +9696,11 @@ func ParseDeleteUserResponse(rsp *http.Response) (*DeleteUserResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7913,12 +9728,19 @@ func ParseRenameUserResponse(rsp *http.Response) (*RenameUserResponse, error) {
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Status
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
 
 	}
 
@@ -7947,11 +9769,11 @@ func ParseListWebhooksResponse(rsp *http.Response) (*ListWebhooksResponse, error
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -7980,11 +9802,11 @@ func ParseCreateWebhookResponse(rsp *http.Response) (*CreateWebhookResponse, err
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -8013,11 +9835,11 @@ func ParseDeleteWebhookResponse(rsp *http.Response) (*DeleteWebhookResponse, err
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -8046,11 +9868,11 @@ func ParseGetWebhookResponse(rsp *http.Response) (*GetWebhookResponse, error) {
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 
@@ -8079,11 +9901,11 @@ func ParseUpdateWebhookResponse(rsp *http.Response) (*UpdateWebhookResponse, err
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest ErrorModel
+		var dest Status
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSONDefault = &dest
+		response.JSONDefault = &dest
 
 	}
 

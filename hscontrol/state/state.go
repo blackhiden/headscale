@@ -42,6 +42,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
+	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 	"tailscale.com/types/views"
@@ -87,6 +88,17 @@ var ErrNodeNotInNodeStore = errors.New("node no longer exists in NodeStore")
 // ErrNodeNameNotUnique is returned when a node name is not unique, wrapped
 // as `name "X" is already taken`.
 var ErrNodeNameNotUnique = errors.New("already taken")
+
+// ErrNodeAddressShared refuses a database where two nodes hold one address.
+var ErrNodeAddressShared = errors.New("nodes share a tailnet address")
+
+// ErrNodeAddressMissing refuses a database with a node that has neither an
+// IPv4 nor an IPv6 address.
+var ErrNodeAddressMissing = errors.New("node has no tailnet address")
+
+// ErrNodeAddressOutside refuses a database with a node address outside the
+// Tailscale ranges.
+var ErrNodeAddressOutside = errors.New("node address is outside the Tailscale ranges")
 
 // nodeUpdateColumns lists all Node columns that should be written
 // during a struct-based GORM Updates() call.  Listing them explicitly
@@ -235,9 +247,12 @@ type State struct {
 	// policies land in the database in the order they are installed.
 	policyMu sync.Mutex
 
-	// authCache holds pending Web, OIDC and SSH authentication requests.
-	// Admission preserves unexpired entries at capacity. Expiry resolves the
-	// verdict with ErrRegistrationExpired so waiting goroutines wake.
+	// authCache holds Web, OIDC and SSH authentication requests. A decided
+	// request stays until it expires or a new request needs its slot, so a
+	// follow-up that comes late still reads its verdict. Admission preserves
+	// pending entries at capacity.
+	// Expiry resolves the verdict with ErrRegistrationExpired so waiting
+	// goroutines wake.
 	authCache               *expirable.LRU[types.AuthID, *types.AuthRequest]
 	authCacheMu             sync.Mutex
 	authCacheMaxEntries     int
@@ -344,6 +359,51 @@ func (s *State) lockRegistration(machineKey key.MachinePublic) func() {
 	}
 }
 
+// checkNodeAddresses refuses address states the allocator never produces.
+// Policy, routes and SSH find a node by its address, so a shared address
+// serves one node's grants to the other, and a node without one cannot be
+// served. The policy's * covers only the Tailscale ranges, so an address
+// outside them would be read one way as a source and another as a
+// destination.
+func checkNodeAddresses(nodes types.Nodes) error {
+	var errs []error
+
+	holder := make(map[netip.Addr]*types.Node, 2*len(nodes))
+
+	for _, node := range nodes {
+		ips := node.IPs()
+		if len(ips) == 0 {
+			errs = append(errs, fmt.Errorf(
+				"%w: node %d %q; set its ipv4 or ipv6 column in the nodes table to an unused address from the configured prefixes",
+				ErrNodeAddressMissing, node.ID, node.Hostname))
+		}
+
+		var outside []string
+
+		for _, ip := range ips {
+			if other, ok := holder[ip]; ok {
+				errs = append(errs, fmt.Errorf(
+					"%w: %s is held by node %d %q and node %d %q; give one of them an unused address from the configured prefixes in the nodes table",
+					ErrNodeAddressShared, ip, other.ID, other.Hostname, node.ID, node.Hostname))
+			} else {
+				holder[ip] = node
+			}
+
+			if !tsaddr.IsTailscaleIP(ip) {
+				outside = append(outside, ip.String())
+			}
+		}
+
+		if len(outside) > 0 {
+			errs = append(errs, fmt.Errorf(
+				"%w: node %d %q holds %s; give it addresses from the configured prefixes, inside 100.64.0.0/10 (less 100.115.92.0/23) and fd7a:115c:a1e0::/48, in the nodes table",
+				ErrNodeAddressOutside, node.ID, node.Hostname, strings.Join(outside, ", ")))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
 // NewState creates and initializes a new [State] instance, setting up the database,
 // IP allocator, DERP map, policy manager, and loading existing users and nodes.
 func NewState(cfg *types.Config) (*State, error) {
@@ -415,6 +475,11 @@ func NewState(cfg *types.Config) (*State, error) {
 			log.Warn().Uint64(zf.NodeID, node.ID.Uint64()).Err(err).Msg("discarding stored Hostinfo until the node reports again")
 			node.Hostinfo = nil
 		}
+	}
+
+	err = checkNodeAddresses(nodes)
+	if err != nil {
+		return nil, fmt.Errorf("checking node addresses: %w", err)
 	}
 
 	users, err := db.ListUsers(nil)
@@ -1356,7 +1421,7 @@ func (s *State) updateNodeExpiry(
 	nodeID types.NodeID,
 	update func(*types.Node) bool,
 ) (types.NodeView, change.Change, error) {
-	var onlineChanged, expired, refused bool
+	var onlineChanged, expired, refused, expiryChanged bool
 
 	genBefore := s.polMan.NodesGeneration()
 
@@ -1366,12 +1431,19 @@ func (s *State) updateNodeExpiry(
 	// change will remain, and the change describing it is returned with the error.
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		wasOnline := node.Online()
+		wasExpiry, _ := node.View().KeyExpiry()
 
 		if !update(node) {
 			refused = true
 
 			return
 		}
+
+		// Peers see only the expiry in force, as TailNode sends it: none and
+		// a zero time are the same to them, and a time kept while key
+		// expiry is off, or a switch write that changes nothing, is not news.
+		nowExpiry, _ := node.View().KeyExpiry()
+		expiryChanged = !wasExpiry.Equal(nowExpiry)
 		// Control stays connected in NeedsLogin so an expiry extension can
 		// recover the client, but an expired key is not online.
 		node.IsOnline = new(node.ShouldBeOnline())
@@ -1421,7 +1493,11 @@ func (s *State) updateNodeExpiry(
 
 	// Resolve expiry and online status together from the current snapshot
 	// when the mapper sends the change, including after a rapid restoration.
-	c = c.Merge(change.NodeAdded(n.ID())).Merge(recompute)
+	if expiryChanged || onlineChanged {
+		c = c.Merge(change.NodeAdded(n.ID()))
+	}
+
+	c = c.Merge(recompute)
 
 	return n, c, nil
 }
@@ -2018,7 +2094,7 @@ func (s *State) RoutesForPeer(
 ) []netip.Prefix {
 	viaResult := s.polMan.ViaRoutesForPeer(viewer, peer)
 	globalPrimaries := s.nodeStore.PrimaryRoutesForNode(peer.ID())
-	exitRoutes := peer.ExitRoutes()
+	exitRoutes := peer.OfferedExitRoutes()
 
 	var reduced []netip.Prefix
 
@@ -2334,6 +2410,14 @@ func (s *State) UpdatePolicyManagerNodesForTest() error {
 	return err
 }
 
+// SkipAddressForTest takes the next node address out of the pool, so a test
+// can register its next node at an address of its choosing.
+func (s *State) SkipAddressForTest() error {
+	_, _, err := s.ipAlloc.Next()
+
+	return err
+}
+
 // CreateRegisteredNodeForTest creates a test node with allocated IPs. This is a convenience wrapper around the database layer.
 func (s *State) CreateRegisteredNodeForTest(user *types.User, hostname ...string) *types.Node {
 	return s.db.CreateRegisteredNodeForTest(user, hostname...)
@@ -2459,8 +2543,20 @@ func (s *State) DeleteExpiredAccessTokens(cutoff time.Time) (int64, error) {
 	return s.db.DeleteExpiredAccessTokens(cutoff)
 }
 
-// GetAuthCacheEntry retrieves a pending auth request from the cache.
+// GetAuthCacheEntry retrieves an auth request still waiting for its verdict,
+// so a decided login or SSH check is never decided again.
 func (s *State) GetAuthCacheEntry(id types.AuthID) (*types.AuthRequest, bool) {
+	rn, ok := s.GetAuthCacheEntryForFollowup(id)
+	if !ok || rn.IsFinished() {
+		return nil, false
+	}
+
+	return rn, true
+}
+
+// GetAuthCacheEntryForFollowup retrieves an auth request whether or not it
+// has been decided, for the follow-up that waits for its verdict.
+func (s *State) GetAuthCacheEntryForFollowup(id types.AuthID) (*types.AuthRequest, bool) {
 	// Preserve insertion order so admission can reclaim expired entries from
 	// the oldest end without scanning every pending authentication.
 	return s.authCache.Peek(id)
@@ -2510,7 +2606,7 @@ func (s *State) SetAuthCacheEntry(id types.AuthID, entry *types.AuthRequest) err
 		s.authCache.Remove(oldest)
 	}
 
-	if s.authCacheFullFor(entry) {
+	if s.authCacheFullFor(entry) && !s.reclaimFinishedFor(entry) {
 		return ErrAuthCacheFull
 	}
 
@@ -2534,9 +2630,37 @@ func (s *State) authCacheFullFor(entry *types.AuthRequest) bool {
 		s.authCache.Len() >= s.authCacheMaxEntries+authCacheSSHReserve
 }
 
-// DeleteAuthCacheEntry releases a consumed authentication transaction.
-func (s *State) DeleteAuthCacheEntry(id types.AuthID) {
-	s.authCache.Remove(id)
+// reclaimFinishedFor removes decided requests, oldest first, until entry fits.
+// A decided request only waits for a late follow-up, which must not cost a new
+// login its admission. Called with authCacheMu held.
+func (s *State) reclaimFinishedFor(entry *types.AuthRequest) bool {
+	for _, id := range s.authCache.Keys() {
+		if rn, ok := s.authCache.Peek(id); ok && rn.IsFinished() {
+			s.authCache.Remove(id)
+
+			if !s.authCacheFullFor(entry) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// releaseAuth returns a login whose approval failed to pending. An expiry
+// dropped while the approval held it is delivered now.
+func (s *State) releaseAuth(id types.AuthID, rn *types.AuthRequest) {
+	rn.Release()
+
+	if _, ok := s.authCache.Peek(id); !ok {
+		rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
+	}
+}
+
+// DeleteAuthCacheEntry releases a consumed authentication transaction and
+// reports whether this call removed it.
+func (s *State) DeleteAuthCacheEntry(id types.AuthID) bool {
+	return s.authCache.Remove(id)
 }
 
 // DeleteAuthCacheEntryForTest drops a pending auth request from the cache,
@@ -3093,7 +3217,7 @@ func (s *State) processReauthTags(
 				Bool(zf.WasAuthKeyTagged, wasAuthKeyTagged).
 				Msg("Reauth: removing all tags, returning node ownership to user")
 
-			node.Tags = []string{}
+			node.Tags = nil
 			node.UserID = &user.ID
 			node.User = user
 
@@ -3189,11 +3313,20 @@ func (s *State) HandleNodeFromAuthPath(
 	// Read before any NodeStore write below; see updatePolicyManagerNodes.
 	genBefore := s.polMan.NodesGeneration()
 
-	// Get the registration entry from cache
+	// Claimed, the login is this approval's to decide: another approval is
+	// refused, and expiry no longer decides it.
 	regEntry, ok := s.GetAuthCacheEntry(authID)
-	if !ok {
+	if !ok || !regEntry.Claim() {
 		return types.NodeView{}, s.policyChangeSince(genBefore), hsdb.ErrNodeNotFoundRegistrationCache
 	}
+
+	delivered := false
+
+	defer func() {
+		if !delivered {
+			s.releaseAuth(authID, regEntry)
+		}
+	}()
 
 	// Get the user
 	user, err := s.db.GetUserByID(userID)
@@ -3309,11 +3442,11 @@ func (s *State) HandleNodeFromAuthPath(
 		}
 	}
 
-	// Signal to waiting clients
-	regEntry.FinishAuth(types.AuthVerdict{Node: finalNode})
+	// The entry stays cached so a follow-up that looks it up after this
+	// still reads the verdict.
+	regEntry.Deliver(types.AuthVerdict{Node: finalNode})
 
-	// Remove from registration cache
-	s.authCache.Remove(authID)
+	delivered = true
 
 	// Update policy managers
 	usersChange, err := s.updatePolicyManagerUsers()
@@ -3586,6 +3719,13 @@ func (s *State) HandleNodeFromPreAuthKey(
 		reauth, err = pakReregister(existingNodeSameUser, pak, regReq.NodeKey, time.Now())
 	} else {
 		err = pak.Validate()
+	}
+
+	// As on Tailscale SaaS, a key is refused once one of its tags leaves the
+	// policy; it stays valid, and the nodes that hold the tag keep it. A
+	// wake-up does not use the key.
+	if tag, undefined := s.polMan.UndefinedTag(pak.Tags); err == nil && reauth && undefined {
+		err = types.PAKError("key tagged with non-existent tag: " + tag)
 	}
 
 	// A wake-up writes no tags, so the tags it asks for are not refused.
@@ -3881,6 +4021,7 @@ func (s *State) reregisterNodeWithPAK(
 		// Read before the switch below can hide it.
 		wasExpired := node.IsExpiredAt(now)
 		becameTagged := retag && !node.IsTagged()
+		claimedWithoutExpiry := false
 
 		if retag {
 			node.Tags = tags
@@ -3890,12 +4031,13 @@ func (s *State) reregisterNodeWithPAK(
 			// A user key that speaks for a tagged node, with a new node key,
 			// takes it back as that user's device, as on Tailscale SaaS. A
 			// relogin under the same node key keeps it tagged. As at a login
-			// that untags it, the claimed device is not ephemeral.
+			// that untags it, the claimed device is not ephemeral. Its key
+			// expiry stays as it was, off for a tagged node (tag-claim).
 			node.Tags = nil
 			node.UserID = &pak.User.ID
 			node.User = pak.User
 			node.Ephemeral = false
-			node.KeyExpiryDisabled = false
+			claimedWithoutExpiry = prior.KeyExpiryDisabled
 		}
 
 		// A login that tags the node, or with a tagged key, turns key expiry
@@ -3919,6 +4061,11 @@ func (s *State) reregisterNodeWithPAK(
 		// clear the expiry so the database holds NULL instead of
 		// a pointer to zero time.
 		switch {
+		case claimedWithoutExpiry:
+			// Tailscale leaves a device taken back with key expiry off no
+			// expiry time (tag-claim). A tagged node that stays tagged keeps
+			// a stored time, which an admin may have set.
+			node.Expiry = nil
 		case node.IsTagged() && !becameTagged && !wasExpired:
 			// A tagged node keeps its expiry: a future administrative one has
 			// not taken effect. A valid key renews a past one below.
@@ -4626,10 +4773,11 @@ func isUsefulEndpointType(t tailcfg.EndpointType) bool {
 // buildMapRequestChangeResponse picks the narrowest broadcast for a processed
 // MapRequest delta. Policy and route changes are handled by the caller.
 //
-// Two wire constraints shape the order: tailcfg.PeerChange.DERPRegion == 0
-// means "unchanged", so clearing DERP cannot ride a patch and needs a whole
-// peer; and a key patch already carries endpoints, key expiry, and DERP, so a
-// key change subsumes an endpoint or DERP patch in the same request.
+// Two wire constraints shape the order: a [tailcfg.PeerChange] omits a zero
+// DERPRegion or DiscoKey, which then reads as "unchanged", so clearing either
+// cannot ride a patch and needs a whole peer; and a key patch already carries
+// endpoints, key expiry, and DERP, so a key change subsumes an endpoint or
+// DERP patch in the same request.
 // The delta decides which fields to send; their values come from the fresh
 // node because concurrent requests may have superseded the captured values.
 func buildMapRequestChangeResponse(
@@ -4659,6 +4807,10 @@ func buildMapRequestChangeResponse(
 	}
 
 	if delta.discoKeyChanged {
+		if node.DiscoKey().IsZero() {
+			return change.NodeAdded(id)
+		}
+
 		c := change.NodeKeyRotated(node)
 		if delta.derpChanged {
 			c.PeerPatches[0].DERPRegion = currentDERP

@@ -260,6 +260,16 @@ func (ns Nodes) ViewSlice() views.Slice[NodeView] {
 	return views.SliceOf(vs)
 }
 
+// RenameNodeCommand and ExpireNodeCommand are the CLI commands the server
+// names to fix a node; the CLI's tests check that they parse.
+func RenameNodeCommand(id NodeID) string {
+	return fmt.Sprintf("headscale nodes rename --identifier %d <name>", id)
+}
+
+func ExpireNodeCommand(id NodeID) string {
+	return fmt.Sprintf("headscale nodes expire --identifier %d", id)
+}
+
 // IsExpired returns whether the node registration has expired.
 func (node *Node) IsExpired() bool {
 	return node.IsExpiredAt(time.Now())
@@ -381,6 +391,18 @@ func (node *Node) Prefixes() []netip.Prefix {
 // rules reach the internet.
 func (node *Node) ExitRoutes() []netip.Prefix {
 	return node.approvedRoutes(true)
+}
+
+// OfferedExitRoutes returns the exit routes peers are given: both or none.
+// Tailscale offers a node approved for one address family as an exit node to
+// no one, though it still serves the rules its route covers.
+func (node *Node) OfferedExitRoutes() []netip.Prefix {
+	routes := node.ExitRoutes()
+	if len(routes) != len(tsaddr.ExitRoutes()) {
+		return nil
+	}
+
+	return routes
 }
 
 // IsExitNode reports whether the node has any approved exit routes.
@@ -516,6 +538,7 @@ func (node *Node) CanAccessRoutes(
 
 	ips := node.IPs()
 	subnetRoutes := node.SubnetRoutes()
+	isExit := node.IsExitNode()
 	sides := make([]struct{ isSrc, isDst bool }, len(matchers))
 
 	for i, m := range matchers {
@@ -528,9 +551,11 @@ func (node *Node) CanAccessRoutes(
 
 		// Reverse: traffic from the route's subnet is destined for
 		// this node's subnets; the router needs the route for return
-		// traffic.
+		// traffic. An exit node serves a rule's internet destinations,
+		// so it is on that side too, as [Node.CanAccess] has it.
 		sides[i].isDst = m.DestsContainsIP(ips...) ||
-			m.DestsOverlapsPrefixes(subnetRoutes...)
+			m.DestsOverlapsPrefixes(subnetRoutes...) ||
+			(isExit && m.DestsIsTheInternet())
 	}
 
 	var result []netip.Prefix
@@ -1209,6 +1234,14 @@ func (nv NodeView) ExitRoutes() []netip.Prefix {
 	}
 
 	return nv.ж.ExitRoutes()
+}
+
+func (nv NodeView) OfferedExitRoutes() []netip.Prefix {
+	if !nv.Valid() {
+		return nil
+	}
+
+	return nv.ж.OfferedExitRoutes()
 }
 
 func (nv NodeView) IsExitNode() bool {

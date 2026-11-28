@@ -2872,6 +2872,308 @@ func TestBuildPeerMap_AutogroupInternetMakesExitNodeVisible(t *testing.T) {
 		"alice.CanAccess(exit) should be true via DestsIsTheInternet()+IsExitNode() (#3212)")
 }
 
+// peerSpec is one node of a hand-built tailnet: owned by users[user]
+// unless tagged, approved for and announcing routes.
+type peerSpec struct {
+	name   string
+	user   int
+	tags   []string
+	routes []string
+}
+
+// listedPeers builds specs in order, the i-th on 100.64.0.i+1 and
+// fd7a:115c:a1e0::i+1, and returns each node's peers under policy, by name.
+func listedPeers(t *testing.T, policy string, specs ...peerSpec) (*PolicyManager, types.Nodes, map[string][]string) {
+	t.Helper()
+
+	users := types.Users{{ID: 1, Name: "odin"}, {ID: 2, Name: "thor"}, {ID: 3, Name: "freya"}}
+	nodes := make(types.Nodes, 0, len(specs))
+
+	for i, s := range specs {
+		n := node(s.name, fmt.Sprintf("100.64.0.%d", i+1), fmt.Sprintf("fd7a:115c:a1e0::%x", i+1), users[s.user])
+		n.ID = types.NodeID(i + 1) //nolint:gosec // a handful of nodes
+
+		if len(s.tags) > 0 {
+			n.Tags, n.User, n.UserID = s.tags, nil, nil
+		}
+
+		routes := make([]netip.Prefix, 0, len(s.routes))
+		for _, r := range s.routes {
+			routes = append(routes, mp(r))
+		}
+
+		n.Hostinfo = &tailcfg.Hostinfo{RoutableIPs: routes}
+		n.ApprovedRoutes = routes
+		nodes = append(nodes, n)
+	}
+
+	pm, err := NewPolicyManager([]byte(policy), users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	byID := map[types.NodeID]string{}
+	for _, n := range nodes {
+		byID[n.ID] = n.Hostname
+	}
+
+	got := map[string][]string{}
+
+	for id, peers := range pm.BuildPeerMap(nodes.ViewSlice()) {
+		for _, p := range peers {
+			got[byID[id]] = append(got[byID[id]], byID[p])
+		}
+
+		slices.Sort(got[byID[id]])
+	}
+
+	return pm, nodes, got
+}
+
+const peerTagOwners = `"tagOwners": {"tag:exit": ["odin@"], "tag:other": ["odin@"], "tag:server": ["odin@"], "tag:router": ["odin@"]}`
+
+// TestLoneExitListedUnderViaOnly holds where a node approved for one exit
+// route alone is listed one way: on the destinations of a via grant whose
+// sources the route covers, as captured (grant-via-internet-one-family-exit,
+// -bare, -untagged), and nowhere else. A rule without via does not list it.
+func TestLoneExitListedUnderViaOnly(t *testing.T) {
+	t.Parallel()
+
+	v4, v6, both := []string{"0.0.0.0/0"}, []string{"::/0"}, []string{"0.0.0.0/0", "::/0"}
+
+	for _, c := range []struct {
+		name   string
+		policy string
+		specs  []peerSpec
+		want   map[string][]string
+	}{
+		{
+			name: "via grant to the internet",
+			policy: `{` + peerTagOwners + `, "grants": [
+				{"src": ["odin@"], "dst": ["autogroup:internet"], "ip": ["*"], "via": ["tag:exit"]}]}`,
+			specs: []peerSpec{
+				{name: "bulb"},
+				{name: "ex", tags: []string{"tag:exit"}, routes: both},
+				{name: "exv4", tags: []string{"tag:exit"}, routes: v4},
+				{name: "exo", tags: []string{"tag:other"}, routes: v4},
+				{name: "beed", tags: []string{"tag:server"}},
+			},
+			want: map[string][]string{"bulb": {"ex", "exv4"}, "ex": {"bulb", "exo", "exv4"}, "exv4": {"bulb", "exo"}},
+		},
+		{
+			name:   "acl to a tag",
+			policy: `{` + peerTagOwners + `, "acls": [{"action": "accept", "src": ["odin@"], "dst": ["tag:server:22"]}]}`,
+			specs: []peerSpec{
+				{name: "bulb"},
+				{name: "beed", tags: []string{"tag:server"}},
+				{name: "exv4", tags: []string{"tag:exit"}, routes: v4},
+				{name: "ivy", user: 1},
+			},
+			want: map[string][]string{"bulb": {"beed"}, "beed": {"bulb"}},
+		},
+		{
+			name:   "acl to a tag, ipv6 exit route",
+			policy: `{` + peerTagOwners + `, "acls": [{"action": "accept", "src": ["odin@"], "dst": ["tag:server:22"]}]}`,
+			specs: []peerSpec{
+				{name: "bulb"},
+				{name: "beed", tags: []string{"tag:server"}},
+				{name: "exv6", tags: []string{"tag:exit"}, routes: v6},
+				{name: "ivy", user: 1},
+			},
+			want: map[string][]string{"bulb": {"beed"}, "beed": {"bulb"}},
+		},
+		{
+			name:   "autogroup:self",
+			policy: `{` + peerTagOwners + `, "acls": [{"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]}]}`,
+			specs: []peerSpec{
+				{name: "bulb"},
+				{name: "bulb2"},
+				{name: "ivy", user: 1},
+				{name: "exv4", tags: []string{"tag:exit"}, routes: v4},
+			},
+			want: map[string][]string{"bulb": {"bulb2"}, "bulb2": {"bulb"}},
+		},
+		{
+			name: "autogroup:self, a user's own exit node",
+			policy: `{` + peerTagOwners + `, "acls": [
+				{"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]},
+				{"action": "accept", "src": ["thor@"], "dst": ["tag:server:22"]}]}`,
+			specs: []peerSpec{
+				{name: "bulb"},
+				{name: "ivy", user: 1},
+				{name: "oexit", routes: v4},
+				{name: "beed", tags: []string{"tag:server"}},
+			},
+			want: map[string][]string{"bulb": {"oexit"}, "oexit": {"bulb"}, "ivy": {"beed"}, "beed": {"ivy"}},
+		},
+		{
+			name: "app grant",
+			policy: `{` + peerTagOwners + `, "grants": [
+				{"src": ["odin@"], "dst": ["tag:server"], "app": {"example.com/cap/x": [{}]}}]}`,
+			specs: []peerSpec{
+				{name: "bulb"},
+				{name: "beed", tags: []string{"tag:server"}},
+				{name: "exv4", tags: []string{"tag:exit"}, routes: v4},
+			},
+			want: map[string][]string{"bulb": {"beed"}, "beed": {"bulb"}},
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, _, got := listedPeers(t, c.policy, c.specs...)
+			require.Equal(t, c.want, got)
+		})
+	}
+}
+
+// TestViaRouterOfOtherFamilyUnlinked holds that a via router serves a via
+// grant to a public prefix only through a route of the prefix's family: an
+// exit node of the other family carrying the via tag gets no rule and is
+// linked with nobody. The routers that serve the grant still list it, one
+// way, when its lone exit route covers a source.
+func TestViaRouterOfOtherFamilyUnlinked(t *testing.T) {
+	t.Parallel()
+
+	specs := []peerSpec{
+		{name: "bulb"},
+		{name: "ex", tags: []string{"tag:exit"}, routes: []string{"0.0.0.0/0", "::/0"}},
+		{name: "exv4", tags: []string{"tag:exit"}, routes: []string{"0.0.0.0/0"}},
+		{name: "exv6", tags: []string{"tag:exit"}, routes: []string{"::/0"}},
+	}
+
+	for _, c := range []struct {
+		dst, other string
+		want       map[string][]string
+	}{
+		{
+			dst: "8.8.8.0/24", other: "exv6",
+			want: map[string][]string{"bulb": {"ex", "exv4"}, "ex": {"bulb", "exv4", "exv6"}, "exv4": {"bulb", "exv6"}},
+		},
+		{
+			dst: "2001:4860::/32", other: "exv4",
+			want: map[string][]string{"bulb": {"ex", "exv6"}, "ex": {"bulb", "exv4", "exv6"}, "exv6": {"bulb", "exv4"}},
+		},
+	} {
+		t.Run(c.dst, func(t *testing.T) {
+			t.Parallel()
+
+			pm, nodes, got := listedPeers(t, `{`+peerTagOwners+`, "grants": [
+				{"src": ["odin@"], "dst": ["`+c.dst+`"], "ip": ["*"], "via": ["tag:exit"]}]}`, specs...)
+			require.Equal(t, c.want, got)
+
+			other := nodes[slices.IndexFunc(nodes, func(n *types.Node) bool { return n.Hostname == c.other })]
+			rules, err := pm.FilterForNode(other.View())
+			require.NoError(t, err)
+			require.Empty(t, rules, "the router of the other family gets no rule")
+		})
+	}
+}
+
+// TestSelfSiblingsListCoveredDevices holds the one-way listing a router
+// over another user's device brings under autogroup:self: the other devices
+// of the router's user list the covered device (acl-self-routed-by-other-user,
+// -by-third-user, -wide-route), and no device of that user the route does not
+// cover.
+func TestSelfSiblingsListCoveredDevices(t *testing.T) {
+	t.Parallel()
+
+	self := `{` + peerTagOwners + `, "acls": [{"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]}]}`
+
+	for _, c := range []struct {
+		name  string
+		specs []peerSpec
+		want  map[string][]string
+	}{
+		{
+			name: "one covered device",
+			specs: []peerSpec{
+				{name: "bulb1"},
+				{name: "bulb2"},
+				{name: "krouter", user: 1, routes: []string{"100.64.0.1/32"}},
+				{name: "ivy", user: 1},
+				{name: "ven", user: 2},
+			},
+			want: map[string][]string{
+				"bulb1": {"bulb2", "krouter"}, "bulb2": {"bulb1", "krouter"},
+				"krouter": {"bulb1", "bulb2", "ivy"}, "ivy": {"bulb1", "krouter"},
+			},
+		},
+		{
+			name: "a route over two users' devices",
+			specs: []peerSpec{
+				{name: "bulb1"},
+				{name: "bulb2"},
+				{name: "ven", user: 2},
+				{name: "krouter", user: 1, routes: []string{"100.64.0.0/30"}},
+				{name: "bulb3"},
+				{name: "ivy", user: 1},
+			},
+			want: map[string][]string{
+				"bulb1": {"bulb2", "bulb3", "krouter"}, "bulb2": {"bulb1", "bulb3", "krouter"}, "bulb3": {"bulb1", "bulb2", "krouter"},
+				"ven": {"krouter"}, "krouter": {"bulb1", "bulb2", "bulb3", "ivy", "ven"}, "ivy": {"bulb1", "bulb2", "krouter", "ven"},
+			},
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, _, got := listedPeers(t, self, c.specs...)
+			require.Equal(t, c.want, got)
+		})
+	}
+}
+
+// TestRouterSelfRulesCostFollowsCover holds a router's autogroup:self
+// rules to what its routes cover: with a route over no device, computing its
+// filter costs the same in a tailnet ten times the size.
+func TestRouterSelfRulesCostFollowsCover(t *testing.T) {
+	const self = `{"acls": [{"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]}]}`
+
+	allocs := map[int]float64{}
+
+	for _, n := range []int{100, 1000} {
+		users, nodes := benchNodes(n)
+
+		router := node("lan-router", "100.127.0.1", "fd7a:115c:a1e0::ff:1", users[1])
+		router.ID = types.NodeID(n + 1) //nolint:gosec // small
+		lan := []netip.Prefix{mp("10.250.0.0/24")}
+		router.Hostinfo = &tailcfg.Hostinfo{RoutableIPs: lan}
+		router.ApprovedRoutes = lan
+		nodes = append(nodes, router)
+
+		pm, err := NewPolicyManager([]byte(self), users, nodes.ViewSlice())
+		require.NoError(t, err)
+
+		rv := router.View()
+		rules, err := pm.FilterForNode(rv)
+		require.NoError(t, err)
+		require.NotEmpty(t, rules)
+
+		allocs[n] = testing.AllocsPerRun(20, func() {
+			pm.filterRulesMap.Clear()
+			_, _ = pm.FilterForNode(rv)
+		})
+	}
+
+	t.Logf("allocations of a router's filter: %v", allocs)
+	assert.LessOrEqual(t, allocs[1000], allocs[100]+2, "a router's self rules cost the tailnet's size")
+}
+
+// TestCapabilityNamedTwiceOnce holds that an app grant writes a destination
+// the document repeats once (grant-app-destination-repeated), and each
+// destination it names apart its own, though two name the same nodes.
+func TestCapabilityNamedTwiceOnce(t *testing.T) {
+	t.Parallel()
+
+	pm, nodes, _ := listedPeers(t, `{"groups": {"group:o": ["odin@"]}, "grants": [
+		{"src": ["thor@"], "dst": ["odin@", "group:o", "odin@"], "app": {"example.com/cap/x": [{"v": 1}]}}]}`,
+		peerSpec{name: "bulb"}, peerSpec{name: "ivy", user: 1})
+
+	rules, err := pm.FilterForNode(nodes[0].View())
+	require.NoError(t, err)
+	require.Len(t, rules, 1)
+	require.Len(t, rules[0].CapGrant, 2, "odin@ once, group:o once")
+}
+
 // Reproduction for #3160: ambiguous user@ used to silently drop rules.
 func TestNewPolicyManager_DuplicateUsername(t *testing.T) {
 	users := types.Users{
@@ -3917,12 +4219,12 @@ func TestSetNodesRetriesAfterFailedRecompile(t *testing.T) {
 	require.Equal(t, gen+1, pm.NodesGeneration())
 }
 
-// TestSetNodesCachedResultsMatchFresh drives random node writes through
+// TestRapidSetNodesCachedResultsMatchFresh drives random node writes through
 // one PolicyManager, reading every node between writes so its caches
 // fill, and checks each read against a PolicyManager built fresh from the
 // same nodes. A cache entry that a write should have dropped shows up as
 // a difference.
-func TestSetNodesCachedResultsMatchFresh(t *testing.T) {
+func TestRapidSetNodesCachedResultsMatchFresh(t *testing.T) {
 	users := types.Users{{ID: 1, Name: "u1"}, {ID: 2, Name: "u2"}, {ID: 3, Name: "u3"}}
 
 	policies := []struct {
@@ -4943,4 +5245,24 @@ func TestAmbiguousUserKeepsOtherGroupMembers(t *testing.T) {
 
 	_, err = pm.SetPolicy(pol)
 	require.ErrorIs(t, err, ErrMultipleUsersFound)
+}
+
+// TestUndefinedTag holds a server with no policy to the tagged keys it has
+// always taken.
+func TestUndefinedTag(t *testing.T) {
+	none, err := NewPolicyManager(nil, nil, types.Nodes{}.ViewSlice())
+	require.NoError(t, err)
+
+	_, undefined := none.UndefinedTag([]string{"tag:any"})
+	require.False(t, undefined, "no policy defines no tag and refuses none")
+
+	pm, err := NewPolicyManager([]byte(`{"tagOwners": {"tag:kept": []}}`), nil, types.Nodes{}.ViewSlice())
+	require.NoError(t, err)
+
+	_, undefined = pm.UndefinedTag([]string{"tag:kept"})
+	require.False(t, undefined)
+
+	tag, undefined := pm.UndefinedTag([]string{"tag:kept", "tag:gone"})
+	require.True(t, undefined)
+	require.Equal(t, "tag:gone", tag)
 }

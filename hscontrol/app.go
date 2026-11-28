@@ -320,10 +320,13 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 	lastExpiryCheck := time.Unix(0, 0)
 
+	var refreshes sync.WaitGroup
+	defer refreshes.Wait()
+
 	if h.cfg.DERP.AutoUpdate && h.cfg.DERP.UpdateFrequency != 0 {
 		// A refresh retries for minutes when a source is unreachable; the
 		// tasks below must not wait for it.
-		go h.refreshDERPMap(ctx)
+		refreshes.Go(func() { h.refreshDERPMap(ctx) })
 	}
 
 	var extraRecordsUpdate <-chan []tailcfg.DNSRecord
@@ -445,16 +448,22 @@ func (h *Headscale) refreshDERPMap(ctx context.Context) {
 		case <-ticker.C:
 		}
 
+		// select picks either when both are ready; Serve waits for this
+		// goroutine, so a cancelled refresh must not start another fetch.
+		if ctx.Err() != nil {
+			return
+		}
+
 		log.Info().Msg("fetching DERPMap updates")
 
-		derpMap, err := backoff.Retry(ctx, func() (*tailcfg.DERPMap, error) { //nolint:contextcheck
-			derpMap, err := derp.GetDERPMap(h.cfg.DERP, h.cfg.DERPShuffleSeed())
+		derpMap, err := backoff.Retry(ctx, func() (*tailcfg.DERPMap, error) {
+			derpMap, err := derp.GetDERPMap(ctx, h.cfg.DERP, h.cfg.DERPShuffleSeed())
 			if err != nil {
 				return nil, err
 			}
 
 			if h.cfg.DERP.Server.Enabled && h.cfg.DERP.Server.AutomaticallyAddEmbeddedDerpRegion {
-				region, err := h.DERPServer.GenerateRegion()
+				region, err := h.DERPServer.GenerateRegion() //nolint:contextcheck // only a debug DNS lookup uses a context
 				if err != nil {
 					return nil, fmt.Errorf("generating embedded DERP region: %w", err)
 				}
@@ -634,6 +643,15 @@ func (h *Headscale) Serve(ctx context.Context) error {
 	h.mapBatcher.Start()
 	defer h.mapBatcher.Close()
 
+	// The scheduled tasks log, feed the batcher and touch the state: they end
+	// before the batcher closes and before Serve returns, on every path.
+	var tasks sync.WaitGroup
+
+	defer func() {
+		cancel()
+		tasks.Wait()
+	}()
+
 	if h.cfg.DERP.Server.Enabled {
 		// When embedded DERP is enabled we always need a STUN server
 		if h.cfg.DERP.Server.STUNAddr == "" {
@@ -650,7 +668,7 @@ func (h *Headscale) Serve(ctx context.Context) error {
 
 	// Start on the sources that loaded; only a map with no region at all,
 	// after the embedded region and the policy's derpMap, is fatal.
-	derpMap, derpErr := derp.GetDERPMap(h.cfg.DERP, h.cfg.DERPShuffleSeed()) //nolint:contextcheck // startup fetch, bounded by its HTTP client
+	derpMap, derpErr := derp.GetDERPMap(ctx, h.cfg.DERP, h.cfg.DERPShuffleSeed())
 	if derpErr != nil {
 		log.Warn().Err(derpErr).Msg("skipping DERP map sources that failed to load")
 	}
@@ -689,7 +707,11 @@ func (h *Headscale) Serve(ctx context.Context) error {
 
 		h.cfg.SetExtraRecords(h.extraRecordMan.Records())
 
-		go h.extraRecordMan.Run() //nolint:contextcheck // stopped by Close
+		// Deferred before Close, so it waits for Run to see Close.
+		var watcher sync.WaitGroup
+		defer watcher.Wait()
+
+		watcher.Go(h.extraRecordMan.Run) //nolint:contextcheck // stopped by Close
 		defer h.extraRecordMan.Close()
 	}
 
@@ -698,7 +720,7 @@ func (h *Headscale) Serve(ctx context.Context) error {
 
 	// Start all scheduled tasks, e.g. expiring nodes, derp updates and
 	// records updates
-	go h.scheduledTasks(ctx)
+	tasks.Go(func() { h.scheduledTasks(ctx) })
 
 	//
 	//
@@ -975,6 +997,11 @@ func (h *Headscale) Serve(ctx context.Context) error {
 					Msg("shutting down gracefully")
 
 				h.ephemeralGC.Close()
+
+				// Before the shutdown clock starts: the servers' grace period
+				// is theirs alone.
+				info("waiting for scheduled tasks")
+				tasks.Wait()
 
 				// Gracefully shut down servers
 				shutdownCtx, cancel := context.WithTimeout(

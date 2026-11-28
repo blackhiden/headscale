@@ -37,8 +37,6 @@ Use `--no-docs` to print a dense configuration file without the comments/documen
 
 Use `--minimal` to print the most essential configuration options.
 
-Use `--running` to print the current running configuration of the live Headscale server, with secrets redacted.
-
 [Configuration options](configuration-options.md) describes every key, with examples for the configuration file, the
 environment and NixOS.
 

@@ -307,6 +307,12 @@ func TestReloginOfExpiredNodeClearsPeerExpiry(t *testing.T) {
 		}
 	}, 5*time.Second, 10*time.Millisecond, "observer must see the node expired")
 
+	// The client regenerates its key only once it has seen its own expiry;
+	// before that it re-registers the old key, which the auth key renews.
+	client.WaitForCondition(t, "own key expired", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid() && nm.SelfKeyExpiry().Before(time.Now()) && !nm.SelfKeyExpiry().IsZero()
+	})
+
 	// The server answers the expired key with NodeKeyExpired, so the client
 	// generates a new key, the way tailscaled re-authenticates.
 	client.Reconnect(t)
@@ -698,6 +704,56 @@ func TestReloginWithoutExpiryClearsPeerExpiry(t *testing.T) {
 			assert.True(c, p.KeyExpiry().IsZero(), "observer holds %v", p.KeyExpiry())
 		}
 	}, 10*time.Second, 50*time.Millisecond, "observer drops the expiry")
+}
+
+// TestClearedDiscoKeyReachesPeers has a node report no disco key while a peer
+// holds its old one: the peer must drop it, as a fresh session holds none. The
+// node's own client is gone first, or it would report its key again.
+func TestClearedDiscoKeyReachesPeers(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "disco")
+	quiet := servertest.NewClient(t, srv, "quiet", servertest.WithUser(user))
+	viewer := servertest.NewClient(t, srv, "viewer", servertest.WithUser(user))
+	id := findNodeID(t, srv, "quiet")
+
+	viewer.WaitForPeers(t, 1, 10*time.Second)
+	quiet.Disconnect(t)
+
+	report := func(disco key.DiscoPublic) {
+		t.Helper()
+
+		node, ok := srv.State().GetNodeByID(id)
+		require.True(t, ok)
+
+		c, err := srv.State().UpdateNodeFromMapRequest(id, tailcfg.MapRequest{NodeKey: node.NodeKey(), DiscoKey: disco})
+		require.NoError(t, err)
+		srv.App.Change(c)
+	}
+	holds := func(observer *servertest.TestClient, want key.DiscoPublic, msg string) {
+		t.Helper()
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			p, ok := observer.PeerByName("quiet")
+			if assert.True(c, ok) {
+				assert.Equal(c, want, p.DiscoKey())
+			}
+		}, 10*time.Second, 50*time.Millisecond, msg)
+	}
+
+	old := key.NewDisco().Public()
+	report(old)
+	holds(viewer, old, "viewer holds the reported disco key")
+
+	report(key.DiscoPublic{})
+
+	node, ok := srv.State().GetNodeByID(id)
+	require.True(t, ok)
+	require.True(t, node.DiscoKey().IsZero(), "the server stores the cleared key")
+
+	holds(viewer, key.DiscoPublic{}, "viewer drops the old disco key")
+	holds(servertest.NewClient(t, srv, "fresh", servertest.WithUser(user)), key.DiscoPublic{}, "a fresh session holds no disco key")
 }
 
 // TestReloginFollowsNewHostname: a node's name follows a new hostname at a login

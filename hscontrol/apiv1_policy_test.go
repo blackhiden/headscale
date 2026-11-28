@@ -3,9 +3,11 @@ package hscontrol
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
 
-	"github.com/blackhiden/headscale/hscontrol/mapper"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,6 +60,21 @@ func TestAPIV1PolicyGet(t *testing.T) {
 		assert.JSONEq(t, validPolicy, got.Policy)
 		// updatedAt is emitted even though no omitempty is set.
 		assert.NotEmpty(t, got.UpdatedAt)
+	})
+
+	// 0.29 answered file mode with GetPolicyResponse{Policy} (grpcv1.go at
+	// v0.29.7); the gateway's protojson has EmitUnpopulated, which writes an
+	// unset message field as null. Headplane reads null as "not editable".
+	t.Run("file mode updatedAt is null", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "policy.hujson")
+		require.NoError(t, os.WriteFile(path, []byte(validPolicy), 0o600))
+
+		app := createFilePolicyApp(t)
+		app.cfg.Policy.Path = path
+
+		res := callHandler(newHumaTestHandler(app), http.MethodGet, "/api/v1/policy", nil)
+		require.Equal(t, http.StatusOK, res.status, "body: %s", res.body)
+		assert.JSONEq(t, `{"policy":`+strconv.Quote(validPolicy)+`,"updatedAt":null}`, string(res.body))
 	})
 }
 
@@ -172,13 +189,20 @@ func TestAPIV1PolicyCheck(t *testing.T) {
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
-	t.Run("empty rejected", func(t *testing.T) {
+	// 0.29 answered an empty check with 200 {} (CheckPolicy in grpcv1.go at
+	// v0.29.7); a write of one stays refused (TestAPIV1PolicySet/empty_rejected).
+	t.Run("empty passes", func(t *testing.T) {
 		h := newAPIV1Harness(t)
 
-		res := h.callHuma(
-			http.MethodPost, "/api/v1/policy/check", []byte(`{"policy":""}`),
-		)
-		assertStatus(t, res, http.StatusBadRequest)
+		// "" is a request with no body at all.
+		for _, body := range []string{`{"policy":""}`, `{}`, `{"policy":null}`, ""} {
+			res := h.callHuma(http.MethodPost, "/api/v1/policy/check", []byte(body))
+			assertStatus(t, res, http.StatusOK)
+			assert.JSONEq(t, `{}`, string(res.body))
+
+			res = h.callHuma(http.MethodPut, "/api/v1/policy", []byte(body))
+			assertStatus(t, res, http.StatusBadRequest)
+		}
 	})
 
 	t.Run("valid returns empty object", func(t *testing.T) {
@@ -198,20 +222,5 @@ func TestAPIV1PolicyCheck(t *testing.T) {
 func createFilePolicyApp(t *testing.T) *Headscale {
 	t.Helper()
 
-	cfg := validConfig(t)
-	cfg.Policy.Mode = types.PolicyModeFile
-
-	app, err := NewHeadscale(&cfg)
-	require.NoError(t, err)
-
-	app.mapBatcher = mapper.NewBatcherAndMapper(&cfg, app.state)
-	app.mapBatcher.Start()
-
-	t.Cleanup(func() {
-		if app.mapBatcher != nil {
-			app.mapBatcher.Close()
-		}
-	})
-
-	return app
+	return createTestApp(t, func(cfg *types.Config) { cfg.Policy.Mode = types.PolicyModeFile })
 }

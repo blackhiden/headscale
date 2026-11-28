@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/danielgtaylor/huma/v2"
+	apiv1 "github.com/blackhiden/headscale/hscontrol/api/v1"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
@@ -116,6 +118,26 @@ func TestAPIV1RenameUser(t *testing.T) {
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
+	// Names are unique among local users only, so the rename commits.
+	t.Run("name held by an oidc user", func(t *testing.T) {
+		h := newAPIV1Harness(t)
+		h.app.state.CreateUserForTest("alice")
+		oidc := h.app.state.CreateUserForTest("bob")
+		require.NoError(t, h.app.state.DB().DB.Model(oidc).Updates(map[string]any{
+			"provider": util.RegisterMethodOIDC, "provider_identifier": "https://idp.example.com/bob",
+		}).Error)
+
+		res := h.callHuma(http.MethodPost, "/api/v1/user/1/rename/bob", nil)
+		require.Equal(t, http.StatusOK, res.status, string(res.body))
+
+		var got struct {
+			User map[string]any `json:"user"`
+		}
+		require.NoError(t, json.Unmarshal(res.body, &got))
+		assert.Equal(t, "1", got.User["id"])
+		assert.Equal(t, "bob", got.User["name"])
+	})
+
 	t.Run("oidc user refused", func(t *testing.T) {
 		h := newAPIV1Harness(t)
 		user := h.app.state.CreateUserForTest("alice")
@@ -195,4 +217,21 @@ func TestAPIV1ListUsers(t *testing.T) {
 		res := h.assertParity(t, http.MethodGet, "/api/v1/user?id=abc", nil)
 		assertStatus(t, res, http.StatusBadRequest)
 	})
+}
+
+// TestAPIV1UserConflictDocumented pins the 409 of user create and rename in
+// the OpenAPI document, so generated clients decode it.
+func TestAPIV1UserConflictDocumented(t *testing.T) {
+	app := createTestApp(t)
+	_, api := apiv1.Handler(apiv1.Backend{State: app.state, Change: app.Change, Cfg: app.cfg})
+	paths := api.OpenAPI().Paths
+
+	for path, op := range map[string]*huma.Operation{
+		"/api/v1/user":                          paths["/api/v1/user"].Post,
+		"/api/v1/user/{oldId}/rename/{newName}": paths["/api/v1/user/{oldId}/rename/{newName}"].Post,
+	} {
+		require.NotNil(t, op, path)
+		assert.Contains(t, op.Responses, "409", path)
+		assert.Contains(t, op.Responses, "default", path)
+	}
 }

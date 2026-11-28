@@ -245,8 +245,9 @@ long-lived secret joins any number of nodes. A client keeps its newest 1000
 access tokens and minting more ends the oldest, so give a long-lived integration
 its own client.
 
-Create an OAuth client with the `auth_keys` scope and the tags its nodes get. The
-secret is shown once:
+Create an OAuth client with the `auth_keys` scope and the tags its nodes get.
+Each tag must exist in the policy's `tagOwners`, or the create fails. The secret
+is shown once:
 
 ```shell
 headscale oauth-clients create --scope auth_keys --tag tag:ci
@@ -257,8 +258,9 @@ and revoke auth keys of any tag, an `oauth_keys` token every OAuth client, and a
 `devices:core:read` token reads every device, routes included with `fields=all`.
 Keep the secret as safe as any credential that can revoke keys. Without
 `all=true`, a token lists only the auth keys made through a token, whatever their
-tags; with it, every valid auth key. No listing holds a spent, expired or revoked
-key. Tags limit only the tags a token puts on keys, clients and devices, and
+tags; with it, every valid auth key. An admin API key lists OAuth clients only
+with `all=true`, which `headscale oauth-clients list` sends. No listing holds a
+spent, expired or revoked key. Tags limit only the tags a token puts on keys, clients and devices, and
 which tagged devices it may retag. Deleting an OAuth client revokes its secret
 and its access tokens; auth keys, clients and nodes created with it stay until
 you remove them.
@@ -268,8 +270,8 @@ Build the auth key from the secret:
 1. Swap the prefix: `hskey-client-…` becomes `tskey-client-…`. The client only
    runs the exchange for `tskey-client-`; Headscale accepts both.
 1. Append `?baseURL=<your Headscale URL>`.
-1. Set `--advertise-tags`. Each tag must exist in the policy's `tagOwners` and be
-   one of the OAuth client's tags, or owned by one of them.
+1. Set `--advertise-tags`. Each tag must be one of the OAuth client's tags, or
+   owned by one of them.
 
 ```text
 tskey-client-<id>-<secret>?baseURL=https://headscale.example.com

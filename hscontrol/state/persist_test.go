@@ -38,17 +38,19 @@ import (
 // persistTestSetup pre-creates a sqlite database on disk with a single
 // registered node, then constructs a State that loads it. The on-disk
 // path is returned so the test can close the State and re-open one
-// against the same file to simulate a server restart. The caller owns
-// the returned State and must Close it; persistTestReopen handles the
-// second State's lifecycle for the restart simulation.
+// against the same file to simulate a server restart. The State is
+// closed when the test ends, and may be closed before for the restart;
+// persistTestReopen handles the second State's lifecycle.
 func persistTestSetup(t *testing.T) (string, *State, types.NodeID) {
 	t.Helper()
 
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
+	// Each close is registered as its part is made; both are safe to repeat.
 	database, err := db.NewHeadscaleDatabase(cfg)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = database.Close() })
 
 	user := database.CreateUserForTest("persist-user")
 	node := database.CreateRegisteredNodeForTest(user, "persist-node")
@@ -57,6 +59,7 @@ func persistTestSetup(t *testing.T) (string, *State, types.NodeID) {
 
 	s, err := NewState(cfg)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
 
 	return dbPath, s, node.ID
 }
@@ -84,6 +87,8 @@ func persistTestConfig(dbPath string) *types.Config {
 			Type: types.DatabaseSqlite,
 			Sqlite: types.SqliteConfig{
 				Path: dbPath,
+				// WAL as in production: a commit then needs no fsync.
+				WriteAheadLog: true,
 			},
 		},
 		Prefixes:  types.PrefixesConfig{V4: &prefixV4, V6: &prefixV6, Allocation: types.IPAllocationStrategySequential},
@@ -114,7 +119,7 @@ func TestLoadedDuplicateNamesAreResolvedInMemory(t *testing.T) {
 
 	ids := make([]types.NodeID, 0, len(stored))
 	for _, name := range stored {
-		node := database.CreateNodeForTest(user)
+		node := database.CreateRegisteredNodeForTest(user)
 		require.NoError(t, database.DB.Model(&types.Node{}).Where("id = ?", node.ID).
 			Update("given_name", name).Error)
 		ids = append(ids, node.ID)
@@ -925,7 +930,7 @@ func TestConcurrentDeleteNodesShareNodeStoreBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("delete-batch-user")
-	nodes := database.CreateNodesForTest(user, 2, "delete-batch-node")
+	nodes := database.CreateRegisteredNodesForTest(user, 2, "delete-batch-node")
 
 	require.NoError(t, database.Close())
 
@@ -1681,6 +1686,108 @@ func TestNewStateEmptyPolicyFile(t *testing.T) {
 	require.NoError(t, s.Close())
 }
 
+// refusedPolicyDocuments are documents headscale refuses at validation,
+// as the hosted service does: a tag owner or a group member naming every
+// user of a domain, and a via grant whose destination is not a prefix, a
+// host or autogroup:internet, or lies in the Tailscale address ranges.
+// What a refusal means for a stored document is the same for each, so
+// the tests below table-drive them.
+var refusedPolicyDocuments = map[string]string{
+	"tag-owner-wildcard":    `{"tagOwners": {"tag:web": ["user:*@example.com"]}}`,
+	"group-member-wildcard": `{"groups": {"group:eng": ["user:*@example.com"]}}`,
+	"via-non-ip-dst":        `{"tagOwners": {"tag:web": []}, "grants": [{"src": ["*"], "dst": ["*"], "via": ["tag:web"], "ip": ["*"]}]}`,
+	"via-tailscale-ip-dst":  `{"tagOwners": {"tag:web": []}, "grants": [{"src": ["*"], "dst": ["100.64.0.0/10"], "via": ["tag:web"], "ip": ["*"]}]}`,
+}
+
+// TestNewStateRefusesStoredRefusedPolicy pins that a document headscale
+// refuses at validation stops startup in either policy mode: an upgrade
+// that leaves one stored cannot serve. Recovery is a corrected document:
+// edit the file, or store one with `headscale policy set
+// --bypass-server-and-access-database-directly` while the server is
+// stopped.
+func TestNewStateRefusesStoredRefusedPolicy(t *testing.T) {
+	for name, pol := range refusedPolicyDocuments {
+		t.Run(name+"/database", func(t *testing.T) {
+			cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+
+			// As an upgrade leaves it: stored without validation.
+			d, err := db.NewHeadscaleDatabase(cfg)
+			require.NoError(t, err)
+			_, err = d.SetPolicy(pol)
+			require.NoError(t, err)
+			require.NoError(t, d.Close())
+
+			_, err = NewState(cfg)
+			require.Error(t, err, "a refused document must stop startup")
+		})
+
+		t.Run(name+"/file", func(t *testing.T) {
+			cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+			cfg.Policy = types.PolicyConfig{
+				Mode: types.PolicyModeFile,
+				Path: filepath.Join(t.TempDir(), "policy.hujson"),
+			}
+
+			require.NoError(t, os.WriteFile(cfg.Policy.Path, []byte(pol), 0o600))
+
+			_, err := NewState(cfg)
+			require.Error(t, err, "a refused document must stop startup")
+		})
+	}
+}
+
+// TestReloadPolicyRefusedKeepsPolicyInForce pins what an operator sees
+// when the configured document is one headscale refuses at validation: a
+// reload (SIGHUP in either mode) returns the error and keeps the policy
+// in force, and so does a set through the API or CLI. The stored
+// document is not corrected by either.
+func TestReloadPolicyRefusedKeepsPolicyInForce(t *testing.T) {
+	const allowAll = `{"grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"]}]}`
+
+	for name, pol := range refusedPolicyDocuments {
+		t.Run(name, func(t *testing.T) {
+			_, s, _ := persistTestSetup(t)
+			t.Cleanup(func() { _ = s.Close() })
+
+			_, err := s.SetPolicy([]byte(allowAll))
+			require.NoError(t, err)
+
+			before, _ := s.Filter()
+
+			t.Run("set", func(t *testing.T) {
+				_, err := s.SetPolicy([]byte(pol))
+				require.Error(t, err, "a refused document must not be set")
+
+				after, _ := s.Filter()
+				assert.Equal(t, before, after, "the policy in force is unchanged")
+			})
+
+			t.Run("reload-from-database", func(t *testing.T) {
+				_, err := s.SetPolicyInDB(pol)
+				require.NoError(t, err)
+
+				_, err = s.ReloadPolicy()
+				require.Error(t, err, "a refused document must not reload")
+
+				after, _ := s.Filter()
+				assert.Equal(t, before, after, "the policy in force is unchanged")
+			})
+
+			t.Run("reload-from-file", func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "policy.hujson")
+				require.NoError(t, os.WriteFile(path, []byte(pol), 0o600))
+				s.cfg.Policy = types.PolicyConfig{Mode: types.PolicyModeFile, Path: path}
+
+				_, err := s.ReloadPolicy()
+				require.Error(t, err, "a refused document must not reload")
+
+				after, _ := s.Filter()
+				assert.Equal(t, before, after, "the policy in force is unchanged")
+			})
+		})
+	}
+}
+
 // TestNodeWriteChangeWhenPolicyRefreshFails fails both the NodeStore
 // writer's SetNodes and the caller's. The write still reached the
 // NodeStore, so the change returned with the error must resend the node to
@@ -2333,6 +2440,85 @@ func TestNewStateDiscardsOversizedHostinfo(t *testing.T) {
 	require.True(t, ok)
 	assert.False(t, nv.Hostinfo().Valid(),
 		"oversized Hostinfo is dropped until the node reports again")
+}
+
+// TestNewStateChecksNodeAddresses pins which stored addresses refuse a start.
+func TestNewStateChecksNodeAddresses(t *testing.T) {
+	const (
+		v4a, v4b = "100.64.0.1", "100.64.0.2"
+		v6a, v6b = "fd7a:115c:a1e0::1", "fd7a:115c:a1e0::2"
+	)
+
+	for _, tt := range []struct {
+		name string
+		// ipv4 and ipv6 of nodes alpha and beta; nil stores NULL.
+		addrs   [2][2]any
+		wantErr []string
+	}{
+		{
+			name:    "shared IPv4",
+			addrs:   [2][2]any{{v4a, v6a}, {v4a, v6b}},
+			wantErr: []string{v4a, `"alpha"`, `"beta"`},
+		},
+		{
+			name:    "shared IPv6",
+			addrs:   [2][2]any{{v4a, v6a}, {v4b, v6a}},
+			wantErr: []string{v6a, `"alpha"`, `"beta"`},
+		},
+		{
+			name:    "no address",
+			addrs:   [2][2]any{{v4a, v6a}, {nil, nil}},
+			wantErr: []string{"no tailnet address", `"beta"`},
+		},
+		{
+			name:  "one family each",
+			addrs: [2][2]any{{v4a, nil}, {nil, v6b}},
+		},
+		{
+			name:    "outside the Tailscale ranges",
+			addrs:   [2][2]any{{v4a, v6a}, {"10.0.0.2", "2001:db8::2"}},
+			wantErr: []string{"outside the Tailscale ranges", `"beta"`, "10.0.0.2", "2001:db8::2"},
+		},
+		{
+			name:    "one family outside",
+			addrs:   [2][2]any{{v4a, v6a}, {"10.0.0.2", v6b}},
+			wantErr: []string{"outside the Tailscale ranges", `"beta"`, "10.0.0.2"},
+		},
+		{
+			name:    "in the ChromeOS block",
+			addrs:   [2][2]any{{v4a, v6a}, {"100.115.92.2", v6b}},
+			wantErr: []string{"outside the Tailscale ranges", `"beta"`, "100.115.92.2"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dbPath := t.TempDir() + "/headscale.db"
+			cfg := persistTestConfig(dbPath)
+			database, err := db.NewHeadscaleDatabase(cfg)
+			require.NoError(t, err)
+
+			user := database.CreateUserForTest("address-user")
+
+			for i, hostname := range []string{"alpha", "beta"} {
+				node := database.CreateRegisteredNodeForTest(user, hostname)
+				require.NoError(t, database.DB.Exec("UPDATE nodes SET ipv4 = ?, ipv6 = ? WHERE id = ?",
+					tt.addrs[i][0], tt.addrs[i][1], node.ID).Error)
+			}
+
+			require.NoError(t, database.Close())
+
+			s, err := NewState(cfg)
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				require.NoError(t, s.Close())
+
+				return
+			}
+
+			for _, want := range tt.wantErr {
+				require.ErrorContains(t, err, want)
+			}
+		})
+	}
 }
 
 // TestBootKeepsHostinfoTheMapPathStored pins that the startup check keeps

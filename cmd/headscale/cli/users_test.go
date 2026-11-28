@@ -11,6 +11,8 @@ import (
 
 	clientv1 "github.com/blackhiden/headscale/gen/client/v1"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // filterUsersServer serves GET /api/v1/user responses filtered like the
@@ -233,5 +235,31 @@ func TestUserIDFromArg(t *testing.T) {
 				t.Errorf("userIDFromArg(%q) = %q, want %q", tt.arg, id, tt.wantID)
 			}
 		})
+	}
+}
+
+// TestUserConflictShowsDetail: the v1 document declares the 409 of create and
+// rename, so the client decodes it apart from the default error.
+func TestUserConflictShowsDetail(t *testing.T) {
+	env := serveSocket(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(clientv1.ListUsersOutputBody{Users: []clientv1.User{{Id: "1", Name: "alice"}}})
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"code":6,"message":"user already exists","details":[]}`))
+	}))
+
+	for _, args := range [][]string{
+		{"users", "create", "bob"},
+		{"users", "rename", "--identifier", "1", "--new-name", "bob"},
+	} {
+		_, stderr, err := runHeadscale(t, env, args...)
+		require.Error(t, err, args)
+		assert.Contains(t, stderr, "user already exists", args)
 	}
 }

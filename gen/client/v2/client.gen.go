@@ -348,7 +348,7 @@ type ListDevicesParams struct {
 
 // ListKeysParams defines parameters for ListKeys.
 type ListKeysParams struct {
-	// All Without it, a token sees only the auth keys tokens made.
+	// All Without it, a token sees only the auth keys tokens made, and an admin API key sees no OAuth clients.
 	All *bool `form:"all,omitempty" json:"all,omitempty"`
 }
 
@@ -664,7 +664,7 @@ type ClientInterface interface {
 
 	// ListKeys List auth keys and OAuth clients
 	//
-	// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients (an admin API key sees all).
+	// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients. An admin API key sees every auth key, and OAuth clients only with `all=true`.
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/keys (the `ListKeys` operationId).
 	ListKeys(ctx context.Context, tailnet string, params *ListKeysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1170,7 +1170,7 @@ func (c *Client) ListDevices(ctx context.Context, tailnet string, params *ListDe
 
 // ListKeys List auth keys and OAuth clients
 //
-// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients (an admin API key sees all).
+// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients. An admin API key sees every auth key, and OAuth clients only with `all=true`.
 //
 // Corresponds with GET /api/v2/tailnet/{tailnet}/keys (the `ListKeys` operationId).
 func (c *Client) ListKeys(ctx context.Context, tailnet string, params *ListKeysParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2823,7 +2823,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListKeysWithResponse List auth keys and OAuth clients
 	//
-	// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients (an admin API key sees all).
+	// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients. An admin API key sees every auth key, and OAuth clients only with `all=true`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -5168,7 +5168,7 @@ func (c *ClientWithResponses) ListDevicesWithResponse(ctx context.Context, tailn
 
 // ListKeysWithResponse List auth keys and OAuth clients
 //
-// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients (an admin API key sees all).
+// A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients. An admin API key sees every auth key, and OAuth clients only with `all=true`.
 //
 // Returns a wrapper object for the known response body format(s).
 //

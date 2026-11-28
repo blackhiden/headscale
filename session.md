@@ -1,6 +1,58 @@
 # Session
 
-## Current Task: Merge upstream/main (configuration overhaul) into dev ✅ COMPLETE
+## Current Task: Merge upstream/main (00822e63) into dev ✅ COMPLETE
+
+**Completed:** 2026-11-28
+
+### Objective
+
+Finish the in-progress merge of `upstream/main` (`00822e63`, the changelog
+restyle and policy follow-ups) into `dev` and resolve its conflicts.
+
+### Conflicts resolved
+
+- `CHANGELOG.md`: took upstream's restyled 0.29.4 entries, kept the fork's
+  `Dockerfile.tailscale-HEAD` entry and the `0.29.3-arsydoni4326-alt` release
+  section.
+- `hscontrol/api/v1/api.go`: took upstream's new middleware (query, body and
+  status handling, routing errors, protojson body decoding) and re-applied the
+  fork's RBAC (`principalAdminKey`/`principalScopesKey`, OAuth scope
+  enforcement, `requireScope`).
+- `hscontrol/state/auth_cache_test.go`: kept upstream's registration-lock tests
+  and the fork's QR-expiry test, with the fork module path.
+- `gen/client/v1/client.gen.go`: regenerated with `make client`.
+- `flakehashes.json`: recomputed with `go run ./cmd/vendorhash update`.
+
+### Merge artifacts repaired
+
+- `github.com/juanfont/headscale` module paths in six test files.
+- Unused imports left by upstream removals in `generate.go`,
+  `generate_test.go`, `apiv1_policy_test.go`, `apiv2_compat_test.go`,
+  `auth_tags_test.go` and `node_health.go`.
+- Stale `--running` line in `docs/ref/configuration.md` (upstream removed the
+  flag).
+- Deleted `hscontrol/policy/v2/issue_3212_test.go`: upstream moved the captures
+  into the `routes_results` golden suite, and the fork's copy only carried
+  module-path rewrites.
+
+### Validation
+
+- Preservation audit from `docs/MERGE-PRESERVATION.md` section 4 — PASS.
+- `git diff --check` — PASS.
+- `go build ./...` — PASS.
+- `go vet ./...` — PASS.
+- `go test ./hscontrol/state`, `./hscontrol/config`, `./cmd/headscale/cli` — PASS.
+- `go test ./hscontrol` — only `TestTailSQLAccess` fails, the known
+  environment-only failure that also reproduces on clean upstream.
+
+### Notes
+
+- The `headplane` gitlink was not changed by this merge.
+- No release was created for this merge.
+
+---
+
+## Previous Task: Merge upstream/main (configuration overhaul) into dev ✅ COMPLETE
 
 **Completed:** 2026-11-27
 

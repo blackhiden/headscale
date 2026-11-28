@@ -26,7 +26,6 @@ import (
 	"time"
 
 	apiv2 "github.com/blackhiden/headscale/hscontrol/api/v2"
-	"github.com/blackhiden/headscale/hscontrol/mapper"
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/blackhiden/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
@@ -65,6 +64,8 @@ var apiv2CompatSkipReasons = map[string]string{
 
 	"policy-api/P7/0/body": hujsonFormatted,
 	"policy-api/P7/1/body": hujsonFormatted,
+
+	"policy-api/P2/0/v1-verdict": v1EmptyCheckAccepted,
 }
 
 // apiv2CompatNotCompared lists, by key prefix, checks left out: SaaS's
@@ -100,6 +101,7 @@ const (
 	emptyKeyListNull            = "EMPTY_KEY_LIST_NULL: SaaS answers a listing that holds no key with keys null; headscale with []"
 	deletedClientCredentialText = "DELETED_CLIENT_CREDENTIAL_TEXT: SaaS refuses a deleted client's secret and tokens with API token invalid; headscale says invalid client credentials and unauthorized"
 	hujsonFormatted             = "HUJSON_FORMATTED: SaaS stores a HuJSON policy formatted, comments kept; headscale stores the bytes as sent"
+	v1EmptyCheckAccepted        = "V1_EMPTY_CHECK_ACCEPTED: SaaS's validate refuses an empty policy; v1's frozen check accepts it, as 0.29 did, and only a write refuses it"
 )
 
 // SaaS behaviour recorded as it is; following it is the maintainer's call.
@@ -277,21 +279,12 @@ func newAPIReplay(t *testing.T, c *testcapture.Capture, useV1 bool) *apiReplay {
 	return r
 }
 
-// newAddressedTestApp is [createTestApp] with address prefixes, so joined
-// nodes get addresses the replayed policies can name.
+// newAddressedTestApp is [createTestApp], whose config gives joined
+// nodes addresses the replayed policies can name.
 func newAddressedTestApp(t *testing.T) *Headscale {
 	t.Helper()
 
-	cfg := validConfig(t)
-
-	app, err := NewHeadscale(&cfg)
-	require.NoError(t, err)
-
-	app.mapBatcher = mapper.NewBatcherAndMapper(&cfg, app.state)
-	app.mapBatcher.Start()
-	t.Cleanup(app.mapBatcher.Close)
-
-	return app
+	return createTestApp(t)
 }
 
 // apiCheck is one rendering of an outcome: SaaS's and headscale's.

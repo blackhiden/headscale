@@ -89,6 +89,7 @@ type PolicyManager struct {
 	// global and per-node filter rules are derived from these.
 	compiledGrants []compiledGrant
 	userNodeIdx    userNodeIndex
+	ownerIdx       ownerIndex
 
 	// Lazy map of per-node filter rules (reduced, for packet filters)
 	filterRulesMap *xsync.Map[types.NodeID, []tailcfg.FilterRule]
@@ -332,6 +333,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	pm.resolvedPol = pol
 	pm.compiledGrants = grants
 	pm.userNodeIdx = buildUserNodeIndex(pm.nodes)
+	pm.ownerIdx = buildOwnerIndex(pm.userNodeIdx)
 	precomputeSelfRules(pm.compiledGrants, pm.userNodeIdx)
 	pm.needsPerNodeFilter = hasPerNodeGrants(pm.compiledGrants)
 	pm.viaTargetTags = collectViaTargetTags(pm.compiledGrants)
@@ -839,14 +841,15 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	// Precompute each node's route ranges and exit-node status once; the
 	// O(n^2) pair scans below would otherwise recompute them for every pair.
 	type nodeRoutes struct {
-		subnet []netipx.IPRange
-		isExit bool
+		subnet, loneExit []netipx.IPRange
+		isExit           bool
 	}
 
 	routeInfo := make(map[types.NodeID]nodeRoutes, nodes.Len())
 	for _, n := range nodes.All() {
 		routeInfo[n.ID()] = nodeRoutes{
 			subnet: types.RouteRanges(n.SubnetRoutes()), isExit: n.IsExitNode(),
+			loneExit: loneExitRanges(n),
 		}
 	}
 
@@ -930,8 +933,13 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 					continue
 				}
 
-				addCapSourceOnExit(ret, ids[i], ids[j], capSrc[i], routeInfo[ids[j]].isExit)
-				addCapSourceOnExit(ret, ids[j], ids[i], capSrc[j], routeInfo[ids[i]].isExit)
+				if capSrc[j] && routeInfo[ids[i]].isExit {
+					ret[ids[i]] = append(ret[ids[i]], ids[j])
+				}
+
+				if capSrc[i] && routeInfo[ids[j]].isExit {
+					ret[ids[j]] = append(ret[ids[j]], ids[i])
+				}
 			}
 		}
 
@@ -948,9 +956,17 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	nodeMatchers := make(map[types.NodeID][]matcher.Match, nodes.Len())
 	capSrc := make(map[types.NodeID]bool, nodes.Len())
 
+	viaSrcs := make(map[types.NodeID][]matcher.Match)
+	siblingSrcs := siblingSelfSources(pm.compiledGrants, nodes, pm.userNodeIdx, pm.ownerIdx)
+
 	for _, node := range nodes.All() {
-		ms := pm.nodeMatchersLocked(node, viaPeerRule)
+		ms := pm.nodeMatchersLocked(node, noViaRules)
 		nodeMatchers[node.ID()] = ms
+
+		if srcs := viaSources(pm.compiledGrants, node); len(srcs) > 0 {
+			viaSrcs[node.ID()] = srcs
+		}
+
 		capSrc[node.ID()] = slices.ContainsFunc(ms, func(m matcher.Match) bool {
 			return m.CapDestsIsTheInternet() &&
 				matcherReachesSource(&m, node.IPs(), routeInfo[node.ID()].subnet)
@@ -987,7 +1003,9 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 			canJReachI := hasFilterI && nodeJ.CanAccessWithRoutes(matchersI, nodeI, riJ.subnet, riI.subnet, riI.isExit)
 			canIReachJ := hasFilterJ && nodeI.CanAccessWithRoutes(matchersJ, nodeJ, riI.subnet, riJ.subnet, riJ.isExit)
 
-			linked := canIAccessJ || canJAccessI || canJReachI || canIReachJ
+			linked := canIAccessJ || canJAccessI || canJReachI || canIReachJ ||
+				isViaSource(viaSrcs[nodeI.ID()], nodeJ, riJ.subnet) ||
+				isViaSource(viaSrcs[nodeJ.ID()], nodeI, riI.subnet)
 			if linked || sameUser(nodeI, nodeJ) {
 				ret[nodeI.ID()] = append(ret[nodeI.ID()], nodeJ.ID())
 				ret[nodeJ.ID()] = append(ret[nodeJ.ID()], nodeI.ID())
@@ -995,25 +1013,69 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 				continue
 			}
 
-			addCapSourceOnExit(ret, nodeI.ID(), nodeJ.ID(), capSrc[nodeI.ID()], riJ.isExit)
-			addCapSourceOnExit(ret, nodeJ.ID(), nodeI.ID(), capSrc[nodeJ.ID()], riI.isExit)
+			if (capSrc[nodeJ.ID()] && riI.isExit) ||
+				selfSourceOfSibling(siblingSrcs, nodeI, nodeJ) ||
+				loneExitSource(viaSrcs[nodeI.ID()], riJ.loneExit) {
+				ret[nodeI.ID()] = append(ret[nodeI.ID()], nodeJ.ID())
+			}
+
+			if (capSrc[nodeI.ID()] && riJ.isExit) ||
+				selfSourceOfSibling(siblingSrcs, nodeJ, nodeI) ||
+				loneExitSource(viaSrcs[nodeJ.ID()], riI.loneExit) {
+				ret[nodeJ.ID()] = append(ret[nodeJ.ID()], nodeI.ID())
+			}
 		}
 	}
 
 	return ret
 }
 
-// addCapSourceOnExit lists src on exit, and only there, when src is the
-// source of a capability to the internet. SaaS does this: the capability
-// carries no traffic, so src gets no exit route and does not list exit.
-func addCapSourceOnExit(
-	ret map[types.NodeID][]types.NodeID,
-	src, exit types.NodeID,
-	srcHasCap, isExit bool,
-) {
-	if srcHasCap && isExit {
-		ret[exit] = append(ret[exit], src)
+// Three things make a node list another that does not list it back, as on
+// SaaS. An exit node lists the source of a capability to the internet: the
+// capability carries no traffic, so the source gets no exit route.
+// [loneExitSource] and [selfSourceOfSibling] are the other two.
+
+// loneExitRanges returns node's exit route when it is approved for one
+// address family only. SaaS offers it to no one as an exit route, see
+// [types.Node.OfferedExitRoutes], and reads it as a route over the sources
+// it covers.
+func loneExitRanges(node types.NodeView) []netipx.IPRange {
+	if len(node.OfferedExitRoutes()) > 0 {
+		return nil
 	}
+
+	return types.RouteRanges(node.ExitRoutes())
+}
+
+// loneExitSource reports whether lone, a peer's [loneExitRanges], covers a
+// source of a via grant the viewer serves, see [viaSources]. The viewer
+// lists such a peer; the peer, no source by its own reckoning, does not list
+// the viewer. SaaS does so under via grants
+// (grant-via-internet-one-family-exit, -bare, -untagged); a rule without
+// via lists no such peer.
+func loneExitSource(via []matcher.Match, lone []netipx.IPRange) bool {
+	if len(lone) == 0 {
+		return false
+	}
+
+	return slices.ContainsFunc(via, func(m matcher.Match) bool {
+		return m.SrcsOverlapsRanges(lone)
+	})
+}
+
+// selfSourceOfSibling reports whether peer is another user's device that a
+// subnet route of a device of viewer's user covers and that is a source of
+// its user's autogroup:self rules, see [siblingSelfSources].
+func selfSourceOfSibling(srcs map[uint]map[types.NodeID]bool, viewer, peer types.NodeView) bool {
+	return nodeHasUserIdentity(viewer) && srcs[viewer.User().ID()][peer.ID()]
+}
+
+// isViaSource reports whether node, or a subnet it routes, is a source of one
+// of a router's via grants, see [viaSources].
+func isViaSource(srcs []matcher.Match, node types.NodeView, routes []netipx.IPRange) bool {
+	return slices.ContainsFunc(srcs, func(m matcher.Match) bool {
+		return matcherReachesSource(&m, node.IPs(), routes)
+	})
 }
 
 func matcherReachesSource(m *matcher.Match, ips []netip.Addr, routes []netipx.IPRange) bool {
@@ -1052,7 +1114,7 @@ func (pm *PolicyManager) filterRulesForNodeLocked(
 	node types.NodeView,
 ) []tailcfg.FilterRule {
 	return filterRulesForNode(
-		pm.compiledGrants, node, pm.userNodeIdx,
+		pm.compiledGrants, node, pm.userNodeIdx, pm.ownerIdx,
 	)
 }
 
@@ -1126,7 +1188,7 @@ func (pm *PolicyManager) FilterForNode(node types.NodeView) ([]tailcfg.FilterRul
 // MatchersForNode returns the matchers that filter the routes a node sees.
 // These are UNREDUCED matchers - they include all rules where the node could be either source or destination.
 // This is different from [PolicyManager.FilterForNode] which returns REDUCED rules for packet filtering.
-// Peers come from [PolicyManager.BuildPeerMap], which uses [viaPeerRule] where these matchers use the via rule.
+// Peers come from [PolicyManager.BuildPeerMap], which uses [viaSources] where these matchers use the via rule.
 //
 // For global policies: returns the global matchers (same for all nodes)
 // For autogroup:self: returns node-specific matchers from unreduced compiled rules.
@@ -1526,6 +1588,29 @@ func (pm *PolicyManager) TagExists(tag string) bool {
 	return exists
 }
 
+// UndefinedTag returns the first of tags the policy does not define; none
+// without a policy.
+func (pm *PolicyManager) UndefinedTag(tags []string) (string, bool) {
+	if pm == nil {
+		return "", false
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	if pm.pol == nil {
+		return "", false
+	}
+
+	for _, tag := range tags {
+		if _, ok := pm.pol.TagOwners[Tag(tag)]; !ok {
+			return tag, true
+		}
+	}
+
+	return "", false
+}
+
 func (pm *PolicyManager) NodeCanApproveRoute(node types.NodeView, route netip.Prefix) bool {
 	if pm == nil {
 		return false
@@ -1664,7 +1749,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 	resolved := make([]bool, len(grants))
 	viewerMatchesGrant := make([]bool, len(grants))
 	resolvedDstPrefixes := make([][]netip.Prefix, len(grants))
-	grantHasAutoGroupInternet := make([]bool, len(grants))
+	autogroupInternet := make([]bool, len(grants))
 
 	matchViewer := func(i int) bool {
 		if resolved[i] {
@@ -1696,7 +1781,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		}
 
 		if viewerMatchesGrant[i] {
-			resolvedDstPrefixes[i], grantHasAutoGroupInternet[i] = resolveViaDestinations(
+			resolvedDstPrefixes[i], autogroupInternet[i] = resolveViaDestinations(
 				pm.resolvedPol, pm.users, pm.nodes, grants[i].Destinations,
 			)
 		}
@@ -1727,19 +1812,22 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		// the passes below walk Include and Exclude per grant, so their
 		// size must be bounded by the peer's routes, not by the grant's
 		// destinations.
+		// autogroup:internet names every public prefix, so a subnet route
+		// to one is steered as a route to a listed destination is.
 		for _, route := range peerSubnetRoutes {
-			if slices.ContainsFunc(resolvedDstPrefixes[i], route.Overlaps) {
+			if slices.ContainsFunc(resolvedDstPrefixes[i], route.Overlaps) ||
+				(autogroupInternet[i] && util.TheInternet().OverlapsPrefix(route)) {
 				matchedPrefixes = append(matchedPrefixes, route)
 			}
 		}
 
-		// Per-viewer steering for autogroup:internet: a peer advertising
+		// Per-viewer steering for internet destinations: a peer advertising
 		// approved exit routes is the via-tagged node's analogue of
 		// "advertises the destination". The downstream Include/Exclude
 		// split below restricts the viewer to exit nodes carrying the
-		// via tag.
-		if grantHasAutoGroupInternet[i] && peer.IsExitNode() {
-			matchedPrefixes = append(matchedPrefixes, peer.ExitRoutes()...)
+		// via tag. A public prefix is on the internet as autogroup:internet is.
+		if autogroupInternet[i] || prefixesReachInternet(resolvedDstPrefixes[i]) {
+			matchedPrefixes = append(matchedPrefixes, peer.OfferedExitRoutes()...)
 		}
 
 		if len(matchedPrefixes) == 0 {
@@ -1943,15 +2031,11 @@ func grantReachesInternet(grant Grant, dsts []netip.Prefix) bool {
 		return true
 	}
 
-	var b netipx.IPSetBuilder
-	for _, p := range dsts {
-		b.AddPrefix(p)
-	}
+	return prefixesReachInternet(dsts)
+}
 
-	// Resolved prefixes are valid, so the builder cannot fail.
-	set, _ := b.IPSet()
-
-	return util.HasInternetDestination(set)
+func prefixesReachInternet(dsts []netip.Prefix) bool {
+	return slices.ContainsFunc(dsts, util.TheInternet().OverlapsPrefix)
 }
 
 func (pm *PolicyManager) Version() int {

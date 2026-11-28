@@ -24,9 +24,11 @@ type PolicyRequestBody struct {
 
 // PolicyResponseBody is the v1.GetPolicyResponse/SetPolicyResponse body. Fields
 // carry no omitempty so zero values are emitted (EmitUnpopulated parity).
+// UpdatedAt is null in file mode, as 0.29 sent it; web UIs read null as a
+// policy they cannot edit.
 type PolicyResponseBody struct {
-	Policy    string    `json:"policy"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Policy    string     `json:"policy"`
+	UpdatedAt *time.Time `json:"updatedAt" nullable:"true"`
 }
 
 type (
@@ -42,8 +44,9 @@ type (
 		Body PolicyResponseBody
 	}
 
+	// The gateway read a request without a body as an empty one.
 	checkPolicyInput struct {
-		Body PolicyRequestBody
+		Body *PolicyRequestBody `required:"false"`
 	}
 	checkPolicyOutput struct {
 		Body struct{}
@@ -68,7 +71,7 @@ func registerPolicy(api huma.API, b Backend) {
 
 			out := &getPolicyOutput{}
 			out.Body.Policy = p.Data
-			out.Body.UpdatedAt = p.UpdatedAt
+			out.Body.UpdatedAt = &p.UpdatedAt
 
 			return out, nil
 		case types.PolicyModeFile:
@@ -123,7 +126,7 @@ func registerPolicy(api huma.API, b Backend) {
 
 		out := &setPolicyOutput{}
 		out.Body.Policy = updated.Data
-		out.Body.UpdatedAt = updated.UpdatedAt
+		out.Body.UpdatedAt = &updated.UpdatedAt
 
 		return out, nil
 	})
@@ -137,6 +140,11 @@ func registerPolicy(api huma.API, b Backend) {
 		Tags:        []string{"Policy"},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, in *checkPolicyInput) (*checkPolicyOutput, error) {
+		// 0.29 passed an empty policy; only a write must refuse one.
+		if in.Body == nil || in.Body.Policy == "" {
+			return &checkPolicyOutput{}, nil
+		}
+
 		err := b.State.ValidatePolicy([]byte(in.Body.Policy))
 		if err != nil {
 			return nil, mapError(err.Error(), err)

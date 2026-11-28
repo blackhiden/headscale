@@ -60,7 +60,7 @@ A secret takes the value itself or `file:<path>` to read it from a file, e.g.
 
 - Environment variables in the path are expanded.
 - Whitespace around the content of the file is trimmed, an empty file is an error.
-- `headscale generate config --running` and `/debug/config` show a literal secret as `<redacted>`.
+- `/debug/config` shows a literal secret as `<redacted>`.
 
 The secrets are [`database.postgres.pass`](#database.postgres.pass), [`oidc.client_secret`](#oidc.client_secret), [`cli.api_key`](#cli.api_key) and every setting of [`dns.challenge.provider`](#dns.challenge.provider), where a non-string one, such as acme-dns `config`, is the JSON in the file.
 
@@ -301,7 +301,7 @@ Replaces `noise_private_key_path` ([removed](#noise_private_key_path)).
 
 ## `prefixes` { #prefixes data-toc-label="prefixes" }
 
-The IP ranges node addresses are allocated from. Keep at least one of [`prefixes.v4`](#prefixes.v4) and [`prefixes.v6`](#prefixes.v6). Use the Tailscale ranges, `100.64.0.0/10` and `fd7a:115c:a1e0::/48`, or ranges inside them: the client assumes them, and other ranges are unsupported.
+The IP ranges node addresses are allocated from. Keep at least one of [`prefixes.v4`](#prefixes.v4) and [`prefixes.v6`](#prefixes.v6). Use the Tailscale ranges, `100.64.0.0/10` and `fd7a:115c:a1e0::/48`, or ranges inside them: the client assumes them, and headscale refuses other ranges.
 
 ??? example "All `prefixes` keys and defaults"
 
@@ -1641,7 +1641,7 @@ Replaces `db_user` ([removed](#db_user)).
 - **Default:** `""`
 - **Env:** `HEADSCALE_DATABASE_POSTGRES_PASS`
 
-The password, or `file:<path>` to read it from a file, read only when [`database.type`](#database.type) is `postgres`. `headscale generate config --running` and `/debug/config` show a literal password as `<redacted>` and a `file:` reference as written.
+The password, or `file:<path>` to read it from a file, read only when [`database.type`](#database.type) is `postgres`. `/debug/config` shows a literal password as `<redacted>` and a `file:` reference as written.
 
 === "YAML"
 
@@ -2260,7 +2260,7 @@ The servers asked for the zone's nameservers, each an IP or host with an optiona
 - **Default:** `{}`
 - **Env:** `HEADSCALE_DNS_CHALLENGE_PROVIDER` ([JSON object](#env))
 
-The DNS provider that writes challenge records: `name` selects it, the other keys are its settings. Keys are lowercased on load, at every depth; two that differ only in case are an error. Any setting may be `file:<path>` to read it from a file; a non-string one, such as acme-dns `config`, is the JSON in it. `headscale generate config --running` and `/debug/config` show `name` and `file:` references; every other setting is `<redacted>`, as any may be a credential. See [DNS-01 challenge provider](dns.md#dns-01-challenge-provider) to set a provider up, acme-dns included, and to set it from environment variables.
+The DNS provider that writes challenge records: `name` selects it, the other keys are its settings. Keys are lowercased on load, at every depth; two that differ only in case are an error. Any setting may be `file:<path>` to read it from a file; a non-string one, such as acme-dns `config`, is the JSON in it. `/debug/config` shows `name` and `file:` references; every other setting is `<redacted>`, as any may be a credential. See [DNS-01 challenge provider](dns.md#dns-01-challenge-provider) to set a provider up, acme-dns included, and to set it from environment variables.
 
 | Provider     | Settings                                                    |
 | ------------ | ----------------------------------------------------------- |
@@ -2693,7 +2693,7 @@ The client ID from the provider; required when [`oidc.issuer`](#oidc.issuer) is 
 - **Default:** `""`
 - **Env:** `HEADSCALE_OIDC_CLIENT_SECRET`
 
-The client secret from the provider, or `file:<path>` to read it from a file; required when [`oidc.issuer`](#oidc.issuer) is set. `headscale generate config --running` and `/debug/config` show a literal secret as `<redacted>` and a `file:` reference as written.
+The client secret from the provider, or `file:<path>` to read it from a file; required when [`oidc.issuer`](#oidc.issuer) is set. `/debug/config` shows a literal secret as `<redacted>` and a `file:` reference as written.
 
 === "YAML"
 

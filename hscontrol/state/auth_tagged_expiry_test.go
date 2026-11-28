@@ -1269,8 +1269,9 @@ func TestTaggedPAKReauthSameKeyPreservesTags(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
 
-	// tag:admin must be permitted for the admin SetNodeTags call.
-	_, err = s.SetPolicy([]byte(`{"tagOwners":{"tag:admin":["admin@"]}}`))
+	// tag:admin must be permitted for the admin SetNodeTags call, and the
+	// key's tag:orig defined for the key to register.
+	_, err = s.SetPolicy([]byte(`{"tagOwners":{"tag:admin":["admin@"],"tag:orig":[]}}`))
 	require.NoError(t, err)
 
 	// Reusable tagged key (the shape used by the admin-override integration
@@ -1590,7 +1591,9 @@ func TestExpiredTaggedNodeReauthRetags(t *testing.T) {
 // is a node property, not tied to the auth key, so re-keying an already-tagged
 // node with a different key must retag it WITHOUT wiping that future expiry.
 // Only a stale PAST expiry is cleared (see TestExpiredTaggedNodeReauthRetags).
-// Symmetric with the same-key relogin path.
+// Symmetric with the same-key relogin path. The login with a tagged key turns
+// key expiry off, as on Tailscale SaaS, so the kept time no longer counts
+// until an admin turns it on again.
 func TestTaggedPAKReauthRetagPreservesFutureAdminExpiry(t *testing.T) {
 	s := newRetagTestState(t)
 
@@ -1607,10 +1610,11 @@ func TestTaggedPAKReauthRetagPreservesFutureAdminExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	// Admin sets a deliberate future expiry on the tagged node
-	// (`headscale nodes expire`), which SetNodeExpiry permits.
+	// (`headscale nodes expire`), which turns key expiry on.
 	future := time.Now().Add(30 * 24 * time.Hour)
-	_, _, err = s.SetNodeExpiry(first.ID(), &future)
+	expiring, _, err := s.ExpireNodeAt(first.ID(), future)
 	require.NoError(t, err)
+	require.True(t, expiring.IsExpiredAt(future.Add(time.Hour)), "the admin expiry counts before the relogin")
 
 	// Re-key with a different tagged key.
 	key2, err := s.CreatePreAuthKey(nil, false, false, nil, []string{"tag:tag2"})
@@ -1627,6 +1631,8 @@ func TestTaggedPAKReauthRetagPreservesFutureAdminExpiry(t *testing.T) {
 		"a deliberate future admin expiry must survive a different-key retag")
 	require.Equal(t, future.Unix(), second.AsStruct().Expiry.Unix(),
 		"the admin expiry value must be unchanged")
+	require.True(t, second.KeyExpiryDisabled(), "a login with a tagged key turns key expiry off")
+	require.False(t, second.IsExpiredAt(future.Add(time.Hour)), "the kept expiry does not count while key expiry is off")
 }
 
 // newRetagTestState builds a State with an empty policy (tagged-PAK tags need
@@ -3408,4 +3414,69 @@ func TestExpiredNodeSameKeyLoginAsksForNewKey(t *testing.T) {
 			assert.False(t, node.IsExpired())
 		})
 	}
+}
+
+// TestUntaggingReauthStoresNilTags pins that a login which takes a tagged
+// node back stores nil tags, like every other untagging path: a session
+// rendered before the change holds nil, and a fresh one must not see a
+// different empty list.
+func TestUntaggingReauthStoresNilTags(t *testing.T) {
+	dbPath := t.TempDir() + "/headscale.db"
+	cfg := persistTestConfig(dbPath)
+
+	database, err := db.NewHeadscaleDatabase(cfg)
+	require.NoError(t, err)
+
+	user := database.CreateUserForTest("untag-user")
+	node := database.CreateRegisteredNodeForTest(user, "untag-node")
+	machineKey := node.MachineKey
+	nodeKey := node.NodeKey
+	discoKey := node.DiscoKey
+
+	require.NoError(t, database.Close())
+
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	seeded, ok := s.nodeStore.UpdateNode(node.ID, func(n *types.Node) {
+		n.Tags = []string{"tag:foo"}
+		n.UserID = nil
+		n.User = user
+	})
+	require.True(t, ok)
+	require.True(t, seeded.IsTagged(), "precondition: node must be tagged")
+
+	policy := fmt.Sprintf(`{"tagOwners":{"tag:foo":["%s@"]}}`, user.Name)
+	_, err = s.SetPolicy([]byte(policy))
+	require.NoError(t, err)
+
+	// A login with no requested tags takes the node back as the user's own.
+	regData := &types.RegistrationData{
+		MachineKey: machineKey,
+		NodeKey:    nodeKey,
+		DiscoKey:   discoKey,
+		Hostname:   "untag-node",
+		Hostinfo:   &tailcfg.Hostinfo{Hostname: "untag-node"},
+	}
+
+	authID := types.MustAuthID()
+	require.NoError(t, s.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(regData)))
+
+	finalNode, _, err := s.HandleNodeFromAuthPath(
+		authID,
+		types.UserID(user.ID),
+		nil,
+		util.RegisterMethodOIDC,
+	)
+	require.NoError(t, err)
+	require.True(t, finalNode.Valid())
+
+	require.False(t, finalNode.IsTagged(), "the login must take the node back")
+	require.Nil(t, finalNode.AsStruct().Tags,
+		"an untagging reauth must store nil tags, as every other untagging path does")
+
+	stored, ok := s.GetNodeByID(node.ID)
+	require.True(t, ok)
+	require.Nil(t, stored.AsStruct().Tags, "the stored node must carry nil tags")
 }

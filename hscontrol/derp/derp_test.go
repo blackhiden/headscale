@@ -1,6 +1,7 @@
 package derp
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/blackhiden/headscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
@@ -277,11 +281,11 @@ func TestGetDERPMapKeepsOrderAcrossRefreshes(t *testing.T) {
 		source.Regions[id+1] = region
 	}
 
-	first, err := GetDERPMap(types.DERPConfig{DERPMap: source}, "stable.example.com")
+	first, err := GetDERPMap(t.Context(), types.DERPConfig{DERPMap: source}, "stable.example.com")
 	require.NoError(t, err)
 
 	for range 5 {
-		next, err := GetDERPMap(types.DERPConfig{DERPMap: source}, "stable.example.com")
+		next, err := GetDERPMap(t.Context(), types.DERPConfig{DERPMap: source}, "stable.example.com")
 		require.NoError(t, err)
 
 		if diff := cmp.Diff(first, next); diff != "" {
@@ -475,6 +479,52 @@ homeparams:
 	require.NoError(t, err)
 }
 
+// TestLoadDERPMapFromPathNeedsARegularFile: a pipe or a directory is refused
+// before it is read, as a pipe's read would hold a refresh, and shutdown with
+// it, past any cancel. A link to a regular file still loads: operators link
+// their config files.
+func TestLoadDERPMapFromPathNeedsARegularFile(t *testing.T) {
+	dir := t.TempDir()
+
+	file := filepath.Join(dir, "derp.json")
+	require.NoError(t, os.WriteFile(file, []byte(`{"Regions": {"1": {"RegionID": 1, "Nodes": [{"Name": "1a", "RegionID": 1}]}}}`), 0o600))
+
+	link := filepath.Join(dir, "link.json")
+	require.NoError(t, os.Symlink(file, link))
+
+	fifo := filepath.Join(dir, "fifo.json")
+	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
+
+	sub := filepath.Join(dir, "dir.json")
+	require.NoError(t, os.Mkdir(sub, 0o700))
+
+	// Opening a pipe with no writer must not wait for one.
+	opened := make(chan error, 1)
+
+	go func() {
+		_, err := loadDERPMapFromPath(fifo)
+		opened <- err
+	}()
+
+	select {
+	case err := <-opened:
+		require.ErrorIs(t, err, errDERPMapNotFile)
+	case <-time.After(10 * time.Second):
+		t.Fatal("opening a pipe with no writer blocked")
+	}
+
+	for _, path := range []string{file, link} {
+		_, err := GetDERPMap(t.Context(), types.DERPConfig{Paths: []string{path}}, "")
+		require.NoError(t, err, path)
+	}
+
+	for _, path := range []string{fifo, sub} {
+		_, err := GetDERPMap(t.Context(), types.DERPConfig{Paths: []string{path}}, "")
+		require.ErrorIs(t, err, errDERPMapNotFile, path)
+		require.ErrorContains(t, err, path)
+	}
+}
+
 // TestLoadDERPMapFromURLValidates pins that a fetched map meets the region
 // rules a derp.paths file does.
 func TestLoadDERPMapFromURLValidates(t *testing.T) {
@@ -486,7 +536,7 @@ func TestLoadDERPMapFromURLValidates(t *testing.T) {
 	addr, err := url.Parse(srv.URL)
 	require.NoError(t, err)
 
-	_, err = loadDERPMapFromURL(*addr)
+	_, err = loadDERPMapFromURL(t.Context(), *addr)
 	require.ErrorIs(t, err, ErrRegionIDKey)
 }
 
@@ -521,7 +571,7 @@ regions:
 	brokenPath := filepath.Join(t.TempDir(), "broken.yaml")
 	require.NoError(t, os.WriteFile(brokenPath, []byte("regions: [\n"), 0o600))
 
-	dm, err := GetDERPMap(types.DERPConfig{
+	dm, err := GetDERPMap(t.Context(), types.DERPConfig{
 		URLs:  []types.HTTPURL{types.HTTPURL(goodURL.String()), types.HTTPURL(downURL.String())},
 		Paths: []string{goodPath, brokenPath, filepath.Join(t.TempDir(), "missing.yaml")},
 	}, "")
@@ -545,7 +595,7 @@ func TestGetDERPMapURLParseError(t *testing.T) {
 		"https://alice:" + marker,
 	} {
 		t.Run(u, func(t *testing.T) {
-			_, err := GetDERPMap(types.DERPConfig{URLs: []types.HTTPURL{types.HTTPURL(u)}}, "")
+			_, err := GetDERPMap(t.Context(), types.DERPConfig{URLs: []types.HTTPURL{types.HTTPURL(u)}}, "")
 			require.EqualError(t, err, "derp.urls[0]: invalid URL syntax")
 			require.NotContains(t, err.Error(), marker)
 		})
@@ -564,6 +614,35 @@ func TestLoadDERPMapFromURLRejectsHTTPError(t *testing.T) {
 	addr, err := url.Parse(srv.URL)
 	require.NoError(t, err)
 
-	_, err = loadDERPMapFromURL(*addr)
+	_, err = loadDERPMapFromURL(t.Context(), *addr)
 	require.ErrorIs(t, err, errDERPMapStatus)
+}
+
+// TestGetDERPMapStopsWhenCancelled: a cancelled ctx ends the request in
+// flight and skips the sources after it, so a refresh that shutdown waits
+// for ends at once rather than after each source's timeout.
+func TestGetDERPMapStopsWhenCancelled(t *testing.T) {
+	held := make(chan struct{})
+
+	first := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(held)
+		<-r.Context().Done()
+	}))
+	defer first.Close()
+
+	var requested atomic.Int32
+
+	second := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requested.Add(1) }))
+	defer second.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	go func() {
+		<-held
+		cancel()
+	}()
+
+	_, err := GetDERPMap(ctx, types.DERPConfig{URLs: []types.HTTPURL{types.HTTPURL(first.URL), types.HTTPURL(second.URL)}}, "")
+	require.ErrorIs(t, err, context.Canceled)
+	require.Zero(t, requested.Load(), "a source after the cancel was read")
 }

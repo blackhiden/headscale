@@ -98,6 +98,8 @@ var (
 	ErrGrantMissingIPOrApp             = errors.New("ip and app can not both be empty")
 	ErrGrantIPPortList                 = errors.New("only one port range allowed")
 	ErrGrantViaNotATag                 = errors.New("via can only be a tag")
+	ErrGrantViaNonIPDst                = errors.New("cannot use via with non-IP dsts")
+	ErrGrantViaTailscaleIP             = errors.New("cannot use via with tailscale IPs")
 	ErrProtocolPortInvalidFormat       = errors.New("expected only one colon in Internet protocol and port type")
 	ErrCapNameInvalidForm              = errors.New("capability name must have the form {domain}/{path}")
 	ErrCapNameTailscaleDomain          = errors.New("capability name must not be in the tailscale.com domain")
@@ -177,6 +179,7 @@ var (
 	ErrInvalidAlias                = errors.New("invalid alias format")
 	ErrInvalidAutoApprover         = errors.New("invalid auto approver format")
 	ErrInvalidOwner                = errors.New("invalid owner format")
+	ErrTagOwnerUserWildcard        = errors.New("only tag:name, group:name, role autogroups, or user@domain are allowed")
 	ErrGroupNotDefined             = errors.New("group not found")
 	ErrInvalidGroupMember          = errors.New("invalid group member type")
 	ErrGroupValueNotArray          = errors.New("group value must be an array of users")
@@ -427,6 +430,18 @@ func approvedSubnetRoutes(nodes views.Slice[types.NodeView]) []string {
 	slices.Sort(routes)
 
 	return routes
+}
+
+// approvedSubnetPrefixes is [approvedSubnetRoutes] as prefixes.
+func approvedSubnetPrefixes(nodes views.Slice[types.NodeView]) []netip.Prefix {
+	routes := approvedSubnetRoutes(nodes)
+	prefixes := make([]netip.Prefix, 0, len(routes))
+
+	for _, route := range routes {
+		prefixes = append(prefixes, netip.MustParsePrefix(route))
+	}
+
+	return prefixes
 }
 
 // Username is a string that represents a username, it must contain an @.
@@ -1579,6 +1594,12 @@ func (g *Groups) UnmarshalJSON(b []byte) error {
 			if isGroup(u) {
 				return fmt.Errorf("groups[%q]: %q: %w", key, u, ErrGroupMembersCannotBeRecursive)
 			}
+
+			// SaaS takes a domain's users as a source or destination,
+			// never as the members of a group.
+			if strings.HasPrefix(u, "user:*@") {
+				return fmt.Errorf("groups[%q]: %q: %w", key, u, ErrInvalidGroupMember)
+			}
 		}
 	}
 
@@ -2557,6 +2578,42 @@ var tailscaleCapAllowlist = map[peercap.Cap]bool{
 	peercap.Cap("tailscale.com/cap/tailsql"): true,
 }
 
+// validateViaDestinations refuses what SaaS refuses as the destination of a
+// grant with via: only routable prefixes and autogroup:internet can be
+// steered through a router, and a node's own address is not routed. The
+// 4via6 range is the one part of the Tailscale ranges a router serves.
+func validateViaDestinations(hosts Hosts, destinations Aliases) error {
+	for _, dst := range destinations {
+		var pfx netip.Prefix
+
+		switch d := dst.(type) {
+		case *Prefix:
+			pfx = netip.Prefix(*d)
+		case *Host:
+			pfx = netip.Prefix(hosts[*d])
+		case *AutoGroup:
+			if !d.Is(AutoGroupInternet) {
+				return ErrGrantViaNonIPDst
+			}
+
+			continue
+		default:
+			return ErrGrantViaNonIPDst
+		}
+
+		if !pfx.IsValid() || tsaddr.TailscaleViaRange().Contains(pfx.Addr()) &&
+			pfx.Bits() >= tsaddr.TailscaleViaRange().Bits() {
+			continue
+		}
+
+		if pfx.Overlaps(tsaddr.CGNATRange()) || pfx.Overlaps(tsaddr.TailscaleULARange()) {
+			return ErrGrantViaTailscaleIP
+		}
+	}
+
+	return nil
+}
+
 // validateGrantSrcDstCombination validates [Grant]-specific source/destination
 // combinations. [Grant]s are stricter than [ACL]s: wildcard (*) sources are NOT
 // allowed with autogroup:self destinations because * includes tags, and tags
@@ -2996,6 +3053,13 @@ func (p *Policy) validateWithUsers(users types.Users) error {
 			}
 		}
 
+		if len(grant.Via) > 0 {
+			err := validateViaDestinations(p.Hosts, grant.Destinations)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+
 		// Validate grant-specific source/destination combinations.
 		// Grants are stricter than ACLs: wildcard (*) src with autogroup:self
 		// dst is rejected because * includes tags, and tags cannot use
@@ -3088,6 +3152,11 @@ func (p *Policy) validateWithUsers(users types.Users) error {
 				if _, ok := p.TagOwners[*tagOwner]; !ok {
 					errs = append(errs, fmt.Errorf("tagOwners[%q]: %q: %w",
 						string(tag), string(*tagOwner), ErrUndefinedTagReference))
+				}
+			case *Username:
+				if strings.HasPrefix(string(*tagOwner), "user:*@") {
+					errs = append(errs, fmt.Errorf("tagOwners[%q]: %q: %w",
+						string(tag), string(*tagOwner), ErrTagOwnerUserWildcard))
 				}
 			}
 		}

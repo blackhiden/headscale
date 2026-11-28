@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/blackhiden/headscale/hscontrol/types"
@@ -26,6 +27,7 @@ import (
 
 var (
 	errEmptyDERPMapFile = errors.New("DERP map file has no regions or homeparams")
+	errDERPMapNotFile   = errors.New("DERP map is not a regular file")
 	errDERPMapStatus    = errors.New("unexpected HTTP status")
 	errDERPURLSyntax    = errors.New("invalid URL syntax")
 
@@ -87,9 +89,27 @@ func validateRegions(dm *tailcfg.DERPMap) error {
 // rejects one in a policy derpMap, so a misspelt key cannot silently do
 // nothing. A map with neither regions nor HomeParams is an error too;
 // HomeParams alone is valid, to score regions from other sources. Regions
-// must pass [ValidateRegion].
+// must pass [ValidateRegion]. The path must name a regular file, or a link to
+// one: a pipe or device can block the read past any cancel.
 func loadDERPMapFromPath(path string) (*tailcfg.DERPMap, error) {
-	data, err := os.ReadFile(path)
+	// Non-blocking, so a pipe's open returns at once; the opened file is
+	// checked and read, so the path cannot be swapped in between.
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, fmt.Errorf("reading DERP map: %w", err)
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("reading DERP map: %w", err)
+	}
+
+	if !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%w: %s", errDERPMapNotFile, path)
+	}
+
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("reading DERP map: %w", err)
 	}
@@ -111,8 +131,8 @@ func loadDERPMapFromPath(path string) (*tailcfg.DERPMap, error) {
 	return &derpMap, nil
 }
 
-func loadDERPMapFromURL(addr url.URL) (*tailcfg.DERPMap, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), types.HTTPTimeout)
+func loadDERPMapFromURL(ctx context.Context, addr url.URL) (*tailcfg.DERPMap, error) {
+	ctx, cancel := context.WithTimeout(ctx, types.HTTPTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr.String(), nil)
@@ -238,9 +258,10 @@ func ApplyPolicy(base, pol *tailcfg.DERPMap) *tailcfg.DERPMap {
 // GetDERPMap merges every configured DERP map source. A source that fails to
 // load is skipped rather than failing the rest, as a derp.urls server is often
 // a third party's: the map always holds what did load, and the error joins
-// every failure for the caller to judge. shuffleSeed orders DERP nodes the
-// same on every server of a tailnet.
-func GetDERPMap(cfg types.DERPConfig, shuffleSeed string) (*tailcfg.DERPMap, error) {
+// every failure for the caller to judge. Once ctx ends, the sources not read
+// yet are skipped and its cause joins the error. shuffleSeed orders DERP
+// nodes the same on every server of a tailnet.
+func GetDERPMap(ctx context.Context, cfg types.DERPConfig, shuffleSeed string) (*tailcfg.DERPMap, error) {
 	var (
 		derpMaps []*tailcfg.DERPMap
 		errs     []error
@@ -250,7 +271,15 @@ func GetDERPMap(cfg types.DERPConfig, shuffleSeed string) (*tailcfg.DERPMap, err
 		derpMaps = append(derpMaps, cfg.DERPMap)
 	}
 
+	read := 0
+
 	for i, u := range cfg.URLs {
+		if ctx.Err() != nil {
+			break
+		}
+
+		read++
+
 		addr, err := url.Parse(string(u))
 		if err != nil {
 			// The parser's error quotes the URL or parts of it, credentials
@@ -260,7 +289,7 @@ func GetDERPMap(cfg types.DERPConfig, shuffleSeed string) (*tailcfg.DERPMap, err
 			continue
 		}
 
-		derpMap, err := loadDERPMapFromURL(*addr)
+		derpMap, err := loadDERPMapFromURL(ctx, *addr)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -270,6 +299,12 @@ func GetDERPMap(cfg types.DERPConfig, shuffleSeed string) (*tailcfg.DERPMap, err
 	}
 
 	for _, path := range cfg.Paths {
+		if ctx.Err() != nil {
+			break
+		}
+
+		read++
+
 		derpMap, err := loadDERPMapFromPath(path)
 		if err != nil {
 			errs = append(errs, err)
@@ -277,6 +312,10 @@ func GetDERPMap(cfg types.DERPConfig, shuffleSeed string) (*tailcfg.DERPMap, err
 		}
 
 		derpMaps = append(derpMaps, derpMap)
+	}
+
+	if read < len(cfg.URLs)+len(cfg.Paths) {
+		errs = append(errs, context.Cause(ctx))
 	}
 
 	derpMap := mergeDERPMaps(derpMaps)
